@@ -2,11 +2,11 @@ class Archipelago_BadgeSalesmanItem_Base extends Hat_Collectible_Important;
 `include(APRandomizer\Classes\Globals.uci);
 
 var int LocationID;
-var string ItemName;
+var string DisplayName;
 
 simulated static function string GetLocalizedItemName()
 {
-	return default.ItemName;
+	return default.DisplayName;
 }
 
 simulated function bool OnCollected(Actor Collector)
@@ -22,6 +22,6 @@ simulated function bool OnCollected(Actor Collector)
 defaultproperties
 {
     CollectSound = None;
-    ItemName = "Item";
+    DisplayName = "Item";
 	HUDIcon = Texture2D'APRandomizer_content.ap_logo';
 }

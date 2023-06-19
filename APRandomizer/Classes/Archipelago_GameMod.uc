@@ -20,6 +20,7 @@ struct immutable ShopItemInfo
 {
 	var class<Archipelago_BadgeSalesmanItem_Base> ItemClass;
 	var int ItemID;
+	var int ItemFlags;
 };
 
 var array<ShopItemInfo> ShopItemList;
@@ -737,11 +738,12 @@ function class<Archipelago_BadgeSalesmanItem_Base> GetShopItemClassFromLocation(
 	return None;
 }
 
-function ShopItemInfo CreateShopItemInfo(class<Archipelago_BadgeSalesmanItem_Base> itemClass, int ItemID)
+function ShopItemInfo CreateShopItemInfo(class<Archipelago_BadgeSalesmanItem_Base> itemClass, int ItemID, int flags)
 {
 	local ShopItemInfo shopInfo;
 	shopInfo.ItemClass = itemClass;
 	shopInfo.ItemID = itemId;
+	shopInfo.ItemFlags = flags;
 	ShopItemList.AddItem(shopInfo);
 	return shopInfo;
 }
@@ -758,16 +760,18 @@ function int GetShopItemID(class<Archipelago_BadgeSalesmanItem_Base> itemClass)
 	return 0;
 }
 
-function bool DoesShopItemInfoExist(class<Archipelago_BadgeSalesmanItem_Base> itemClass)
+function ShopItemInfo GetShopItemInfo(class<Archipelago_BadgeSalesmanItem_Base> itemClass)
 {
 	local int i;
+	local ShopItemInfo shopInfo;
 	for (i = 0; i < ShopItemList.Length; i++)
 	{
 		if (ShopItemList[i].ItemClass == itemClass)
-			return true;
+			return ShopItemList[i];
 	}
 	
-	return false;
+	// can't return None
+	return shopInfo;
 }
 
 function IterateChestArray()
@@ -1553,7 +1557,7 @@ static function Archipelago_GameMod GetGameMod()
 defaultproperties
 {
 	bAlwaysTick = true;
-	DebugMode = false;
+	DebugMode = true;
 	ParadeTrapMembers = 4;
 	ParadeTrapDelay = 1;
 	ParadeTrapSpread = 1;

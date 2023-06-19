@@ -134,6 +134,7 @@ function OpenShop(Controller c)
 	local array<int> shopLocationList;
 	local Hat_HUDMenuShop shop;
 	local HUD MyHUD;
+	local ShopItemInfo shopInfo;
 	
 	MyHUD = PlayerController(c).MyHUD;
 	
@@ -148,7 +149,16 @@ function OpenShop(Controller c)
 	{
 		for (i = 0; i < CurrentItemsToSell.Length; i++)
 		{
-			shopLocationList.AddItem(CurrentItemsToSell[i].default.LocationID);
+			shopInfo = `AP.GetShopItemInfo(CurrentItemsToSell[i]);
+			if (shopInfo.ItemClass == None)
+				continue;
+			
+			`AP.DebugMessage(shopInfo.ItemClass $" flags: " $shopInfo.ItemFlags);
+			// Only hint progression
+			if (shopInfo.ItemFlags != ItemFlag_Important && shopInfo.ItemFlags != ItemFlag_ImportantSkipBalancing)
+				continue;
+			
+			shopLocationList.AddItem(shopInfo.ItemClass.default.LocationID);
 		}
 		
 		if (shopLocationList.Length > 0)
@@ -196,6 +206,7 @@ function CalculateIndicesToSell(Hat_PlayerController pc)
 			{
 				// move number 10 to end of list
 				// list is in alphabetical order, so 10 comes after 1
+				// this is janky, I'll handle all of this a better way later
 				ObjectClassList.RemoveItem(ItemClass);
 				ObjectClassList.AddItem(ItemClass);
 				i -= 1;

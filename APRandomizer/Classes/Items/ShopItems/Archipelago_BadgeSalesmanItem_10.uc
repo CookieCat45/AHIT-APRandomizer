@@ -3,5 +3,5 @@ class Archipelago_BadgeSalesmanItem_10 extends Archipelago_BadgeSalesmanItem_Bas
 defaultproperties
 {
 	LocationID = 301012;
-	ItemName = "Item 10";
+	DisplayName = "Item 10";
 }

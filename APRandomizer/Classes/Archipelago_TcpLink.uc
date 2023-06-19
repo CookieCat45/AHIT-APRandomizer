@@ -364,9 +364,11 @@ function OnLocationInfoCommand(string json)
 		shopItemClass = `AP.GetShopItemClassFromLocation(jsonChild.GetIntValue("location"));
 		if (shopItemClass != None)
 		{
-			if (!`AP.DoesShopItemInfoExist(shopItemClass))
+			if (`AP.GetShopItemInfo(shopItemClass).ItemClass == None)
 			{
-				`AP.CreateShopItemInfo(shopItemClass, jsonChild.GetIntValue("item"));
+				`AP.CreateShopItemInfo(shopItemClass, 
+				jsonChild.GetIntValue("item"),
+				jsonChild.GetIntValue("flags"));
 			}
 		}
 		else
