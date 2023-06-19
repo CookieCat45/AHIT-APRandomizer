@@ -1553,7 +1553,7 @@ static function Archipelago_GameMod GetGameMod()
 defaultproperties
 {
 	bAlwaysTick = true;
-	DebugMode = true;
+	DebugMode = false;
 	ParadeTrapMembers = 4;
 	ParadeTrapDelay = 1;
 	ParadeTrapSpread = 1;
