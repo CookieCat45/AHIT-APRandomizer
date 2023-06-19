@@ -162,8 +162,8 @@ function OnPostInitGame()
 	
 	foreach DynamicActors(class'Actor', a)
 	{
-		//if (a.bHidden)
-		//	continue;
+		if (!DebugMode && a.bHidden)
+			continue;
 		
 		if (a.IsA('Hat_NPC_BadgeSalesman') && !a.IsA('Archipelago_NPC_BadgeSalesman'))
 		{
