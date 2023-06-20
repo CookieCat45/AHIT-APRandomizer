@@ -2,10 +2,12 @@ class Archipelago_GameMod extends GameMod;
 
 var Archipelago_TcpLink Client;
 var Archipelago_BroadcastHandler Broadcaster;
+var Archipelago_SlotData SlotData;
+var Archipelago_ItemResender ItemResender;
 var int PlayerSlot;
 var bool DebugMode;
-var bool WaitingToShuffle;
 var bool ActMapChange;
+var bool IsItemTimePiece; // used to tell if a time piece being given to us is from AP or not
 var array<string> PlayerNames;
 
 struct immutable ShuffledAct
@@ -18,21 +20,18 @@ struct immutable ShuffledAct
 
 struct immutable ShopItemInfo
 {
-	var class<Archipelago_BadgeSalesmanItem_Base> ItemClass;
+	var class<Archipelago_ShopItem_Base> ItemClass;
 	var int ItemID;
 	var int ItemFlags;
 };
 
 var array<ShopItemInfo> ShopItemList;
-var Archipelago_SlotData SlotData;
 
 // Level bits
 const ArchipelagoPrefix = "Archipelago_";
 const ArchipelagoEnabledBit = "ArchipelagoEnabled";
 const TotalYarnCollectedBit = "TotalYarnCollected";
 const LastItemBit = "LastItemIndex";
-const MustacheYarnBit = "MustacheYarn";
-const CookingCatRelicBit = "CookingCatRelic";
 
 // Location ID ranges (added to 300000)
 const BaseIDRange = 300000;
@@ -42,7 +41,7 @@ const Chapter4IDRange = 30000;
 const StoryBookPageIDRange = 40000;
 
 // Event checks
-const MustacheGirlYarnCheck = 301000;
+const RumbiYarnCheck = 301000;
 const CookingCatRelicCheck = 301001;
 const UmbrellaCheck = 301002;
 
@@ -113,12 +112,19 @@ event PostBeginPlay()
 	
 	if (IsInSpaceship())
 	{
+		// Stop Mustache Girl tutorial cutscene (it breaks when removing the yarn)
+		// The player can still get the yarn by smacking Rumbi 
+		// after obtaining 4 time pieces.
+		class'Hat_SaveBitHelper'.static.AddLevelBit("HUBIntruders", 1);
+		class'Hat_SaveBitHelper'.static.AddLevelBit("HUBIntruders_Alert", 1);
+		
 		// Skip the intro cinematic so we don't go to Mafia Town
 		class'Hat_SaveBitHelper'.static.SetLevelBits("hub_cinematics", 1);
 	}
-	else
+	
+	if (ItemResender == None)
 	{
-		WaitingToShuffle = true;
+		ItemResender = new class'Archipelago_ItemResender';
 	}
 }
 
@@ -126,22 +132,34 @@ function OnPostInitGame()
 {
 	local string path;
 	local Hat_SpaceshipPowerPanel panel;
+	local Hat_SaveGame_Base save;
 	local Actor a;
+	local int i, saveCount;
 	
-	if (!IsArchipelagoEnabled())
-		return;
+	// If on titlescreen, find any Archipelago-enabled save files
+	// and remove the hub_cinematics level bit to prevent the game from forcing
+	// the player into Mafia Town.
+	if (`GameManager.GetCurrentMapFilename() ~= `GameManager.TitleScreenMapName)
+	{
+		saveCount = `SaveManager.NumUsedSaveSlots();
 		
-	if (HasAPBit(MustacheYarnBit, 1))
-	{
-		// give the client a bit of time to connect
-		SetTimer(3.0, false, NameOf(MustacheYarnCheck));
-	}
-	
-	if (HasAPBit(CookingCatRelicBit, 1))
-	{
-		SetTimer(3.0, false, NameOf(CookingCatRelic));
+		for (i = 0; i < saveCount; i++)
+		{
+			save = `SaveManager.GetSaveSlot(i);
+			if (save == None)
+				continue;
+			
+			if (HasAPBit(ArchipelagoEnabledBit, 1, save))
+			{
+				class'Hat_SaveBitHelper'.static.SetLevelBits("hub_cinematics", 0, "hub_spaceship", save);
+				Hat_SaveGame(save).AllowSaving = false;
+			}
+		}
 	}
 
+	if (!IsArchipelagoEnabled())
+		return;
+	
 	if (DebugMode)
 	{
 		SetTimer(1.0, true, NameOf(PrintItemsNearPlayer));
@@ -163,13 +181,18 @@ function OnPostInitGame()
 	
 	foreach DynamicActors(class'Actor', a)
 	{
-		if (!DebugMode && a.bHidden)
-			continue;
-		
 		if (a.IsA('Hat_NPC_BadgeSalesman') && !a.IsA('Archipelago_NPC_BadgeSalesman'))
 		{
+			if (a.bHidden)
+				continue;
+			
 			Spawn(class'Archipelago_NPC_BadgeSalesman', , , a.Location, a.Rotation);
 			a.Destroy();
+		}
+		else if (a.IsA('Hat_Collectible_Important'))
+		{
+			a.SetHidden(true);
+			a.SetCollision(false, false);
 		}
 	}
 	
@@ -208,12 +231,41 @@ function OnPostInitGame()
 		CreateClient();
 }
 
-event Tick(float d)
+// Called by client the moment a "Connected" packet is received from the Archipelago server.
+// Slot data is not available at this point.
+function OnPreConnected()
 {
-	if (WaitingToShuffle && IsFullyConnected()) // Wait until we're fully connected to shuffle collectibles
+	SetAPBits(ArchipelagoEnabledBit, 1);
+}
+
+// Called by client when fully connected to Archipelago
+// All slot data should be available at this point.
+function OnFullyConnected()
+{
+	local Hat_TreasureChest_Base chest;
+	
+	if (!IsInSpaceship())
 	{
-		WaitingToShuffle = false;
 		ShuffleCollectibles();
+	}
+	
+	// Have we beaten our seed? Send again in case we somehow weren't connected before.
+	if (HasAPBit("HasBeatenGame", 1))
+	{
+		BeatGame();
+	}
+	
+	foreach DynamicActors(class'Hat_TreasureChest_Base', chest)
+	{
+		chest.DontSave = false;
+	}
+	
+	// resend any locations we checked while not connected
+	if (class'Engine'.static.BasicLoadObject(ItemResender, 
+	"APRandomizer/item_resender"$`SaveManager.GetCurrentSaveData().CreationTimeStamp, false, 1))
+	{
+		DebugMessage("Loaded item resender successfully!");
+		ItemResender.ResendLocations();
 	}
 }
 
@@ -343,14 +395,33 @@ function OnPreOpenHUD(HUD InHUD, out class<Object> InHUDElement)
 	if (!IsArchipelagoEnabled())
 		return;
 	
-	if (InHUDElement == class'Hat_HUDMenuActSelect'
-	&& Hat_HUDMenu_ModLevelSelect(Hat_HUD(InHUD).GetHUD(class'Hat_HUDMenu_ModLevelSelect', true)) == None)
+	if (InHUDElement == class'Hat_HUDMenuShop')
+	{
+		SetTimer(0.0001, false, NameOf(CheckShopOverride), self, Hat_HUD(InHUD));
+	}
+	if (InHUDElement == class'Hat_HUDMenuActSelect')
 	{
 		InHUDElement = class'Archipelago_HUDMenuActSelect';
 	}
 	else if (!ActMapChange && InHUDElement == class'Hat_HUDElementActTitleCard')
 	{
 		SetTimer(0.0001, false, NameOf(CheckActTitleCard), self, Hat_HUD(InHUD));
+	}
+}
+
+function CheckShopOverride(Hat_HUD hud)
+{
+	local Actor merchant;
+	local Hat_HUDMenuShop shop;
+	local Archipelago_ShopInventory_MafiaBoss mShop;
+	
+	shop = Hat_HUDMenuShop(hud.GetHUD(class'Hat_HUDMenuShop'));
+	merchant = shop.MerchantActor;
+	
+	if (merchant.IsA('Hat_NPC_MafiaBossJar'))
+	{
+		mShop = new class'Archipelago_ShopInventory_MafiaBoss';
+		shop.SetShopInventory(hud, mShop);
 	}
 }
 
@@ -402,10 +473,17 @@ function OnTimePieceCollected(string Identifier)
 		`SaveManager.GetCurrentSaveData().RemoveTimePiece(Identifier);
 	}
 	
+	if (!IsItemTimePiece)
+	{
+		// This is the only goal for now
+		if (Identifier == "TheFinale_FinalBoss")
+			BeatGame();
+	}
+	
 	for (i = 0; i < Len(Identifier); i++)
 		id += Asc(Mid(Identifier, i, 1));
 	
-	id += ActCompleteIDRange;
+	id += BaseIDRange + ActCompleteIDRange;
 	DebugMessage("Collected Time Piece: "$Identifier $", Location ID = " $id);
 	
 	// We actually completed this act, so set the Time Piece ID as a level bit
@@ -413,7 +491,7 @@ function OnTimePieceCollected(string Identifier)
 	{
 		// We entered this act from a different act, set the original act's Time Piece instead
 		currentAct = GetActualCurrentAct();
-
+		
 		for (i = 0; i < SlotData.ShuffledActList.Length; i++)
 		{
 			if (SlotData.ShuffledActList[i].NewAct == currentAct)
@@ -439,8 +517,7 @@ function OnTimePieceCollected(string Identifier)
 		SetAPBits("ActComplete_"$Identifier, 1);
 	}
 	
-	if (IsFullyConnected())
-		SendLocationCheck(id);
+	SendLocationCheck(id);
 }
 
 function Hat_ChapterActInfo GetActualCurrentAct()
@@ -639,9 +716,6 @@ function ShuffleCollectibles()
 	local array<class<Object>> shopItemClasses;
 	local class<Object> shopItem;
 	
-	if (!IsArchipelagoEnabled())
-		return;
-
 	foreach DynamicActors(class'Hat_Collectible_Important', collectible)
 	{
 		if (collectible.IsA('Hat_Collectible_VaultCode_Base') || collectible.IsA('Hat_Collectible_InstantCamera')
@@ -652,11 +726,6 @@ function ShuffleCollectibles()
 		if (DebugMode)
 		{
 			DebugMessage("[ShuffleCollectibles] Found item: " $collectible.GetLevelName() $"."$collectible.Name $ObjectToLocationId(collectible));
-		}
-		else
-		{
-			collectible.SetHidden(true);
-			collectible.SetCollision(false, false);
 		}
 	}
 	
@@ -700,15 +769,14 @@ function ShuffleCollectibles()
 	*/
 	
 	locationArray.Length = 0;
-	shopItemClasses = class'Hat_ClassHelper'.static.GetAllScriptClasses("Archipelago_BadgeSalesmanItem_Base");
+	shopItemClasses = class'Hat_ClassHelper'.static.GetAllScriptClasses("Archipelago_ShopItem_Base");
 	
 	foreach shopItemClasses(shopItem)
 	{
-		if (shopItem == class'Archipelago_BadgeSalesmanItem_Base')
+		if (shopItem == class'Archipelago_ShopItem_Base')
 			continue;
 	
-		locationArray.AddItem(
-			class<Archipelago_BadgeSalesmanItem_Base>(shopItem).default.LocationID);
+		locationArray.AddItem(class<Archipelago_ShopItem_Base>(shopItem).default.LocationID);
 	}
 	
 	// scout shop items
@@ -719,26 +787,29 @@ function ShuffleCollectibles()
 		SetTimer(0.5, true, NameOf(IterateChestArray));
 }
 
-function class<Archipelago_BadgeSalesmanItem_Base> GetShopItemClassFromLocation(int locationId)
+function bool GetShopItemClassFromLocation(int locationId, out class<Archipelago_ShopItem_Base> outClass)
 {
 	local array<class<Object>> shopItemClasses;
 	local class<Object> shopItem;
 	
-	shopItemClasses = class'Hat_ClassHelper'.static.GetAllScriptClasses("Archipelago_BadgeSalesmanItem_Base");
+	shopItemClasses = class'Hat_ClassHelper'.static.GetAllScriptClasses("Archipelago_ShopItem_Base");
 	
 	foreach shopItemClasses(shopItem)
 	{
-		if (shopItem == class'Archipelago_BadgeSalesmanItem_Base')
+		if (shopItem == class'Archipelago_ShopItem_Base')
 			continue;
 		
-		if (class<Archipelago_BadgeSalesmanItem_Base>(shopItem).default.LocationID == locationId);
-			return class<Archipelago_BadgeSalesmanItem_Base>(shopItem);
+		if (class<Archipelago_ShopItem_Base>(shopItem).default.LocationID == locationId)
+		{
+			outClass = class<Archipelago_ShopItem_Base>(shopItem);
+			return true;
+		}
 	}
 	
-	return None;
+	return false;
 }
 
-function ShopItemInfo CreateShopItemInfo(class<Archipelago_BadgeSalesmanItem_Base> itemClass, int ItemID, int flags)
+function ShopItemInfo CreateShopItemInfo(class<Archipelago_ShopItem_Base> itemClass, int ItemID, int flags)
 {
 	local ShopItemInfo shopInfo;
 	shopInfo.ItemClass = itemClass;
@@ -748,7 +819,7 @@ function ShopItemInfo CreateShopItemInfo(class<Archipelago_BadgeSalesmanItem_Bas
 	return shopInfo;
 }
 
-function int GetShopItemID(class<Archipelago_BadgeSalesmanItem_Base> itemClass)
+function int GetShopItemID(class<Archipelago_ShopItem_Base> itemClass)
 {
 	local int i;
 	for (i = 0; i < ShopItemList.Length; i++)
@@ -760,18 +831,19 @@ function int GetShopItemID(class<Archipelago_BadgeSalesmanItem_Base> itemClass)
 	return 0;
 }
 
-function ShopItemInfo GetShopItemInfo(class<Archipelago_BadgeSalesmanItem_Base> itemClass)
+function bool GetShopItemInfo(class<Archipelago_ShopItem_Base> itemClass, optional out ShopItemInfo shopInfo)
 {
 	local int i;
-	local ShopItemInfo shopInfo;
 	for (i = 0; i < ShopItemList.Length; i++)
 	{
 		if (ShopItemList[i].ItemClass == itemClass)
-			return ShopItemList[i];
+		{
+			shopInfo = ShopItemList[i];
+			return true;
+		}
 	}
 	
-	// can't return None
-	return shopInfo;
+	return false;
 }
 
 function IterateChestArray()
@@ -785,9 +857,6 @@ function IterateChestArray()
 		ClearTimer(NameOf(IterateChestArray));
 		return;
 	}
-
-	if (!DebugMode && !IsFullyConnected())
-		return;
 	
 	for (i = 0; i < ChestArray.Length; i++)
 	{
@@ -825,13 +894,13 @@ function IterateChestArray()
 		BulliedNPCArray.RemoveItem(BulliedNPCArray[i]);
 	}
 	
-	if (locationArray.Length > 0 && IsFullyConnected())
+	if (locationArray.Length > 0)
 	{
 		SendMultipleLocationChecks(locationArray);
 	}
 }
 
-// for Brewing Hat boxes that contain important items
+// for breakable objects that contain important items
 function OnPreBreakableBreak(Actor Breakable, Pawn Breaker)
 {
 	local Hat_ImpactInteract_Breakable_ChemicalBadge b;
@@ -843,7 +912,7 @@ function OnPreBreakableBreak(Actor Breakable, Pawn Breaker)
 	local Rotator rot;
 	local Vector vel;
 	local float rangeMin, rangeMax;
-
+	
 	if (!IsArchipelagoEnabled())
 		return;
 
@@ -872,19 +941,16 @@ function OnPreBreakableBreak(Actor Breakable, Pawn Breaker)
 				ScreenMessage(message);
 			}
 			
-			if (IsFullyConnected())
-			{
-				spawnClass = class'Archipelago_RandomizedItem_Misc';
-				item = Archipelago_RandomizedItem_Misc(Spawn(spawnClass,,,b.Location + vect(0,0,50),,,true));
-				item.LocationId = ObjectToLocationId(b);
-				
-				rangeMin = 65536 / 16;
-				rangeMax = 65536 / 8;
-				rot.Yaw = RandRange(65536 * -1,65536);
-				rot.Pitch = 16384 + RandRange(rangeMin,rangeMax);
-				vel = Vector(rot)*RandRange(150,300) + vect(0,0,1)*RandRange(200,500);
-				item.Bounce(vel);
-			}
+			spawnClass = class'Archipelago_RandomizedItem_Misc';
+			item = Archipelago_RandomizedItem_Misc(Spawn(spawnClass,,,b.Location + vect(0,0,50),,,true));
+			item.LocationId = ObjectToLocationId(b);
+			
+			rangeMin = 65536 / 16;
+			rangeMax = 65536 / 8;
+			rot.Yaw = RandRange(65536 * -1,65536);
+			rot.Pitch = 16384 + RandRange(rangeMin,rangeMax);
+			vel = Vector(rot)*RandRange(150,300) + vect(0,0,1)*RandRange(200,500);
+			item.Bounce(vel);
 		}
 	}
 }
@@ -910,14 +976,12 @@ function OnLoadoutChanged(PlayerController controller, Object loadout, Object ba
 	if (item == None)
 		return;
 	
-	// remove base game umbrella in favor of our own. Also this is the umbrella check.
-	// We don't need to worry about resending the check because the player can just complete Mafia Town Act 1 again.
-	if (class<Hat_Weapon_Umbrella>(item.BackpackClass) != None && class<Archipelago_Weapon_Umbrella>(item.BackpackClass) == None)
+	// remove base game umbrella in favor of our own. This is the umbrella check in Mafia Town.
+	if (class<Hat_Weapon_Umbrella>(item.BackpackClass) != None 
+	&& class<Archipelago_Weapon_Umbrella>(item.BackpackClass) == None)
 	{
 		Hat_Loadout(loadout).RemoveBackpack(item);
-		
-		if (IsFullyConnected())
-			SendLocationCheck(UmbrellaCheck);
+		SendLocationCheck(UmbrellaCheck);
 	}
 }
 
@@ -928,7 +992,7 @@ function OnCollectibleSpawned(Object collectible)
 	local Vector vel;
 	local Rotator rot;
 	local float range;
-
+	
 	if (!IsArchipelagoEnabled() || collectible.IsA('Archipelago_RandomizedItem_Base'))
 		return;
 	
@@ -936,33 +1000,25 @@ function OnCollectibleSpawned(Object collectible)
 	{
 		if (collectible.IsA('Hat_Collectible_BadgePart_Sprint'))
 		{
-			// Mustache Girl yarn
+			// Rumbi yarn
 			Actor(collectible).Destroy();
-			
-			if (IsFullyConnected())
-				SendLocationCheck(MustacheGirlYarnCheck);
-			else // This won't happen again, so we need to set a level bit telling us we need to send the check later
-				SetAPBits(MustacheYarnBit, 1);
+			SendLocationCheck(RumbiYarnCheck);
 		}
 		else if (collectible.IsA('Hat_Collectible_Decoration_BurgerTop'))
 		{
-			// Cooking Cat relic (don't destroy to avoid breaking the cutscene)
-			Hat_Collectible_Important(collectible).InventoryClass = None;
-			Hat_Collectible_Important(collectible).SkipFirstTimeMessage = true;
-			Hat_Collectible_Important(collectible).CollectSound = None;
+			// Cooking Cat relic
 			Actor(collectible).ShutDown();
-			
-			if (IsFullyConnected())
-				SendLocationCheck(CookingCatRelicCheck);
-			else
-				SetAPBits(CookingCatRelicBit, 1);
+			Hat_Collectible_Important(collectible).InventoryClass = None;
+			Hat_Collectible_Important(collectible).CollectSound = None;
+			Hat_Collectible_Important(collectible).SkipFirstTimeMessage = true;
+			SendLocationCheck(CookingCatRelicCheck);
 		}
 	}
 	else if (Hat_Collectible_Important(collectible) != None && Actor(collectible).Owner != None)
 	{
 		DebugMessage(collectible.Name $"Owner Name: " $Actor(collectible).Owner.Name);
 			
-		if (IsFullyConnected() && Actor(collectible).Owner.IsA('Hat_Goodie_Vault_Base'))
+		if (Actor(collectible).Owner.IsA('Hat_Goodie_Vault_Base'))
 		{
 			// We don't have the data of this item so just spawn a misc
 			spawnClass = class'Archipelago_RandomizedItem_Misc';
@@ -995,7 +1051,7 @@ function OnCollectedCollectible(Object collectible)
 		DebugMessage(message);
 	}
 	
-	if (!IsArchipelagoEnabled() || !IsFullyConnected())
+	if (!IsArchipelagoEnabled())
 		return;
 	
 	// If this is an Archipelago item or a storybook page, send it
@@ -1003,7 +1059,7 @@ function OnCollectedCollectible(Object collectible)
 	{
 		SendLocationCheck(ObjectToLocationId(collectible));
 	}
-	else
+	else // Normal item
 	{
 		item = Archipelago_RandomizedItem_Base(collectible);
 		
@@ -1085,6 +1141,16 @@ function SendLocationCheck(int id, optional bool scout)
 {
 	local string jsonMessage;
 	
+	if (!IsFullyConnected() && !scout)
+	{
+		ItemResender.AddLocation(id);
+		
+		class'Engine'.static.BasicSaveObject(ItemResender, 
+		"APRandomizer/item_resender"$`SaveManager.GetCurrentSaveData().CreationTimeStamp, false, 1, true);
+		
+		return;
+	}
+	
 	if (!scout)
 	{
 		jsonMessage = "[{\"cmd\":\"LocationChecks\",\"locations\":[" $id $"]}]";
@@ -1101,6 +1167,16 @@ function SendMultipleLocationChecks(array<int> locationArray, optional bool scou
 {
 	local string jsonMessage;
 	local int i;
+	
+	if (!IsFullyConnected() && !scout && !hint)
+	{
+		ItemResender.AddMultipleLocations(locationArray);
+		
+		class'Engine'.static.BasicSaveObject(ItemResender, 
+		"APRandomizer/item_resender"$`SaveManager.GetCurrentSaveData().CreationTimeStamp, false, 1, true);
+		
+		return;
+	}
 
 	if (!scout)
 	{
@@ -1130,7 +1206,7 @@ function SendMultipleLocationChecks(array<int> locationArray, optional bool scou
 	}
 	
 	jsonMessage $= "}]";
-	Client.SendBinaryMessage(jsonMessage);
+	client.SendBinaryMessage(jsonMessage);
 }
 
 function BabyTrapTimer()
@@ -1265,24 +1341,6 @@ function ForceStandVisibility()
 	}
 }
 
-function MustacheYarnCheck()
-{
-	if (IsFullyConnected())
-	{
-		SendLocationCheck(MustacheGirlYarnCheck);
-		SetAPBits(MustacheYarnBit, 0);
-	}
-}
-
-function CookingCatRelic()
-{
-	if (IsFullyConnected())
-	{
-		SendLocationCheck(CookingCatRelicCheck);
-		SetAPBits(CookingCatRelicBit, 0);
-	}
-}
-
 function PlayHatStitchAnimation(Hat_PlayerController pc, Hat_BackpackItem item)
 {
 	local Hat_HUDElement element;
@@ -1343,6 +1401,15 @@ function PrintItemsNearPlayer()
 			ScreenMessage("[PrintItemsNearPlayer] Found collectible: " $page.Name $"("$ObjectToLocationId(page)$")");
 		}
 	}
+}
+
+function BeatGame()
+{
+	SetAPBits("HasBeatenGame", 1);
+	if (!IsFullyConnected())
+		return;
+	
+	client.SendBinaryMessage("[{\"cmd\":\"StatusUpdate\", \"status\":30}]");
 }
 
 function bool IsArchipelagoEnabled()
@@ -1436,13 +1503,14 @@ function DebugMessage(String message)
 {
 	if (!DebugMode)
 		return;
-
+	
 	if (Broadcaster == None)
 	{
 		Broadcaster = Spawn(class'Archipelago_BroadcastHandler');
 	}
 	
     Broadcaster.Broadcast(GetALocalPlayerController(), message);
+	`Broadcast(message);
 }
 
 function int ObjectToLocationId(Object obj)
@@ -1526,26 +1594,28 @@ function float GetVectorDistance(Vector start, Vector end)
 	return distance;
 }
 
-static function bool SetAPBits(string id, int i)
+static function bool SetAPBits(string id, int i, optional Hat_SaveGame_Base save)
 {
-	return class'Hat_SaveBitHelper'.static.SetLevelBits(id, i, ArchipelagoPrefix, `SaveManager.GetCurrentSaveData());
+	return class'Hat_SaveBitHelper'.static.SetLevelBits(id, i, ArchipelagoPrefix, save);
 }
 
-static function bool HasAPBit(string id, int i)
+static function bool HasAPBit(string id, int i, optional Hat_SaveGame_Base save)
 {
-	return class'Hat_SaveBitHelper'.static.HasLevelBit(id, i, ArchipelagoPrefix, `SaveManager.GetCurrentSaveData());
+	return class'Hat_SaveBitHelper'.static.HasLevelBit(id, i, ArchipelagoPrefix, save);
 }
 
-static function int GetAPBits(string id, optional int defaultValue=0)
+static function int GetAPBits(string id, optional int defaultValue=0, optional Hat_SaveGame_Base save)
 {
-	return class'Hat_SaveBitHelper'.static.GetLevelBits(id, ArchipelagoPrefix, `SaveManager.GetCurrentSaveData(), defaultValue);
+	return class'Hat_SaveBitHelper'.static.GetLevelBits(id, ArchipelagoPrefix, save, defaultValue);
 }
 
-// Borrowed this handy function from Jawchewa, you can access the mod object from this function via `AP
+// Borrowed this handy function from Jawchewa, 
+// you can access the mod actor via the `AP macro
+// if you have `include(APRandomizer\Classes\Globals.uci); in your file.
 static function Archipelago_GameMod GetGameMod()
 {
     local Archipelago_GameMod mod;
-
+    
     foreach class'WorldInfo'.static.GetWorldInfo().DynamicActors(class'Archipelago_GameMod', mod)
     {
 		return mod;

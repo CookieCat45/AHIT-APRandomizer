@@ -465,8 +465,8 @@ static function string GetTimePieceFromItemID(int id, optional out int IsAct, op
 			
 		// Time's End
 		case 300087:
-		displayName = "The Finale";
-		return "";
+			displayName = "The Finale";
+			return "TheFinale_FinalBoss";
 		
 		default:
 			return "";

@@ -2,6 +2,7 @@ class Archipelago_HUDMenuShop extends Hat_HUDMenuShop
     dependson(Archipelago_ItemInfo)
 	deprecated;
 
+/*
 `include(APRandomizer\Classes\Globals.uci);
 
 function DrawShopWindow(HUD H, float x, float y, float size)
@@ -20,9 +21,9 @@ function DrawShopWindow(HUD H, float x, float y, float size)
 	bUseCheckoutCart = (ShopInventory != None && ShopInventory.HasCheckoutCart());
 	bRenderDescription = (ShopInventory == None || ShopInventory.ShowDescriptions) && !bUseCheckoutCart;
 	HasManyItems = ShopInventory.ItemsForSale.Length > 3;
-
+	
 	TargetCollectible = (ShopInventory != None && CurrentItemIndex >= 0 && ShopInventory.ItemsForSale.Length > CurrentItemIndex) ? class<Hat_Collectible_Important>(ShopInventory.ItemsForSale[CurrentItemIndex].CollectibleClass) : None;
-
+	
 	if (`IsMirrorMode)
 	{
 		x = H.Canvas.ClipX - x;
@@ -279,3 +280,4 @@ function DrawShopWindow(HUD H, float x, float y, float size)
 		DrawCostNumber(H, MyPosX + size*0.14, MyPosY, size*0.057, bUseCheckoutCart ? CurrentCostCount : Min(Int(CurrentCostCount_Visuals), CurrentCostCount));
 	}
 }
+*/

@@ -17,7 +17,6 @@ var bool OwnItem;
 var string ItemDisplayName;
 var string ItemDesc;
 var Surface HUDIcon;
-var bool SaveGameOnCollect;
 var bool DoSpinEffect;
 var class<object> InventoryClass;
 var string OriginalCollectibleName; // the "Name" variable, NOT the display name!
@@ -51,27 +50,18 @@ simulated function bool OnCollected(Actor Collector)
 	local Hat_Loadout loadout;
 	local Hat_LoadoutBackpackItem item;
 	
-	// Don't do anything if we aren't connected 
-	// TODO: add something to send pending items when player reconnects
-	if (!WasFromServer() && !`AP.IsFullyConnected())
-		return false;
-	
 	if (LightComponent != None)
 		LightComponent.SetEnabled(false);
 	
 	if (IdleAudioComponent != None)
 		IdleAudioComponent.VolumeMultiplier = 0;
-
+	
 	if (ImportantItemParticle != None)
 		ImportantItemParticle.SetActive(false);
 	
 	if (WasFromServer())
 	{
-		if (IsA('Archipelago_RandomizedItem_Yarn'))
-		{
-			`AP.OnYarnCollected();
-		}
-		else if (InventoryClass != None)
+		if (InventoryClass != None)
 		{
 			pc = Hat_PlayerController(Pawn(Collector).controller);
 			item = class'Hat_Loadout'.static.MakeLoadoutItem(InventoryClass);
@@ -91,7 +81,7 @@ simulated function bool OnCollected(Actor Collector)
 			}
 		}
 	}
-	else
+	else if (!`AP.IsFullyConnected())
 	{
 		CollectSound = None;
 	}
@@ -100,9 +90,7 @@ simulated function bool OnCollected(Actor Collector)
 	if (OriginalCollectibleName != "")
 		SetOriginalLevelBit();
 		
-	if (SaveGameOnCollect)
-		`SaveManager.SaveToFile();
-	
+	`SaveManager.SaveToFile();
 	return Super.OnCollected(Collector);
 }
 
@@ -149,7 +137,7 @@ simulated function OnCollectedDisappear(Actor a)
 
 function bool ShouldDoSpinEffect()
 {
-	return DoSpinEffect && (!IsOwnItem() || WasFromServer());
+	return DoSpinEffect && (!IsOwnItem() || WasFromServer() || !`AP.IsFullyConnected());
 }
 
 defaultproperties

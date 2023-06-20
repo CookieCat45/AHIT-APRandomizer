@@ -1,4 +1,4 @@
-// Item from a different AP game.
+// Item unknown or from a different AP game.
 class Archipelago_RandomizedItem_Misc extends Archipelago_RandomizedItem_Base;
 
 defaultproperties

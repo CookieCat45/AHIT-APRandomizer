@@ -24,6 +24,18 @@ function Connect()
 {
 	`AP.ScreenMessage("Connecting to host: "$TargetHost$":"$TargetPort);
     Resolve(TargetHost);
+	
+	ClearTimer(NameOf(TimedOut));
+	SetTimer(6.0, false, NameOf(TimedOut));
+}
+
+function TimedOut()
+{
+	if (!FullyConnected)
+	{
+		`AP.ScreenMessage("Connection attempt to "$TargetHost$":"$TargetPort $"timed out, retrying...");
+		Connect();
+	}
 }
 
 event Resolved(IpAddr Addr)
@@ -48,6 +60,8 @@ event Opened()
 {
 	local string crlf;
 	
+	ClearTimer(NameOf(TimedOut));
+	
 	crlf = chr(13)$chr(10);
 	LinkMode = MODE_Line;
 	ReceiveMode = RMODE_Event;
@@ -66,7 +80,7 @@ event Opened()
 event ReceivedLine(string message)
 {
 	ReceiveMode = RMODE_Manual;
-	
+
 	if (!FullyConnected && !ConnectingToAP)
 	{
 		ConnectToAP();
@@ -102,19 +116,6 @@ function ConnectToAP()
 	message = class'JsonObject'.static.EncodeJson(json);
 	message = "["$message$"]";
 	SendBinaryMessage(message);
-	
-	ClearTimer(NameOf(TimedOut));
-	SetTimer(5.0, false, NameOf(TimedOut));
-}
-
-function TimedOut()
-{
-	if (!FullyConnected && ConnectingToAP)
-	{
-		`AP.ScreenMessage("Connection attempt timed out. Closing connection...");
-		ConnectingToAP = false;
-		Close();
-	}
 }
 
 event Tick(float d)
@@ -217,11 +218,12 @@ function ParseJSON(string json)
 	switch (jsonObj.GetStringValue("cmd"))
 	{
 		case "Connected":
+			`AP.OnPreConnected();
 			`AP.ScreenMessage("Successfully connected to "$TargetHost$":"$TargetPort);
 			`AP.PlayerSlot = jsonObj.GetIntValue("slot");
 			FullyConnected = true;
 			ConnectingToAP = false;
-
+			
 			jsonChild = jsonObj.GetObject("slot_data");
 			`AP.LoadSlotData(jsonChild);
 			
@@ -260,7 +262,8 @@ function ParseJSON(string json)
 				`AP.PlayerNames[jsonChild.GetIntValue("slot")] = jsonChild.GetStringValue("alias");
 			}
 			
-			OnFullyConnected();
+			// Fully connected
+			`AP.OnFullyConnected();
 			break;
 			
 			
@@ -309,32 +312,16 @@ function ParseJSON(string json)
 	}
 }
 
-function OnFullyConnected()
-{
-	local Hat_TreasureChest_Base chest;
-
-	foreach DynamicActors(class'Hat_TreasureChest_Base', chest)
-	{
-		chest.DontSave = false;
-	}
-}
-
 function OnLocationInfoCommand(string json)
 {
 	local bool b;
-	local int count;
-	local JsonObject jsonObj;
-	local JsonObject jsonChild;
-	local int i;
-	local string s;
-	local int itemId;
-	local int locId;
+	local int i, itemId, locId, count;
+	local string itemName, timePieceId, s;
+	local JsonObject jsonObj, jsonChild;
 	local Archipelago_RandomizedItem_Base item;
 	local Hat_Collectible_Important collectible;
-	local string itemName;
-	local string timePieceId;
 	local class worldClass;
-	local class<Archipelago_BadgeSalesmanItem_Base> shopItemClass;
+	local class<Archipelago_ShopItem_Base> shopItemClass;
 	
 	`AP.ReplOnce(json, "locations", "locations_0", json, true);
 	b = true;
@@ -342,7 +329,7 @@ function OnLocationInfoCommand(string json)
 	
 	while (b)
 	{
-		if (`AP.ReplOnce(json, ",{", ",\"locations_"$count+1 $"\":{", s, false))
+		if (`AP.ReplOnce(json, ",{", ",\"locations_" $count+1 $"\":{", s, false))
 		{
 			json = s;
 			count++;
@@ -354,6 +341,7 @@ function OnLocationInfoCommand(string json)
 	}
 	
 	jsonObj = class'JsonObject'.static.DecodeJson(json);
+	`AP.DebugMessage("Count: "$count);
 	
 	for (i = 0; i <= count; i++)
 	{
@@ -361,10 +349,9 @@ function OnLocationInfoCommand(string json)
 		if (jsonChild == None)
 			continue;
 		
-		shopItemClass = `AP.GetShopItemClassFromLocation(jsonChild.GetIntValue("location"));
-		if (shopItemClass != None)
+		if (`AP.GetShopItemClassFromLocation(jsonChild.GetIntValue("location"), shopItemClass))
 		{
-			if (`AP.GetShopItemInfo(shopItemClass).ItemClass == None)
+			if (!`AP.GetShopItemInfo(shopItemClass))
 			{
 				`AP.CreateShopItemInfo(shopItemClass, 
 				jsonChild.GetIntValue("item"),
@@ -381,6 +368,7 @@ function OnLocationInfoCommand(string json)
 				locId = `AP.ObjectToLocationId(collectible);
 				if (locId == jsonChild.GetIntValue("location"))
 				{
+					`AP.DebugMessage("Replacing item: "$collectible $", Location ID: "$locId);
 					itemId = jsonChild.GetIntValue("item");
 					b = class'Archipelago_ItemInfo'.static.GetNativeItemData(itemId, itemName, worldClass);
 					
@@ -524,7 +512,10 @@ function GrantTimePiece(string timePieceId, bool IsAct, string itemName)
 	
 	// Tell AP to stop removing this Time Piece in OnTimePieceCollected()
 	`AP.SetAPBits(timePieceId, 1);
+
+	`AP.IsItemTimePiece = true;
 	`SaveManager.GetCurrentSaveData().GiveTimePiece(timePieceId, IsAct);
+	`AP.IsItemTimePiece = false;
 	
 	if (`AP.IsInSpaceship() && `AP.SlotData.Initialized)
 	{
@@ -772,9 +763,6 @@ event Closed()
 	
 	foreach DynamicActors(class'Hat_TreasureChest_Base', chest)
 		chest.DontSave = true;
-	
-	if (!`AP.DebugMode)
-		`AP.WaitingToShuffle = true;
 	
 	// Destroy ourselves and create a new client. 
 	// Reconnecting with the same client object after closing a connection does not work (for some reason).

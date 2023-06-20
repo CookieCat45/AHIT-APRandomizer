@@ -7,21 +7,9 @@ class Archipelago_NPC_BadgeSalesman extends Hat_NPC
     placeable;
 
 `include(APRandomizer\Classes\Globals.uci);
-/*
-const NumItemsToSell = 3;
-const Debug_WarnUnimplementedBadges = false;
-	
-struct SalesmanSoldDecoration
-{
-	var() int TimePieceThreshold;
-	var() int EnergyBitCost;
-	var() int YarnCost;
-	var() class<Hat_Collectible_Important> ItemClass;
-};
-*/
 
-//var() Array<SalesmanSoldDecoration> SoldItems;
-var() Array<class<Archipelago_BadgeSalesmanItem_Base>> SoldItems;
+var() Array<class<Archipelago_ShopItem_Base>> AllSoldItems;
+var() Array<class<Archipelago_ShopItem_Base>> SoldItems;
 var() Array<int> TimePieceThreshold_AppearInSpaceship;
 var transient Hat_ShopInventory ShopInventory;
 var(Conversations) Hat_ConversationTree SoldOutConversationTree;
@@ -31,43 +19,18 @@ var transient bool SoldOut;
 var transient bool IsInitialSlotPurchase;
 var(Music) SoundCue Music;
 var transient Hat_MusicNodeBlend_Dynamic DynamicMusicNode;
-var transient Array<class<Archipelago_BadgeSalesmanItem_Base>> CurrentItemsToSell;
+var transient Array<class<Archipelago_ShopItem_Base>> CurrentItemsToSell;
 var(Lights) SpotlightComponent Spotlight;
 var(Particles) ParticleSystemComponent GlitchyParticle;
 
-
 simulated event PostBeginPlay()
 {
-	if (Role == Role_Authority && Owner == None && CreationTime <= 0)
-	{
-		if (class'Hat_SeqCond_IsBeta'.static.IsBeta(class'Hat_SeqCond_IsBeta'.const.BetaMode_Speedrun))
-		{
-			Destroy();
-			return;
-		}
-	}
-	
 	DefaultConversationTree = ConversationTree;
-	
     Super.PostBeginPlay();
 }
 
-
 static function int ShouldAppearInHUB(Hat_GameManager gm)
 {
-	local int TimePieces;
-	local int i;
-	
-	TimePieces = gm.GetTimeObjects();
-	
-	for (i = 0; i < default.TimePieceThreshold_AppearInSpaceship.Length; i++)
-	{
-		if (default.TimePieceThreshold_AppearInSpaceship[i] <= 0) continue;
-		if (TimePieces < default.TimePieceThreshold_AppearInSpaceship[i]) continue;
-		
-		return i;
-	}
-	
 	return -1;
 }
 
@@ -90,10 +53,11 @@ simulated function bool OnInteractedWith(Actor a)
 	
 	if (ConversationTreeInstance != None)
 		ConversationTreeInstance.Destroy();
+	
 	ConversationTreeInstance = None;
-	
-	if (!Super.OnInteractedWith(a)) return false;
-	
+
+	if (!Super.OnInteractedWith(a)) 
+		return false;
 		
 	if (ConversationTreeInstance != None)
 	{
@@ -107,23 +71,25 @@ simulated function bool OnInteractedWith(Actor a)
 			`PushMusicNode(DynamicMusicNode);
 		}
 		
-		
 		Hat_PlayerController(Pawn(a).Controller).TalkManager.PushCompleteDelegate(self.OnTalkMessageComplete);
 	}
+
     return true;
 }
 
 delegate OnTalkMessageComplete(Controller c, int answer)
 {
-	if(SoldOut)
+	if (SoldOut)
 	{
 		if (DynamicMusicNode != None)
 		{
 			DynamicMusicNode.Stop();
 			DynamicMusicNode = None;
 		}
+
 		return;
 	}
+
 	class'Hat_SaveBitHelper'.static.AddLevelBit("BadgeSellerIntro", 1, "hub_spaceship");
 	OpenShop(c);
 }
@@ -139,32 +105,29 @@ function OpenShop(Controller c)
 	MyHUD = PlayerController(c).MyHUD;
 	
 	shop = Hat_HUDMenuShop(Hat_HUD(MyHUD).OpenHUD(class'Hat_HUDMenuShop'));
-	if (shop == None) return;
+	if (shop == None) 
+		return;
+
 	shop.MerchantActor = self;
 	shop.SetShopInventory(MyHUD, GetShopInventory(Hat_PlayerController(c)));
 	shop.PurchaseDelegates.AddItem(self.OnPurchase);
 	TalkingTo = c.Pawn;
 	
-	if (`AP.IsFullyConnected())
+	for (i = 0; i < CurrentItemsToSell.Length; i++)
 	{
-		for (i = 0; i < CurrentItemsToSell.Length; i++)
-		{
-			shopInfo = `AP.GetShopItemInfo(CurrentItemsToSell[i]);
-			if (shopInfo.ItemClass == None)
-				continue;
-			
-			`AP.DebugMessage(shopInfo.ItemClass $" flags: " $shopInfo.ItemFlags);
-			// Only hint progression
-			if (shopInfo.ItemFlags != ItemFlag_Important && shopInfo.ItemFlags != ItemFlag_ImportantSkipBalancing)
-				continue;
-			
-			shopLocationList.AddItem(shopInfo.ItemClass.default.LocationID);
-		}
+		if (!`AP.GetShopItemInfo(CurrentItemsToSell[i], shopInfo))
+			continue;
 		
-		if (shopLocationList.Length > 0)
-		{
-			`AP.SendMultipleLocationChecks(shopLocationList, true, true);
-		}
+		// Only hint progression
+		if (shopInfo.ItemFlags != ItemFlag_Important && shopInfo.ItemFlags != ItemFlag_ImportantSkipBalancing)
+			continue;
+		
+		shopLocationList.AddItem(shopInfo.ItemClass.default.LocationID);
+	}
+	
+	if (shopLocationList.Length > 0)
+	{
+		`AP.SendMultipleLocationChecks(shopLocationList, true, true);
 	}
 }
 
@@ -189,31 +152,11 @@ function int CompareSellingBadges(int A, int B)
 function CalculateIndicesToSell(Hat_PlayerController pc)
 {
 	local int i;
-	local class<Archipelago_BadgeSalesmanItem_Base> ItemClass;
-	local Array<class<Object>> ObjectClassList;
-	
 	if (SoldItems.Length == 0)
 	{
-		ObjectClassList = class'Hat_ClassHelper'.static.GetAllScriptClasses("Archipelago_BadgeSalesmanItem_Base");
-		for (i = 0; i < ObjectClassList.Length; i++)
+		for (i = 0; i < AllSoldItems.Length; i++)
 		{
-			ItemClass = class<Archipelago_BadgeSalesmanItem_Base>(ObjectClassList[i]);
-			if (ItemClass == None || ItemClass == class'Archipelago_BadgeSalesmanItem_Base') 
-				continue;
-			
-			if (ItemClass == class'Archipelago_BadgeSalesmanItem_10'
-			&& i < ObjectClassList.Length-1)
-			{
-				// move number 10 to end of list
-				// list is in alphabetical order, so 10 comes after 1
-				// this is janky, I'll handle all of this a better way later
-				ObjectClassList.RemoveItem(ItemClass);
-				ObjectClassList.AddItem(ItemClass);
-				i -= 1;
-				continue;
-			}
-			
-			SoldItems.AddItem(ItemClass);
+			SoldItems.AddItem(AllSoldItems[i]);
 		}
 	}
 	
@@ -350,18 +293,17 @@ defaultproperties
 	TimePieceThreshold_AppearInSpaceship(1) = 11;
 	TimePieceThreshold_AppearInSpaceship(2) = 15;
 	TimePieceThreshold_AppearInSpaceship(3) = 20;
-	/*
-	SoldItems.Add( (ItemClass = class'Hat_Collectible_BadgePart_OneHitHero', EnergyBitCost = 500, TimePieceThreshold=6) );
-	SoldItems.Add( (ItemClass = class'Hat_Collectible_BadgePart_SuckInOrbs', EnergyBitCost = 50) );
-	SoldItems.Add( (ItemClass = class'Hat_Collectible_BadgePart_NoBonk', EnergyBitCost = 150, TimePieceThreshold=5) );
-	SoldItems.Add( (ItemClass = class'Hat_Collectible_BadgePart_Mumble', EnergyBitCost = 800) );
-	SoldItems.Add( (ItemClass = class'Hat_Collectible_BadgePart_Scooter', EnergyBitCost = 200, TimePieceThreshold=5) );
-	SoldItems.Add( (ItemClass = class'Hat_Collectible_BadgeSlot', EnergyBitCost = 50, TimePieceThreshold=3) );
-	SoldItems.Add( (ItemClass = class'Hat_Collectible_BadgeSlot2', EnergyBitCost = 200, TimePieceThreshold=15) );
-	SoldItems.Add( (ItemClass = class'Hat_Collectible_BadgePart_NoFallDamage', EnergyBitCost = 100) );
-	SoldItems.Add( (ItemClass = class'Hat_Collectible_BadgePart_HatCooldownBonus', TimePieceThreshold=8, EnergyBitCost = 250) );
-	SoldItems.Add( (ItemClass = class'Hat_Collectible_BadgePart_Projectile', TimePieceThreshold=4, EnergyBitCost = 300) );
-	*/
+	
+	AllSoldItems[0] = class'Archipelago_BadgeSalesmanItem_1';
+	AllSoldItems[1] = class'Archipelago_BadgeSalesmanItem_2';
+	AllSoldItems[2] = class'Archipelago_BadgeSalesmanItem_3';
+	AllSoldItems[3] = class'Archipelago_BadgeSalesmanItem_4';
+	AllSoldItems[4] = class'Archipelago_BadgeSalesmanItem_5';
+	AllSoldItems[5] = class'Archipelago_BadgeSalesmanItem_6';
+	AllSoldItems[6] = class'Archipelago_BadgeSalesmanItem_7';
+	AllSoldItems[7] = class'Archipelago_BadgeSalesmanItem_8';
+	AllSoldItems[8] = class'Archipelago_BadgeSalesmanItem_9';
+	AllSoldItems[9] = class'Archipelago_BadgeSalesmanItem_10';
 	
 	ConversationTree = Hat_ConversationTree'HatinTime_Conv_BadgeSalesman.spaceship.SellIntro2'
 	SoldOutConversationTree = Hat_ConversationTree'HatinTime_Conv_BadgeSalesman.spaceship.All_Out'
