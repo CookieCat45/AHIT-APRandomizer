@@ -11,7 +11,6 @@ exec function ap_set_connection_info(string ip, int port)
 	
 	`AP.SlotData.Host = ip;
 	`AP.SlotData.Port = port;
-	
 	`AP.ScreenMessage("Set target host to: "$ip $":" $port);
 }
 
@@ -47,53 +46,25 @@ exec function ap_connect()
 	`AP.Client.Connect();
 }
 
-exec function ap_deathlink(int num)
+exec function ap_deathlink()
 {
-	local string message;
-	local bool enabled;
-	
-	if (!`AP.IsFullyConnected())
-	{
-		`AP.ScreenMessage("You are not connected.");
-		return;
-	}
-	
-	enabled = bool(num);
-	`AP.SlotData.DeathLink = enabled;
-	if (enabled)
-	{
-		message = "[{\"cmd\":\"ConnectUpdate\", \"tags\":[\"DeathLink\"]}]";
-		`AP.ScreenMessage("Death Link enabled");
-	}
+	local bool val;
+
+	val = `AP.SlotData.DeathLink;
+	if (val)
+		`AP.ScreenMessage("Death Link disabled.");
 	else
-	{
-		message = "[{\"cmd\":\"ConnectUpdate\", \"tags\":[]}]";
-		`AP.ScreenMessage("Death Link disabled");
-	}
+		`AP.ScreenMessage("Death Link enabled.");
 	
-	`AP.Client.SendBinaryMessage(message);
+	`AP.SlotData.DeathLink = !val;
 }
 
 // -------------------------------------------- DEBUG COMMANDS -------------------------------------------- \\
-exec function ap_debug()
-{
-	if (!`AP.DebugMode)
-	{
-		`AP.DebugMode = true;
-		`AP.ScreenMessage("Debug mode ON");
-	}
-	else
-	{
-		`AP.DebugMode = false;
-		`AP.ScreenMessage("Debug mode OFF");
-	}
-}
-
 exec function ap_teleport(float x, float y, float z)
 {
 	local Vector loc;
 	
-	if (!`AP.DebugMode)
+	if (!bool(`AP.DebugMode))
 		return;
 	
 	loc.x = x;
@@ -102,38 +73,9 @@ exec function ap_teleport(float x, float y, float z)
 	GetPlayerController().Pawn.SetLocation(loc);
 }
 
-exec function ap_disable_item_collision()
-{
-	local Hat_Collectible_Inventory item;
-	
-	if (!`AP.DebugMode)
-		return;
-	
-	foreach class'WorldInfo'.static.GetWorldInfo().DynamicActors(class'Hat_Collectible_Inventory', item)
-	{
-		item.SetCollision(false, false);
-	}
-	
-	`AP.ScreenMessage("Disabled item collision");
-}
-
-exec function ap_enable_item_collision()
-{
-	local Hat_Collectible_Inventory item;
-	if (!`AP.DebugMode)
-		return;
-	
-	foreach class'WorldInfo'.static.GetWorldInfo().DynamicActors(class'Hat_Collectible_Inventory', item)
-	{
-		item.SetCollision(true, true);
-	}
-	
-	`AP.ScreenMessage("Enabled item collision");
-}
-
 exec function ap_give_yarn(int count)
 {
-	if (!`AP.DebugMode || count <= 0)
+	if (!bool(`AP.DebugMode) || count <= 0)
 		return;
 		
 	`AP.OnYarnCollected(count);

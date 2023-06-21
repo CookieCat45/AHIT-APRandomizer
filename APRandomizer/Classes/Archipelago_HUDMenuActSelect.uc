@@ -10,7 +10,7 @@ simulated function BuildActs(HUD H)
 	local Array< class<Inventory> > InventoryClasses;
 	local MenuSelectHourglass s;
 	
-	UnlockedActIDs = class'Hat_GameManager'.static.GetUnlockedActIDs(ChapterInfo,, ModChapterPackageName);
+	UnlockedActIDs = GetUnlockedActIDs(ChapterInfo,, ModChapterPackageName);
 	// Remove act 99 since its already going to be present as free roam if actless
 	if (ChapterInfo.IsActless)
 	{
@@ -156,6 +156,110 @@ simulated function BuildActs(HUD H)
 	UpdatePlanetRotation(1);
 }
 
+simulated function SetChapterInfo(HUD H, Hat_ChapterInfo i, optional String InModChapterPackageName)
+{
+	local Hat_DynamicStaticActor sa;
+
+	local Array<Hat_ChapterActInfo> UnlockedActIDs;
+	ChapterInfo = i;
+	ModChapterPackageName = InModChapterPackageName;
+	
+	UnlockedActIDs = GetUnlockedActIDs(ChapterInfo,,ModChapterPackageName);
+	
+	IsActiveStandoff = ChapterInfo.IsStandoff && UnlockedActIDs.Length > 1;
+	
+	if (IsActiveStandoff)
+	{
+		IconsCenterLocation.X = 0.5f;
+		IconsCenterLocation.Y = 0.4f;
+	}
+	BuildHourglasses(H);
+	
+	if (ActSelectStandoffEmitter != None)
+		ActSelectStandoffEmitter.ParticleSystemComponent.SetActive(IsActiveStandoff);
+	
+	UpdateColorSchemes(H);
+	if (IsActiveStandoff)
+		UpdateStandoffPoints(H);
+
+	if (PlanetActor != None)
+		PlanetActor.SetHidden(ChapterInfo.HasLavaPlanet);
+
+	foreach GetWorldInfo().AllActors(class'Hat_DynamicStaticActor',sa)
+	{
+		if (sa.Tag == 'ActSelectLavaPlanetActor')
+		{
+			sa.SetHidden(!ChapterInfo.HasLavaPlanet);
+			break;
+		}
+	}
+}
+
+function Array<Hat_ChapterActInfo> GetUnlockedActIDs(Hat_ChapterInfo ci, optional bool IncludePreviewFinale = false, optional string ModPackageName, optional bool bShouldSort)
+{
+	local Array<Hat_ChapterActInfo> UnlockedActIDs;
+	local int i, actid;
+	local bool ChapterFinaleIsUnlocked;
+	local Hat_ChapterActInfo FinaleChapterActInfo;
+	
+	ChapterFinaleIsUnlocked = false;
+	UnlockedActIDs.Length = 0;
+	FinaleChapterActInfo = None;
+	ci.ConditionalUpdateActList();
+	for (i = 0; i < ci.ChapterActInfo.Length; i++)
+	{
+		if (ci.ChapterActInfo[i].IsBonus) continue;
+		
+		// Finale act should show up even if its not complete
+		if (ci.FinaleActID == actid)
+			FinaleChapterActInfo = ci.ChapterActInfo[i];
+		
+		if (!`AP.IsChapterActInfoUnlocked(ci.ChapterActInfo[i], ModPackageName)) continue;
+		UnlockedActIDs.AddItem(ci.ChapterActInfo[i]);
+		actid = ci.ChapterActInfo[i].ActID;
+		if (ci.FinaleActID == actid) ChapterFinaleIsUnlocked = true;
+	}
+	
+	if (IncludePreviewFinale && FinaleChapterActInfo != None && ci.FinaleActID > 0 && UnlockedActIDs.Length > 1 && !ChapterFinaleIsUnlocked)
+	{
+		// always show up
+		UnlockedActIDs.AddItem(FinaleChapterActInfo);
+	}
+	
+	if (bShouldSort)
+		UnlockedActIDs.Sort(SortChapterActInfoByActID);
+	
+	return UnlockedActIDs;
+}
+
+// Makes the assumption both ChapterActInfo are from the same ChapterInfo
+function int SortChapterActInfoByActID(Hat_ChapterActInfo a, Hat_ChapterActInfo b)
+{
+	local int AdjustedActIDA, AdjustedActIDB;
+	local Hat_ChapterInfo ci;
+	
+	AdjustedActIDA = a.ActID;
+	AdjustedActIDB = b.ActID;
+	
+	ci = a.ChapterInfo;
+	if (ci != None)
+	{
+		if (a.ActID == ci.FinaleActID) AdjustedActIDA = 999; // finale is always last
+		if (b.ActID == ci.FinaleActID) AdjustedActIDB = 999; // finale is always last
+		
+		if (a.ActID == 99) AdjustedActIDA = -2; // free roam is always first
+		if (b.ActID == 99) AdjustedActIDB = -2; // free roam is always first
+		
+		if (ci.ActIDAfterIntro > 0)
+		{
+			if (a.ActID == ci.ActIDAfterIntro) AdjustedActIDA = -1; // ActIDAfterIntro is right after free roam in the list
+			if (b.ActID == ci.ActIDAfterIntro) AdjustedActIDB = -1; // ActIDAfterIntro is right after free roam in the list
+		}
+	}
+	
+	return AdjustedActIDB-AdjustedActIDA;
+}
+
 simulated function BuildSpecialHourglasses(HUD H)
 {
 	local MenuSelectHourglass s;
@@ -211,7 +315,7 @@ simulated function BuildSpecialHourglasses(HUD H)
 		}
 		
 		s.IsComplete = `AP.IsActReallyCompleted(s.ChapterActInfo);
-
+		
 		if (IsActiveStandoff &&
 			HasTimePiece(ChapterInfo.GetActHourglass(s.ActID)) &&
 			HasTimePiece(ChapterInfo.GetActHourglass(s.ActID, true)) )
@@ -378,6 +482,44 @@ simulated function BuildSpecialHourglasses(HUD H)
 	}
 }
 
+simulated function BuildBonusHourglasses(HUD H)
+{
+	local int i;
+	local Array<Hat_ChapterActInfo> BonusUnlocked, ColumnA, ColumnB;
+	local bool IsCaveRift, HasCompletedEverythingExceptCaveRifts;
+	
+	BonusUnlocked.Length = 0;
+	ColumnA.Length = 0;
+	ColumnB.Length = 0;
+
+	HasCompletedEverythingExceptCaveRifts = class'Hat_GameManager'.static.AreAllActsComplete(ChapterInfo, false, false);
+
+	ChapterInfo.ConditionalUpdateActList();
+	for (i = 0; i < ChapterInfo.ChapterActInfo.Length; i++)
+	{
+		if (!ChapterInfo.ChapterActInfo[i].IsBonus) continue;
+		
+		IsCaveRift = ChapterInfo.ChapterActInfo[i].RequiredActID.Length <= 0;
+		
+		if (!`AP.IsChapterActInfoUnlocked(ChapterInfo.ChapterActInfo[i], ModChapterPackageName))
+		{
+			// Always allow it to pass if its a cave rift, and we're only missing cave rifts
+			if (!IsCaveRift || !HasCompletedEverythingExceptCaveRifts) continue;
+		}
+		
+		BonusUnlocked.AddItem(ChapterInfo.ChapterActInfo[i]);
+		if (IsCaveRift)
+			ColumnA.AddItem(ChapterInfo.ChapterActInfo[i]);
+		else
+			ColumnB.AddItem(ChapterInfo.ChapterActInfo[i]);
+	}
+	if (BonusUnlocked.Length <= 0) return;
+	
+	BuildBonusHourglassesSide(H, ColumnA, 120, false);
+	BuildBonusHourglassesSide(H, ColumnB, 120, true);
+
+}
+
 simulated function BuildBonusHourglassesSide(HUD H, Array<Hat_ChapterActInfo> HourglassList, float max_angle, bool invertX)
 {
 	local float angle, angle_radians, posx, posy;
@@ -409,8 +551,9 @@ simulated function BuildBonusHourglassesSide(HUD H, Array<Hat_ChapterActInfo> Ho
         IsCompleted = `AP.IsActReallyCompleted(s.ChapterActInfo);
 		s.ID = invertX ? ActSelectType_TimeRift_Water : ActSelectType_TimeRift_Cave;
 		// The cave rift was shown even if we don't have it unlocked - this happens if everything is cleared except the cave rift. In that case, we only want to remind them that it exists.
-		if (s.ID == ActSelectType_TimeRift_Cave && !IsCompleted && !`GameManager.IsChapterActInfoUnlocked(s.ChapterActInfo, ModChapterPackageName))
+		if (s.ID == ActSelectType_TimeRift_Cave && !IsCompleted && !`AP.IsChapterActInfoUnlocked(s.ChapterActInfo, ModChapterPackageName))
 			s.ID = ActSelectType_TimeRift_Cave_Reminder;
+
 		s.PosX = posx;
 		s.PosY = posy;
 		s.ActInfoboxTitle = class'Hat_Localizer'.static.GetGame("levels", s.ID == ActSelectType_TimeRift_Water ? "Location_DreamWorld_Water" : "Location_DreamWorld_Cave");
@@ -465,7 +608,7 @@ simulated function bool HasActiveBlockingFinale(HUD H)
 	if (!ChapterInfo.FinaleIsBlocking) return false;
 	if (!GetFinaleInfo(H, TotalRequired, CompletedRequiredActsLength)) return false;
 	
-	if (`AP.IsActReallyCompleted(ChapterInfo.GetChapterActInfoFromActID(ChapterInfo.FinaleActID))) return false;
+	if (`AP.IsChapterActInfoUnlocked(ChapterInfo.GetChapterActInfoFromActID(ChapterInfo.FinaleActID))) return false;
 	
 	return (CompletedRequiredActsLength >= TotalRequired);
 }
@@ -475,7 +618,7 @@ simulated function bool GetFinaleInfo(HUD H, out int TotalRequired, out int Comp
 	local Array<Hat_ChapterActInfo> CompletedRequiredActs;
 	if (ChapterInfo.FinaleActID <= 0) return false;
 	
-	if (ChapterInfo.FinaleDisappearOnCompletion && `AP.IsActReallyCompleted(ChapterInfo.GetChapterActInfoFromActID(ChapterInfo.FinaleActID))) return false;
+	//if (ChapterInfo.FinaleDisappearOnCompletion && `AP.IsChapterActInfoUnlocked(ChapterInfo.GetChapterActInfoFromActID(ChapterInfo.FinaleActID))) return false;
 	
 	CompletedRequiredActs = GetCompletedRequiredActs(ChapterInfo, ChapterInfo.FinaleActID, TotalRequired, ModChapterPackageName);
 	CompletedRequiredActsLength = CompletedRequiredActs.length;
@@ -502,8 +645,11 @@ function Array<Hat_ChapterActInfo> GetCompletedRequiredActs(Hat_ChapterInfo ci, 
 	
 	for (j = 0; j < IsFinaleWithNoRequiredActIDs ? ci.ChapterActInfo.Length : ci.ChapterActInfo[ActIndex].RequiredActID.Length; j++)
 	{
-		if (IsFinaleWithNoRequiredActIDs) ActID = ci.ChapterActInfo[j].ActID;
-		else ActID = ci.ChapterActInfo[ActIndex].RequiredActID[j];
+		if (IsFinaleWithNoRequiredActIDs) 
+			ActID = ci.ChapterActInfo[j].ActID;
+		else 
+			ActID = ci.ChapterActInfo[ActIndex].RequiredActID[j];
+		
 		hourglass = ci.GetActHourglass(ActID);
 		if (hourglass == "") continue;
 		if (hourglass == ci.ChapterActInfo[ActIndex].Hourglass) continue; // Don't include ourselves
@@ -524,8 +670,8 @@ function Array<Hat_ChapterActInfo> GetCompletedRequiredActs(Hat_ChapterInfo ci, 
 		if (ModPackageName != "")
 			hourglass = class'Hat_TimeObject_Base'.static.GetModTimePieceIdentifier(ModPackageName, hourglass);
 		
-		if (!`AP.IsActReallyCompleted(ci.ChapterActInfo[j])) continue;
-
+		if (!`AP.IsChapterActInfoUnlocked(ci.ChapterActInfo[j])) continue;
+		
 		Results.AddItem(ci.ChapterActInfo[j]);
 	}
 	

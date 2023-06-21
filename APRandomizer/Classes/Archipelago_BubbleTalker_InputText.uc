@@ -85,7 +85,7 @@ function DrawInputText(HUD H, Hat_BubbleTalkerQuestion element, float fTime, flo
     vOrigin.Y = fY + vSize.Y * Lerp(1.22f, 1.13f, alpha);
     
     H.Canvas.SetDrawColor(255, 255, 255, alpha*255);
-    element.DrawCenterRect(H, vOrigin.X + fScale*0.02, vOrigin.Y, fScale * 1.42, fScale*0.92, element.Question01Tex);
+    element.DrawCenterRect(H, vOrigin.X + fScale*0.02, vOrigin.Y, fScale * 2.0, fScale*0.92, element.Question01Tex);
 	
 	CharacterWidth = vSize.X*0.022;
 	CharacterWidth *= Lerp(1.f, 0.7f, FClamp((CharacterLength-10)/7.f, 0, 1));

@@ -4,6 +4,7 @@ class Archipelago_SlotData extends Object
 var transient bool Initialized;
 var array<ShuffledAct> ShuffledActList;
 
+var bool ConnectedOnce;
 var string SlotName;
 var string Password;
 var string Host;

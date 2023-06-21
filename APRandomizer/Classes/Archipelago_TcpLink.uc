@@ -14,7 +14,7 @@ const MaxSentMessageLength = 246;
 event PostBeginPlay()
 {
 	Super.PostBeginPlay();
-	if (`AP.SlotData.SlotName == "")
+	if (!`AP.SlotData.ConnectedOnce)
 	{
 		`AP.OpenSlotNameBubble();
 	}

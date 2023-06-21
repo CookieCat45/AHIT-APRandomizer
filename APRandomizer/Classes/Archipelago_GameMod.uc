@@ -11,8 +11,8 @@ var bool ActMapChange;
 var bool IsItemTimePiece; // used to tell if a time piece being given to us is from AP or not
 var array<string> PlayerNames;
 
-var config bool DebugMode;
-var config bool DisableInjection;
+var config int DebugMode;
+var config int DisableInjection;
 
 struct immutable ShuffledAct
 {
@@ -112,12 +112,11 @@ event PreBeginPlay()
 {
 	Super.PreBeginPlay();
 	
-	if (DisableInjection || `GameManager.GetCurrentMapFilename() ~= `GameManager.TitleScreenMapName)
+	if (bool(DisableInjection) || `GameManager.GetCurrentMapFilename() ~= `GameManager.TitleScreenMapName)
 		return;
 	
 	if (!IsArchipelagoEnabled() && `SaveManager.GetCurrentSaveData().TotalPlayTime <= 0.0)
 	{
-		// New save file. Check if we can enable Archipelago.
 		SetAPBits("ArchipelagoEnabled", 1);
 	}
 }
@@ -175,7 +174,7 @@ function OnPostInitGame()
 	if (!IsArchipelagoEnabled())
 		return;
 	
-	if (DebugMode)
+	if (bool(DebugMode))
 	{
 		SetTimer(1.0, true, NameOf(PrintItemsNearPlayer));
 	}
@@ -214,6 +213,9 @@ function OnPostInitGame()
 			}
 			else if (a.IsA('Hat_Collectible_Important'))
 			{
+				if (a.IsA('Hat_Collectible_VaultCode_Base') || a.IsA('Hat_Collectible_Sticker'))
+					continue;
+				
 				// Hide all regular collectibles, just in case
 				a.ShutDown();
 			}
@@ -351,6 +353,7 @@ function LoadSlotData(JsonObject json)
 	if (SlotData.Initialized)
 		return;
 	
+	SlotData.ConnectedOnce = true;
 	SlotData.ActRando = json.GetBoolValue("ActRandomizer");
 	SlotData.ShuffleStorybookPages = json.GetBoolValue("ShuffleStorybookPages");
 	SlotData.DeathLink = json.GetBoolValue("death_link");
@@ -734,20 +737,17 @@ function UpdateActUnlocks()
 		chapter.ConditionalUpdateActList();
 		foreach chapter.ChapterActInfo(act)
 		{
-			// This set to true prevents the act from unlocking no matter what
-			act.InDevelopment = (!IsChapterActInfoUnlocked2(act));
-
-			if (!act.InDevelopment) // unlocked
+			if (IsChapterActInfoUnlocked(act))
 			{
-				//DebugMessage("Unlocked act: " $act);
+				DebugMessage("Unlocked act: " $act);
 				
-				// Need to add a dummy act to required acts for blue rifts,
-				// otherwise the game thinks it's a purple rift and it won't unlock.
+				/*
 				if (act.IsBonus && !IsPurpleRift(act))
 				{
 					act.RequiredActID.Length = 0;
 					act.RequiredActID.AddItem(0);
 				}
+				*/
 			}
 		}
 	}
@@ -797,7 +797,7 @@ function SetChapterTimePieceRequirement(Hat_ChapterInfo chapter, int amount)
 	}
 }
 
-function bool IsChapterActInfoUnlocked2(Hat_ChapterActInfo ChapterActInfo, optional string ModPackageName)
+function bool IsChapterActInfoUnlocked(Hat_ChapterActInfo ChapterActInfo, optional string ModPackageName)
 {
 	local string hourglass;
 	local int j, actid;
@@ -854,11 +854,7 @@ function bool IsChapterActInfoUnlocked2(Hat_ChapterActInfo ChapterActInfo, optio
 				hourglass = class'Hat_TimeObject_Base'.static.GetModTimePieceIdentifier(ModPackageName, hourglass);
 			}
 			
-			if (IsActReallyCompleted(RequiredChapterActInfo)) 
-			{
-				ChapterActInfo.RequiredActID.RemoveItem(RequiredChapterActInfo.ActID);
-				continue;
-			}
+			if (IsActReallyCompleted(RequiredChapterActInfo)) continue;
 			
 			j = INDEX_NONE;
 			break;
@@ -889,7 +885,7 @@ function ShuffleCollectibles()
 			continue;
 		
 		locationArray.AddItem(ObjectToLocationId(collectible));
-		if (DebugMode)
+		if (bool(DebugMode))
 		{
 			DebugMessage("[ShuffleCollectibles] Found item: " $collectible.GetLevelName() $"."$collectible.Name $ObjectToLocationId(collectible));
 		}
@@ -1003,13 +999,13 @@ function IterateChestArray()
 		if (!ChestArray[i].FullOpened)
 			continue;
 			
-		if (DebugMode)
+		if (bool(DebugMode))
 		{
 			message = "";
 			message = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename(string(ChestArray[i].GetLevelName()));
 			message $= "."$ChestArray[i].Name;
 			message $= "("$ObjectToLocationId(ChestArray[i])$")";
-			ScreenMessage(message);
+			DebugMessage(message);
 		}
 		
 		locationArray.AddItem(ObjectToLocationId(ChestArray[i]));
@@ -1022,13 +1018,13 @@ function IterateChestArray()
 		if (!class'Hat_SaveBitHelper'.static.HasLevelBit(bitName, 1))
 			continue;
 			
-		if (DebugMode)
+		if (bool(DebugMode))
 		{
 			message = "";
 			message = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename(string(BulliedNPCArray[i].GetLevelName()));
 			message $= "."$BulliedNPCArray[i].Name;
 			message $= "("$ObjectToLocationId(BulliedNPCArray[i])$")";
-			ScreenMessage(message);
+			DebugMessage(message);
 		}
 		
 		locationArray.AddItem(ObjectToLocationId(BulliedNPCArray[i]));
@@ -1074,12 +1070,12 @@ function OnPreBreakableBreak(Actor Breakable, Pawn Breaker)
 		
 		if (hasImportantItem)
 		{
-			if (DebugMode)
+			if (bool(DebugMode))
 			{
 				message = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename(string(b.GetLevelName()));
 				message $= "."$b.Name;
 				message $= "("$ObjectToLocationId(b)$")";
-				ScreenMessage(message);
+				DebugMessage(message);
 			}
 			
 			spawnClass = class'Archipelago_RandomizedItem_Misc';
@@ -1109,7 +1105,7 @@ function OnPlayerDeath(Pawn Player)
 function OnLoadoutChanged(PlayerController controller, Object loadout, Object backpackItem)
 {
 	local Hat_BackpackItem item;
-
+	
 	if (!IsArchipelagoEnabled())
 		return;
 	
@@ -1192,7 +1188,7 @@ function OnCollectedCollectible(Object collectible)
 	local string message;
 	local Archipelago_RandomizedItem_Base item;
 	
-	if (DebugMode && collectible.IsA('Hat_Collectible_Important'))
+	if (bool(DebugMode) && collectible.IsA('Hat_Collectible_Important'))
 	{
 		// Show location ID
 		message = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename(string(Actor(collectible).GetLevelName()));
@@ -1698,7 +1694,7 @@ function ScreenMessage(String message)
 
 function DebugMessage(String message)
 {
-	if (!DebugMode)
+	if (!bool(DebugMode))
 		return;
 	
 	if (Broadcaster == None)
