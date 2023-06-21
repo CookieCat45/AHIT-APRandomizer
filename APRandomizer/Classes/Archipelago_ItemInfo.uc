@@ -22,6 +22,16 @@ enum EItemFlags
 	ItemFlag_ImportantSkipBalancing // 9
 };
 
+// Used with slot data
+enum EHatType
+{
+	HatType_Sprint,
+	HatType_Brewing,
+	HatType_Ice,
+	HatType_Dweller,
+	HatType_TimeStop,
+};
+
 enum ESpecialItemType
 {
 	SpecialType_None,

@@ -3,9 +3,6 @@ class Archipelago_TcpLink extends TcpLink
 
 `include(APRandomizer\Classes\Globals.uci);
 
-var string TargetHost;
-var int TargetPort;
-
 var transient string CurrentMessage;
 var transient int BracketCounter;
 var transient bool ParsingMessage;
@@ -17,42 +14,49 @@ const MaxSentMessageLength = 246;
 event PostBeginPlay()
 {
 	Super.PostBeginPlay();
-	Connect();
+	if (`AP.SlotData.SlotName == "")
+	{
+		`AP.OpenSlotNameBubble();
+	}
+	else
+	{
+		Connect();
+	}
 }
 
 function Connect()
 {
-	`AP.ScreenMessage("Connecting to host: "$TargetHost$":"$TargetPort);
-    Resolve(TargetHost);
+	`AP.ScreenMessage("Connecting to host: " $`AP.SlotData.Host$":"$`AP.SlotData.Port);
+    Resolve(`AP.SlotData.Host);
 	
 	ClearTimer(NameOf(TimedOut));
 	SetTimer(6.0, false, NameOf(TimedOut));
+}
+
+event Resolved(IpAddr Addr)
+{
+    Addr.Port = `AP.SlotData.Port;
+    BindPort();
+	
+    if (!Open(Addr))
+    {
+        `AP.ScreenMessage("Failed to open connection to "$`AP.SlotData.Host $":"$`AP.SlotData.Port $", retrying...");
+		SetTimer(5.0, false, NameOf(Connect));
+    }
 }
 
 function TimedOut()
 {
 	if (!FullyConnected)
 	{
-		`AP.ScreenMessage("Connection attempt to "$TargetHost$":"$TargetPort $"timed out, retrying...");
+		`AP.ScreenMessage("Connection attempt to " $`AP.SlotData.Host$":" $`AP.SlotData.Port $" timed out, retrying...");
 		Connect();
 	}
 }
 
-event Resolved(IpAddr Addr)
-{
-    Addr.Port = TargetPort;
-    BindPort();
-	
-    if (!Open(Addr))
-    {
-        `AP.ScreenMessage("Failed to open connection to "$TargetHost$":"$TargetPort $", retrying...");
-		SetTimer(5.0, false, NameOf(Connect));
-    }
-}
-
 event ResolveFailed()
 {
-    `AP.ScreenMessage("Unable to resolve "$TargetHost$":"$TargetPort $". Retrying in 5 seconds...");
+    `AP.ScreenMessage("Unable to resolve " $`AP.SlotData.Host $":"$`AP.SlotData.Port $". Retrying in 5 seconds...");
 	SetTimer(5.0, false, NameOf(Connect));
 }
 
@@ -68,7 +72,7 @@ event Opened()
 	
 	// send HTTP request to server to upgrade to websocket connection
 	SendText("GET / HTTP/1.1" $crlf
-	$"Host: " $TargetHost $crlf
+	$"Host: " $`AP.SlotData.Host $crlf
 	$"Connection: keep-alive, Upgrade" $crlf
 	$"Upgrade: websocket" $crlf
 	$"Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" $crlf
@@ -99,8 +103,8 @@ function ConnectToAP()
 	json = new class'JsonObject';
 	json.SetStringValue("cmd", "Connect");
 	json.SetStringValue("game", "A Hat in Time");
-	json.SetStringValue("name", "CookieHat");
-	json.SetStringValue("password", "");
+	json.SetStringValue("name", `AP.SlotData.SlotName);
+	json.SetStringValue("password", `AP.SlotData.Password);
 	json.SetStringValue("uuid", "");
 	json.SetStringValue("tags", "");
 	json.SetIntValue("items_handling", 7);
@@ -165,9 +169,9 @@ event Tick(float d)
 				}
 			}
 		}
-		else if (Len(CurrentMessage) > 0) // See if we can parse a message anyway
+		else if (Len(CurrentMessage) > 0)
 		{
-			ParseJSON(CurrentMessage);
+			//ParseJSON(CurrentMessage);
 			ClearDataBuffer();
 		}
 	}
@@ -193,11 +197,9 @@ function ClearDataBuffer()
 function ParseJSON(string json)
 {
 	local bool b;
-	local int i;
-	local int count;
-	local string s, message;
-	local JsonObject jsonObj;
-	local JsonObject jsonChild;
+	local int i, count;
+	local string s;
+	local JsonObject jsonObj, jsonChild;
 	
 	//`AP.DebugMessage("[ParseJSON] Received command: " $json);
 		
@@ -219,7 +221,7 @@ function ParseJSON(string json)
 	{
 		case "Connected":
 			`AP.OnPreConnected();
-			`AP.ScreenMessage("Successfully connected to "$TargetHost$":"$TargetPort);
+			`AP.ScreenMessage("Successfully connected to " $`AP.SlotData.Host $":"$`AP.SlotData.Port);
 			`AP.PlayerSlot = jsonObj.GetIntValue("slot");
 			FullyConnected = true;
 			ConnectingToAP = false;
@@ -272,17 +274,12 @@ function ParseJSON(string json)
 			
 			if (jsonChild != None)
 			{
-				if (InStr(json, "\"type\":") != -1)
+				if (IsValidMessageType(jsonChild.GetStringValue("type")))
 				{
-					break;
+					`AP.ScreenMessage(jsonChild.GetStringValue("text"));
 				}
-				else
-				{
-					message = jsonChild.GetStringValue("text");
-				}
-				
-				`AP.ScreenMessage(message);
 			}
+			
 			break;
 			
 			
@@ -310,6 +307,11 @@ function ParseJSON(string json)
 		default:
 			break;
 	}
+}
+
+function bool IsValidMessageType(string msgType)
+{
+	return (msgType != "ItemSend" && msgType != "Hint");
 }
 
 function OnLocationInfoCommand(string json)
@@ -341,7 +343,7 @@ function OnLocationInfoCommand(string json)
 	}
 	
 	jsonObj = class'JsonObject'.static.DecodeJson(json);
-	`AP.DebugMessage("Count: "$count);
+	//`AP.DebugMessage("Count: "$count);
 	
 	for (i = 0; i <= count; i++)
 	{
@@ -456,7 +458,7 @@ function OnReceivedItemsCommand(string json, optional bool connection)
 	}
 	
 	jsonObj = class'JsonObject'.static.DecodeJson(json);
-	index = `AP.GetAPBits(`AP.LastItemBit);
+	index = `AP.GetAPBits("LastItemIndex");
 	
 	// This means we are reconnecting to a previous session, and the server is giving us our entire list of items,
 	// so we need to begin from the next new item in our list or don't give anything otherwise
@@ -494,7 +496,7 @@ function OnReceivedItemsCommand(string json, optional bool connection)
 		}
 	}
 	
-	`AP.SetAPBits(`AP.LastItemBit, index+total);
+	`AP.SetAPBits("LastItemIndex", index+total);
 }
 
 function GrantTimePiece(string timePieceId, bool IsAct, string itemName)
@@ -650,13 +652,16 @@ function OnBounceCommand(string json)
 	local JsonObject jsonObj;
 	local JsonObject jsonChild;
 	local Hat_Player player;
-
+	
 	Repl(json, "[", "");
 	Repl(json, "]", "");
 	
 	jsonObj = class'JsonObject'.static.DecodeJson(json);
+	if (jsonObj == None)
+		return;
+	
 	jsonChild = jsonObj.GetObject("data");
-	if (`AP.IsDeathLinkEnabled() && jsonObj.GetStringValue("tags") == "DeathLink")
+	if (jsonChild != None && `AP.IsDeathLinkEnabled() && jsonObj.GetStringValue("tags") == "DeathLink")
 	{
 		// commit myurder
 		foreach DynamicActors(class'Hat_Player', player)
@@ -759,11 +764,6 @@ function SendBinaryMessage(string message, optional bool continuation)
 
 event Closed()
 {
-	local Hat_TreasureChest_Base chest;
-	
-	foreach DynamicActors(class'Hat_TreasureChest_Base', chest)
-		chest.DontSave = true;
-	
 	// Destroy ourselves and create a new client. 
 	// Reconnecting with the same client object after closing a connection does not work (for some reason).
     `AP.ScreenMessage("Connection was closed. Reconnecting...");
@@ -773,13 +773,11 @@ event Closed()
 event Destroyed()
 {
 	// Notify AP
-	`AP.CreateClient();
+	//`AP.CreateClient(3.0);
 	Super.Destroyed();
 }
 
 defaultproperties
 {
-    TargetHost="127.0.0.1";
-    TargetPort=1453;
 	bAlwaysTick = true;
 }

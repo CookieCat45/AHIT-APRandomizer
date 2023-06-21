@@ -39,14 +39,16 @@ simulated function BuildActs(HUD H)
 		s.StandoffOffset = 0;
 		s.IsUncanny = false;
 		s.IsMissingItem = false;
-
+		
 		if (IsActiveStandoff)
 		{
 			if (i <= 1)
 			{
 				s.PosX = IconsCenterLocation.X;
 				s.PosY = IconsCenterLocation.Y + 0.3;
-				s.IsUncanny = class'Hat_GameManager'.static.IsChapterUncannyFinaleEnabled(ChapterInfo);
+				
+				// This will lock the player out of Act 1, big no no
+				//s.IsUncanny = class'Hat_GameManager'.static.IsChapterUncannyFinaleEnabled(ChapterInfo);
 			}
 			else
 			{
