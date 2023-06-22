@@ -10,7 +10,7 @@ You will need the Steam release of A Hat in Time.
   
 1. Open the Steam console by pasting this into your browser's URL bar: `steam://open/console`
 
-2. In the Steam console, type the following command: `download_depot 253230 253232 7770543545116491859`. Wait for the console to say the download is finished.
+2. In the Steam console, enter the following command: `download_depot 253230 253232 7770543545116491859`. Wait for the console to say the download is finished.
 
 3. Once the download finishes, go to `steamapps/content` in Steam's program folder.
 
