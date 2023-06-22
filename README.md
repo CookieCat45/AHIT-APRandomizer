@@ -1,4 +1,4 @@
-# AHIT-Archipelago
+# AHIT-APRandomizer
 AHIT Archipelago implementation. Currently only works on DLC 2.2.
 
 # How to install
