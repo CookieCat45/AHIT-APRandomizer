@@ -592,11 +592,11 @@ simulated function BuildBonusHourglassesSide(HUD H, Array<Hat_ChapterActInfo> Ho
 		}
 
 		s.IsValid = true;
-		
 		Hourglasses.AddItem(s);
 		
 		if (HourglassList.Length <= 1)
 			break;
+
 		angle += max_angle / float(HourglassList.Length);
 		i++;
 	}
@@ -667,10 +667,10 @@ function Array<Hat_ChapterActInfo> GetCompletedRequiredActs(Hat_ChapterInfo ci, 
 		
 		TotalRequired++;
 		
-		if (ModPackageName != "")
-			hourglass = class'Hat_TimeObject_Base'.static.GetModTimePieceIdentifier(ModPackageName, hourglass);
+		//if (ModPackageName != "")
+		//	hourglass = class'Hat_TimeObject_Base'.static.GetModTimePieceIdentifier(ModPackageName, hourglass);
 		
-		if (!`AP.IsChapterActInfoUnlocked(ci.ChapterActInfo[j])) continue;
+		if (!`AP.IsActReallyCompleted(ci.GetChapterActInfoFromActID(ActID))) continue;
 		
 		Results.AddItem(ci.ChapterActInfo[j]);
 	}

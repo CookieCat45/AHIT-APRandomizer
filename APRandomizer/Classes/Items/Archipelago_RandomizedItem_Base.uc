@@ -31,15 +31,20 @@ function Init()
 	{
 		Destroy();
 	}
-	else if (ItemFlags == ItemFlag_Garbage) // No flashy effects for garbage items (still for traps though :v)
+	else if (ItemFlags == ItemFlag_Garbage)
 	{
-		if (IdleAudioComponent != None)
-			IdleAudioComponent.VolumeMultiplier = 0;
-	
-		if (ImportantItemParticle != None)
+		// No flashy effects for garbage items (still for traps though :v)
+		// Some yarn can be marked as junk
+		if (!IsA('Archipelago_RandomizedItem_Yarn'))
 		{
-			ImportantItemParticle.SetActive(false);
-			ImportantItemParticle.KillParticlesForced();
+			if (IdleAudioComponent != None)
+				IdleAudioComponent.VolumeMultiplier = 0;
+	
+			if (ImportantItemParticle != None)
+			{
+				ImportantItemParticle.SetActive(false);
+				ImportantItemParticle.KillParticlesForced();
+			}
 		}
 	}
 }

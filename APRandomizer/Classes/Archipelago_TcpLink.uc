@@ -14,7 +14,8 @@ const MaxSentMessageLength = 246;
 event PostBeginPlay()
 {
 	Super.PostBeginPlay();
-	if (!`AP.SlotData.ConnectedOnce)
+
+	if (`AP.SlotData.SlotName == "")
 	{
 		`AP.OpenSlotNameBubble();
 	}
@@ -198,16 +199,16 @@ function ParseJSON(string json)
 {
 	local bool b;
 	local int i, count;
-	local string s;
+	local string s, text;
 	local JsonObject jsonObj, jsonChild;
 	
-	//`AP.DebugMessage("[ParseJSON] Received command: " $json);
+	`AP.DebugMessage("[ParseJSON] Received command: " $json);
 		
 	// UnrealScript's JSON parser does not like []
 	json = Repl(json, "[{", "{");
 	json = Repl(json, "}]", "}");
 	
-	//`AP.DebugMessage("[ParseJSON] Reformatted command: " $json);
+	`AP.DebugMessage("[ParseJSON] Reformatted command: " $json);
 	
 	jsonObj = new class'JsonObject';
 	jsonObj = class'JsonObject'.static.DecodeJson(json);
@@ -276,7 +277,11 @@ function ParseJSON(string json)
 			{
 				if (IsValidMessageType(jsonChild.GetStringValue("type")))
 				{
-					`AP.ScreenMessage(jsonChild.GetStringValue("text"));
+					text = jsonChild.GetStringValue("text");
+					if (InStr(text, "[Hint]:") == -1)
+					{
+						`AP.ScreenMessage(text);
+					}
 				}
 			}
 			
@@ -311,7 +316,7 @@ function ParseJSON(string json)
 
 function bool IsValidMessageType(string msgType)
 {
-	return (msgType != "ItemSend" && msgType != "Hint");
+	return (msgType != "ItemSend" && msgType != "Hint" && msgType != "player_id");
 }
 
 function OnLocationInfoCommand(string json)

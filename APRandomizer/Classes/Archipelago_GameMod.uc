@@ -1,4 +1,5 @@
 class Archipelago_GameMod extends GameMod
+	dependson(Archipelago_ItemInfo)
 	dependson(Archipelago_HUDElementBubble)
 	config(Mods);
 
@@ -10,6 +11,7 @@ var int PlayerSlot;
 var bool ActMapChange;
 var bool IsItemTimePiece; // used to tell if a time piece being given to us is from AP or not
 var array<string> PlayerNames;
+var array<string> TakenTimePieces; // see PreBeginPlay()
 
 var config int DebugMode;
 var config int DisableInjection;
@@ -110,6 +112,7 @@ function CreateClient(optional float delay=0.0)
 
 event PreBeginPlay()
 {
+	local Hat_ChapterActInfo act;
 	Super.PreBeginPlay();
 	
 	if (bool(DisableInjection) || `GameManager.GetCurrentMapFilename() ~= `GameManager.TitleScreenMapName)
@@ -118,6 +121,20 @@ event PreBeginPlay()
 	if (!IsArchipelagoEnabled() && `SaveManager.GetCurrentSaveData().TotalPlayTime <= 0.0)
 	{
 		SetAPBits("ArchipelagoEnabled", 1);
+	}
+	
+	// We need to remove the player's time pieces that are from rifts, then give them back
+	// because otherwise the associated rift portals will disappear. Curse you, Hat_TimeRiftPortal!
+	if (IsArchipelagoEnabled() && !IsInSpaceship())
+	{
+		foreach `GameManager.GetChapterInfo().ChapterActInfo(act)
+		{
+			if (act.IsBonus && `SaveManager.HasTimePiece(act.hourglass))
+			{
+				`SaveManager.GetCurrentSaveData().RemoveTimePiece(act.hourglass);
+				TakenTimePieces.AddItem(act.hourglass);
+			}
+		}
 	}
 }
 
@@ -236,6 +253,14 @@ function OnPostInitGame()
 			ChestArray.AddItem(chest);
 			chest.Content = class'Hat_Collectible_EnergyBit';
 		}
+		
+		// see PreBeginPlay()
+		for (i = 0; i < TakenTimePieces.Length; i++)
+		{
+			`SaveManager.GiveTimePiece(TakenTimePieces[i], false);
+		}
+		
+		TakenTimePieces.Length = 0;
 	}
 	
 	// check if our slot data is already saved to disk
@@ -271,7 +296,7 @@ function OpenSlotNameBubble(optional float delay=0.0)
 	hud = Hat_HUD(Hat_PlayerController(GetALocalPlayerController()).MyHUD);
 	bubble = Archipelago_HUDElementBubble(hud.OpenHUD(class'Archipelago_HUDElementBubble'));
 	bubble.BubbleType = BubbleType_SlotName;
-	bubble.OpenInputText(hud, "Archipelago", class'Hat_ConversationType_Internet', 'a', 25);
+	bubble.OpenInputText(hud, "Please enter your slot name.", class'Hat_ConversationType_Regular', 'a', 25);
 }
 
 function OpenPasswordBubble(optional float delay=0.0)
@@ -288,7 +313,7 @@ function OpenPasswordBubble(optional float delay=0.0)
 	hud = Hat_HUD(Hat_PlayerController(GetALocalPlayerController()).MyHUD);
 	bubble = Archipelago_HUDElementBubble(hud.OpenHUD(class'Archipelago_HUDElementBubble'));
 	bubble.BubbleType = BubbleType_Password;
-	bubble.OpenInputText(hud, "Archipelago", class'Hat_ConversationType_Internet', 'a', 25);
+	bubble.OpenInputText(hud, "Please enter password (if there is none, just left-click).", class'Hat_ConversationType_Regular', 'a', 25);
 }
 
 function OpenConnectBubble(optional float delay=0.0)
@@ -305,7 +330,7 @@ function OpenConnectBubble(optional float delay=0.0)
 	hud = Hat_HUD(Hat_PlayerController(GetALocalPlayerController()).MyHUD);
 	bubble = Archipelago_HUDElementBubble(hud.OpenHUD(class'Archipelago_HUDElementBubble'));
 	bubble.BubbleType = BubbleType_Connect;
-	bubble.OpenInputText(hud, "Archipelago", class'Hat_ConversationType_Internet', 'a', 25);
+	bubble.OpenInputText(hud, "Please enter IP:Port.", class'Hat_ConversationType_Regular', 'a', 25);
 }
 
 // Called by client the moment a "Connected" packet is received from the Archipelago server.
@@ -353,7 +378,6 @@ function LoadSlotData(JsonObject json)
 	if (SlotData.Initialized)
 		return;
 	
-	SlotData.ConnectedOnce = true;
 	SlotData.ActRando = json.GetBoolValue("ActRandomizer");
 	SlotData.ShuffleStorybookPages = json.GetBoolValue("ShuffleStorybookPages");
 	SlotData.DeathLink = json.GetBoolValue("death_link");
@@ -394,8 +418,9 @@ function LoadSlotData(JsonObject json)
 			n = json.GetStringValue(actNames[v]);
 			if (n != "")
 			{
-				if (n ~= "DeadBirdBasement") // This needs a special flag
+				if (n ~= "DeadBirdBasement")
 				{
+					// Ch.2 true finale needs a special flag, since there's no unique ChapterActInfo for it
 					actShuffle = CreateShuffledAct(Hat_ChapterActInfo(DynamicLoadObject(actNames[v], class'Hat_ChapterActInfo')), None);
 					actShuffle.IsDeadBirdBasementShuffledAct = true;
 				}
@@ -438,7 +463,7 @@ function ShuffledAct CreateShuffledAct(Hat_ChapterActInfo originalAct, Hat_Chapt
 
 function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string MapName)
 {
-	local Hat_ChapterActInfo act, shuffled, finale;
+	local Hat_ChapterActInfo act, shuffled, ceremony;
 	local bool basementShuffle;
 	local int basement;
 	
@@ -452,15 +477,15 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 	
 	if (Hat_ChapterInfo(ChapterInfo).ChapterID == 2)
 	{
-		finale = Hat_ChapterActInfo(DynamicLoadObject(
+		ceremony = Hat_ChapterActInfo(DynamicLoadObject(
 			"hatintime_chapterinfo.BattleOfTheBirds.BattleOfTheBirds_AwardCeremony", class'Hat_ChapterActInfo'));
 		
-		// If we are entering the Chapter 2 true finale, force Award Ceremony if it hasn't been completed
 		if (MapName ~= "DeadBirdStudio")
 		{
+			// If we are entering the Chapter 2 true finale, force Award Ceremony if it hasn't been completed
 			if (ActID == 6)
 			{
-				if (!IsActReallyCompleted(finale))
+				if (!IsActReallyCompleted(ceremony))
 				{
 					if (!SlotData.ActRando)
 					{
@@ -469,38 +494,42 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 					}
 					else
 					{
-						act = finale;
+						act = ceremony;
 					}
 				}
 			}
-			else // This is the actual Act 1
+			else
 			{
+				// This is the actual Act 1
 				act = Hat_ChapterInfo(ChapterInfo).GetChapterActInfoFromActID(ActID);
 			}
 		}
 		else if (MapName ~= "dead_cinema")
 		{
-			// On the other hand, if the game wants us to go to Award Ceremony instead of the true finale, don't if it's completed
-			if (IsActReallyCompleted(finale))
+			// If the game wants us to go to Award Ceremony, go to the true finale instead if Award Ceremony is completed.
+			// In the act randomizer, Award Ceremony is not shuffled due to this.
+			if (SlotData.ActRando)
 			{
-				if (!SlotData.ActRando)
-				{
-					MapName = "DeadBirdStudio";
+				if (!IsActReallyCompleted(ceremony))
 					return;
-				}
-				else
-				{
-					basementShuffle = true;
-				}
+				
+				basementShuffle = true; // Go to true finale shuffled act
+			}
+			else if (IsActReallyCompleted(ceremony))
+			{
+				MapName = "DeadBirdStudio"; // Go to true finale
+				return;
 			}
 		}
 		else
 		{
+			// Normal Chapter 2 act
 			act = Hat_ChapterInfo(ChapterInfo).GetChapterActInfoFromActID(ActID);
 		}
 	}
 	else
 	{
+		// Normal act
 		act = Hat_ChapterInfo(ChapterInfo).GetChapterActInfoFromActID(ActID);
 	}
 	
@@ -508,15 +537,13 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 		return;
 	
 	basement = 0;
-
+	
 	// We're looking for the Chapter 2 finale's shuffled act if this is true
 	if (basementShuffle)
 	{
 		shuffled = GetDeadBirdBasementShuffledAct(basement);
 		if (basement == 1) // It's vanilla, just don't do anything at this point
-		{
 			return;
-		}
 	}
 	else
 	{
@@ -697,19 +724,39 @@ function Hat_ChapterActInfo GetActualCurrentAct()
 	return `GameManager.GetChapterActInfo();
 }
 
+function Hat_ChapterActInfo GetChapterActInfoFromHourglass(string hourglass)
+{
+	local array<Hat_ChapterInfo> chapterInfoArray;
+	local Hat_ChapterInfo chapter;
+	local Hat_ChapterActInfo act;
+	
+	chapterInfoArray = class'Hat_ChapterInfo'.static.GetAllChapterInfo();
+	foreach chapterInfoArray(chapter)
+	{
+		chapter.ConditionalUpdateActList();
+		foreach chapter.ChapterActInfo(act)
+		{
+			if (act.Hourglass ~= hourglass)
+				return act;
+		}
+	}
+	
+	return None;
+}
+
 function UpdateChapterInfo()
 {
 	local Hat_SpaceshipPowerPanel panel;
-
+	
 	SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo.maingame.MafiaTown', SlotData.Chapter1Cost);
 	SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo.maingame.trainwreck_of_science', SlotData.Chapter2Cost);
 	SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo.maingame.subconforest', SlotData.Chapter3Cost);
 	SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo.maingame.Sand_and_Sails', SlotData.Chapter4Cost);
 	SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo.maingame.Mu_Finale', SlotData.Chapter5Cost);
 	
+	UpdateActUnlocks();
 	if (IsInSpaceship())
 	{
-		UpdateActUnlocks();
 		UpdatePowerPanels();
 		
 		foreach DynamicActors(class'Hat_SpaceshipPowerPanel', panel)
@@ -737,18 +784,21 @@ function UpdateActUnlocks()
 		chapter.ConditionalUpdateActList();
 		foreach chapter.ChapterActInfo(act)
 		{
-			if (IsChapterActInfoUnlocked(act))
+			if (act.IsBonus && !IsPurpleRift(act))
 			{
-				DebugMessage("Unlocked act: " $act);
-				
-				/*
-				if (act.IsBonus && !IsPurpleRift(act))
+				if (IsChapterActInfoUnlocked(act))
 				{
+					// Need to remove this from blue rifts, or else the portal won't appear
 					act.RequiredActID.Length = 0;
-					act.RequiredActID.AddItem(0);
+					act.RequiredActID.AddItem(0); // else game thinks it's a purple rift
+					act.InDevelopment = false;
 				}
-				*/
+				else
+				{
+					act.InDevelopment = true; // Force hide portal
+				}
 			}
+			
 		}
 	}
 }
@@ -866,7 +916,7 @@ function bool IsChapterActInfoUnlocked(Hat_ChapterActInfo ChapterActInfo, option
 
 function bool IsPurpleRift(Hat_ChapterActInfo act)
 {
-	return (act.IsBonus && InStr(act.hourglass, "_cave", false, true) != INDEX_NONE);
+	return (act.IsBonus && InStr(act.hourglass, "_cave", false, true) != -1);
 }
 
 function ShuffleCollectibles()
@@ -1154,10 +1204,10 @@ function OnCollectibleSpawned(Object collectible)
 	}
 	else if (Hat_Collectible_Important(collectible) != None && Actor(collectible).CreationTime > 0)
 	{
-		DebugMessage(collectible.Name $"Owner Name: " $Actor(collectible).Owner.Name);
-		
 		if (Actor(collectible).Owner != None)
 		{
+			DebugMessage(collectible.Name $"Owner Name: " $Actor(collectible).Owner.Name);
+
 			if (Actor(collectible).Owner.IsA('Hat_Goodie_Vault_Base'))
 			{
 				// We don't have the data of this item so just spawn a misc
@@ -1269,7 +1319,31 @@ function OnYarnCollected(optional int amount=1)
 
 function class<Hat_Ability> GetNextHat()
 {
-	switch (EHatType(GetAPBits("HatCraftIndex", 1)))
+	local EHatType type;
+	switch (GetAPBits("HatCraftIndex", 1))
+	{
+		case 1:
+			type = SlotData.Hat1;
+			break;
+		
+		case 2:
+			type = SlotData.Hat2;
+			break;
+
+		case 3:
+			type = SlotData.Hat3;
+			break;
+
+		case 4:
+			type = SlotData.Hat4;
+			break;
+
+		case 5:
+			type = SlotData.Hat5;
+			break;
+	}
+	
+	switch (type)
 	{
 		case HatType_Sprint: 
 			return class'Hat_Ability_Sprint';
@@ -1282,7 +1356,7 @@ function class<Hat_Ability> GetNextHat()
 		
 		case HatType_Dweller: 
 			return class'Hat_Ability_FoxMask';
-
+		
 		case HatType_TimeStop: 
 			return class'Hat_Ability_TimeStop';
 	}
@@ -1581,11 +1655,16 @@ function PrintItemsNearPlayer()
 
 function BeatGame()
 {
+	local JsonObject json;
+	
 	SetAPBits("HasBeatenGame", 1);
 	if (!IsFullyConnected())
 		return;
 	
-	client.SendBinaryMessage("[{\"cmd\":\"StatusUpdate\", \"status\":30}]");
+	json = new class'JsonObject';
+	json.SetStringValue("cmd", "StatusUpdate");
+	json.SetIntValue("status", 30);
+	client.SendBinaryMessage("["$class'JsonObject'.static.EncodeJson(json)$"]");
 }
 
 function bool IsArchipelagoEnabled()

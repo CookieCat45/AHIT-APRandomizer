@@ -25,7 +25,6 @@ enum EItemFlags
 // Used with slot data
 enum EHatType
 {
-	dummy,
 	HatType_Sprint,
 	HatType_Brewing,
 	HatType_Ice,

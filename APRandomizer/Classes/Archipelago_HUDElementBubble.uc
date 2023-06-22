@@ -29,21 +29,6 @@ function OpenInputText(HUD H, string strText, class<Hat_ConversationType_Base> C
     m_hBubbleTalker.InputInstance = new class'Archipelago_BubbleTalker_InputText';
 	m_hBubbleTalker.InputInstance.AddToInteractions(H.PlayerOwner, InVariableName, CharacterLength);
     m_hBubbleTalker.Open(H.PlayerOwner, strText);
-    
-    switch (BubbleType)
-    {
-        case BubbleType_SlotName:
-            `AP.ScreenMessage("Please enter slot name");
-            break;
-        
-        case BubbleType_Password:
-            `AP.ScreenMessage("Please enter password (if there is none, just left-click)");
-            break;
-        
-        case BubbleType_Connect:
-            `AP.ScreenMessage("Please enter IP:Port");
-            break;
-    }
 }
 
 function bool OnClick(HUD H, bool release)

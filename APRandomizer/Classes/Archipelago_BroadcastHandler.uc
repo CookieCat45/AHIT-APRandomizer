@@ -9,4 +9,4 @@ function bool AllowsBroadcast(Actor broadcaster, int inLen)
 function BroadcastText( PlayerReplicationInfo SenderPRI, PlayerController Receiver, coerce string Msg, optional name Type )
 {
 	Receiver.TeamMessage(SenderPRI, Msg, Type, 7.0); // and extend message lifetime
-} 
+}
