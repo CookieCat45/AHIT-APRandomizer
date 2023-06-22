@@ -11,4 +11,9 @@ You will need the Steam release of A Hat in Time.
 5. In the `HatinTime_AP` folder, navigate to `Binaries/Win64` and create a new file: `steam_appid.txt`. In this new text file, input the number `253230` on the first line.
 6. Create a shortcut of `HatinTimeGame.exe` from that folder and move it to wherever you'd like. You will use this shortcut to open the Archipelago-compatible version of A Hat in Time.
 7. Download a release of the mod. Go to `HatinTime_AP/HatinTimeGame/Mods` (if the `Mods` folder doesn't exist, create it) and move the `APRandomizer` folder into it.
-8. Start up the game using your new shortcut. When you create a new save file, you should be prompted to enter your slot name, password, and AP server address:port after loading into the Spaceship.
+8. Start up the game using your new shortcut. Go to the game's settings and make sure "Enable Developer Console" is checked.
+
+When you create a new save file, you should be prompted to enter your slot name, password, and AP server address:port after loading into the Spaceship.
+
+# Info
+This mod, at the moment, is entirely proof-of-concept. There will likely be many bugs, impossible seeds, and other issues. Regardless, you can still set it up and play if you are curious or wish to help with beta-testing.
