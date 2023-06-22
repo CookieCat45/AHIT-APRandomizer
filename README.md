@@ -1,6 +1,10 @@
 # AHIT-APRandomizer
 AHIT Archipelago implementation. Currently only works on DLC 2.2.
 
+This mod, at the moment, is entirely proof-of-concept. There will likely be many bugs, impossible seeds, and other issues. Regardless, you can still set it up and play if you are curious or wish to help with beta-testing.
+
+Currently, no DLC content is shuffled. Only the base game chapters (1-5) work.
+
 # How to install
 You will need the Steam release of A Hat in Time.
   
@@ -14,8 +18,3 @@ You will need the Steam release of A Hat in Time.
 8. Start up the game using your new shortcut. Go to the game's settings and make sure "Enable Developer Console" is checked.
 
 When you create a new save file, you should be prompted to enter your slot name, password, and AP server address:port after loading into the Spaceship.
-
-# Info
-This mod, at the moment, is entirely proof-of-concept. There will likely be many bugs, impossible seeds, and other issues. Regardless, you can still set it up and play if you are curious or wish to help with beta-testing.
-
-Currently, no DLC content is shuffled. Only the base game chapters (1-5) work.
