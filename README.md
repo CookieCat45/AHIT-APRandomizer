@@ -17,3 +17,5 @@ When you create a new save file, you should be prompted to enter your slot name,
 
 # Info
 This mod, at the moment, is entirely proof-of-concept. There will likely be many bugs, impossible seeds, and other issues. Regardless, you can still set it up and play if you are curious or wish to help with beta-testing.
+
+Currently, no DLC content is shuffled. Only the base game chapters (1-5) work.
