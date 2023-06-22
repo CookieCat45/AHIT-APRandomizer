@@ -150,16 +150,21 @@ alpine_regions = [
 
 first_chapter_act_blacklist = [
     "Cheating the Race",
+
     "Train Rush",
     "Dead Bird Studio Basement",
+
     "The Subcon Well",
     "Toilet of Doom",
     "Mail Delivery Service",
     "Time Rift - Pipe",
+    "Time Rift - Village",
+
     "Alpine Free Roam",
     "The Illness has Spread",
     "Time Rift - The Twilight Bell",
     "Time Rift - Curly Tail Trail",
+
     "Time Rift - Gallery",
 ]
 
@@ -392,6 +397,11 @@ def randomize_act_entrances(world: World):
 
                 region_list.remove(region)
                 entrance_list.remove(entrance)
+
+        # Add in blacklisted acts with their defaults
+        for name in blacklisted_acts.keys():
+            blacklisted_region: Region = world.multiworld.get_region(blacklisted_acts[name], world.player)
+            world.update_chapter_act_info(blacklisted_region, blacklisted_region)
 
         set_rift_indirect_connections(world, rift_dict)
 

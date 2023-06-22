@@ -23,6 +23,9 @@ class HatInTimeWorld(World):
 
     option_definitions = ahit_options
 
+    hat_craft_order: typing.List[HatType] = [HatType.SPRINT, HatType.BREWING, HatType.ICE,
+                                             HatType.DWELLER, HatType.TIME_STOP]
+
     hat_yarn_costs: typing.Dict[HatType, int] = {HatType.SPRINT: -1, HatType.BREWING: -1, HatType.ICE: -1,
                                                  HatType.DWELLER: -1, HatType.TIME_STOP: -1}
 
@@ -54,6 +57,9 @@ class HatInTimeWorld(World):
                 yarn.classification = ItemClassification.filler
 
         itempool += yarn_pool
+
+        if self.multiworld.RandomizeHatOrder[self.player].value > 0:
+            self.multiworld.random.shuffle(self.hat_craft_order)
 
         for name in ahit_items.keys():
             if name == "Yarn":
@@ -89,17 +95,25 @@ class HatInTimeWorld(World):
         for i in self.chapter_timepiece_costs.keys():
             spoiler_handle.write("Chapter %i Cost: %i\n" % (i, self.chapter_timepiece_costs[ChapterIndex(i)]))
 
+        for hat in self.hat_craft_order:
+            spoiler_handle.write("Hat Cost: %s: %i\n" % (hat, self.hat_yarn_costs[hat]))
+
     def fill_slot_data(self) -> dict:
-        slot_data: dict = {"sprint_yarn_cost": self.hat_yarn_costs[HatType.SPRINT],
-                           "brewing_yarn_cost": self.hat_yarn_costs[HatType.BREWING],
-                           "ice_yarn_cost": self.hat_yarn_costs[HatType.ICE],
-                           "dweller_yarn_cost": self.hat_yarn_costs[HatType.DWELLER],
-                           "timestop_yarn_cost": self.hat_yarn_costs[HatType.TIME_STOP],
+        slot_data: dict = {"SprintYarnCost": self.hat_yarn_costs[HatType.SPRINT],
+                           "BrewingYarnCost": self.hat_yarn_costs[HatType.BREWING],
+                           "IceYarnCost": self.hat_yarn_costs[HatType.ICE],
+                           "DwellerYarnCost": self.hat_yarn_costs[HatType.DWELLER],
+                           "TimeStopYarnCost": self.hat_yarn_costs[HatType.TIME_STOP],
                            "Chapter1Cost": self.chapter_timepiece_costs[ChapterIndex.MAFIA],
                            "Chapter2Cost": self.chapter_timepiece_costs[ChapterIndex.BIRDS],
                            "Chapter3Cost": self.chapter_timepiece_costs[ChapterIndex.SUBCON],
                            "Chapter4Cost": self.chapter_timepiece_costs[ChapterIndex.ALPINE],
-                           "Chapter5Cost": self.chapter_timepiece_costs[ChapterIndex.FINALE]}
+                           "Chapter5Cost": self.chapter_timepiece_costs[ChapterIndex.FINALE],
+                           "Hat1": int(self.hat_craft_order[0]),
+                           "Hat2": int(self.hat_craft_order[1]),
+                           "Hat3": int(self.hat_craft_order[2]),
+                           "Hat4": int(self.hat_craft_order[3]),
+                           "Hat5": int(self.hat_craft_order[4])}
 
         if self.multiworld.ActRandomizer[self.player].value > 0:
             for name in self.act_connections.keys():

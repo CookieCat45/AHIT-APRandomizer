@@ -46,7 +46,7 @@ def location_dlc_enabled(world: World, location: str) -> bool:
 
 
 ahit_locations = {
-    "Spaceship - Mustache Girl": LocData(301000, "Spaceship"),
+    "Spaceship - Rumbi": LocData(301000, "Spaceship"),
     "Spaceship - Cooking Cat": LocData(301001, "Spaceship"),
     "Mafia Town - Umbrella": LocData(301002, "Welcome to Mafia Town"),
 
@@ -195,10 +195,12 @@ ahit_locations = {
     "Alpine Skyline - The Twilight Bell: Ice Platform": LocData(335826, "The Twilight Bell"),
     "Alpine Skyline - Goat Outpost Horn": LocData(334760, "Alpine Free Roam"),
     "Alpine Skyline - Windy Passage": LocData(334776, "Alpine Free Roam"),
-    "Alpine Skyline - The Windmill: Bird Nest": LocData(336395, "The Windmill"),
+    "Alpine Skyline - The Windmill: Time Trial": LocData(336395, "The Windmill"),
     "Alpine Skyline - The Windmill: Entrance": LocData(335783, "The Windmill"),
     "Alpine Skyline - The Windmill: Dropdown": LocData(335815, "The Windmill"),
     "Alpine Skyline - The Windmill: House Window": LocData(335389, "The Windmill"),
+
+    "Time's End - Frozen Item": LocData(304108, "Time's End"),
 }
 
 act_completions = {
@@ -247,7 +249,7 @@ act_completions = {
     "Act Completion (Time Rift - Curly Tail Trail)": LocData(313335, "Time Rift - Curly Tail Trail"),
     "Act Completion (Time Rift - Alpine Skyline)": LocData(311777, "Time Rift - Alpine Skyline"),
 
-    "Act Completion (Time's End - The Finale)": LocData(311778, "Time's End"),
+    "Act Completion (Time's End - The Finale)": LocData(311872, "Time's End"),
 }
 
 storybook_pages = {
@@ -267,21 +269,21 @@ storybook_pages = {
     "Dead Bird Studio (Rift) - Page: In The Corner": LocData(345453, "Time Rift - Dead Bird Studio"),
     "Dead Bird Studio (Rift) - Page: Above TV Room": LocData(345445, "Time Rift - Dead Bird Studio"),
 
-    "Sleepy Subcon - Page: Behind Entrance Area": LocData(365373, "Time Rift - Dead Bird Studio"),
-    "Sleepy Subcon - Page: Near Wrecking Ball": LocData(365327, "Time Rift - Dead Bird Studio"),
-    "Sleepy Subcon - Page: Behind Crane": LocData(365371, "Time Rift - Dead Bird Studio"),
-    "Sleepy Subcon - Page: Wrecked Treehouse": LocData(365326, "Time Rift - Dead Bird Studio"),
-    "Sleepy Subcon - Page: Behind 2nd Rift Gate": LocData(365372, "Time Rift - Dead Bird Studio"),
-    "Sleepy Subcon - Page: Rotating Platform": LocData(365328, "Time Rift - Dead Bird Studio"),
-    "Sleepy Subcon - Page: Behind 3rd Rift Gate": LocData(365329, "Time Rift - Dead Bird Studio"),
-    "Sleepy Subcon - Page: Frozen Tree": LocData(365330, "Time Rift - Dead Bird Studio"),
-    "Sleepy Subcon - Page: Secret Library": LocData(365370, "Time Rift - Dead Bird Studio"),
+    "Sleepy Subcon - Page: Behind Entrance Area": LocData(345373, "Time Rift - Dead Bird Studio"),
+    "Sleepy Subcon - Page: Near Wrecking Ball": LocData(345327, "Time Rift - Dead Bird Studio"),
+    "Sleepy Subcon - Page: Behind Crane": LocData(345371, "Time Rift - Dead Bird Studio"),
+    "Sleepy Subcon - Page: Wrecked Treehouse": LocData(345326, "Time Rift - Dead Bird Studio"),
+    "Sleepy Subcon - Page: Behind 2nd Rift Gate": LocData(345372, "Time Rift - Dead Bird Studio"),
+    "Sleepy Subcon - Page: Rotating Platform": LocData(345328, "Time Rift - Dead Bird Studio"),
+    "Sleepy Subcon - Page: Behind 3rd Rift Gate": LocData(345329, "Time Rift - Dead Bird Studio"),
+    "Sleepy Subcon - Page: Frozen Tree": LocData(345330, "Time Rift - Dead Bird Studio"),
+    "Sleepy Subcon - Page: Secret Library": LocData(345370, "Time Rift - Dead Bird Studio"),
 
-    "Alpine Skyline (Rift) - Page: Entrance Area Hidden Ledge": LocData(375016, "Time Rift - Alpine Skyline"),
-    "Alpine Skyline (Rift) - Page: Windmill Island Ledge": LocData(375012, "Time Rift - Alpine Skyline"),
-    "Alpine Skyline (Rift) - Page: Waterfall Wooden Pillar": LocData(375015, "Time Rift - Alpine Skyline"),
-    "Alpine Skyline (Rift) - Page: Lonely Birdhouse Top": LocData(375014, "Time Rift - Alpine Skyline"),
-    "Alpine Skyline (Rift) - Page: Below Aqueduct": LocData(375013, "Time Rift - Alpine Skyline"),
+    "Alpine Skyline (Rift) - Page: Entrance Area Hidden Ledge": LocData(345016, "Time Rift - Alpine Skyline"),
+    "Alpine Skyline (Rift) - Page: Windmill Island Ledge": LocData(345012, "Time Rift - Alpine Skyline"),
+    "Alpine Skyline (Rift) - Page: Waterfall Wooden Pillar": LocData(345015, "Time Rift - Alpine Skyline"),
+    "Alpine Skyline (Rift) - Page: Lonely Birdhouse Top": LocData(345014, "Time Rift - Alpine Skyline"),
+    "Alpine Skyline (Rift) - Page: Below Aqueduct": LocData(345013, "Time Rift - Alpine Skyline"),
 }
 
 shop_locations = {
@@ -295,6 +297,7 @@ shop_locations = {
     "Badge Seller - Item 8": LocData(301010, "Badge Seller"),
     "Badge Seller - Item 9": LocData(301011, "Badge Seller"),
     "Badge Seller - Item 10": LocData(301012, "Badge Seller"),
+    "Mafia Boss Shop Item": LocData(301013, "Spaceship"),
 }
 
 location_table = {

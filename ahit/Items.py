@@ -139,10 +139,10 @@ item_frequencies = {
 }
 
 junk_weights = {
-    "25 Pons": 40,
-    "50 Pons": 20,
-    "Health Pon": 30,
-    "100 Pons": 10,
+    "25 Pons": 50,
+    "50 Pons": 10,
+    "Health Pon": 35,
+    "100 Pons": 5,
 }
 
 item_table = {

@@ -13,9 +13,9 @@ def can_use_hat(state: CollectionState, world: World, hat: HatType) -> bool:
 
 def get_remaining_hat_cost(state: CollectionState, world: World, hat: HatType) -> int:
     cost: int = 0
-    for i in range(5):
-        cost += world.hat_yarn_costs.get(HatType(i))
-        if HatType(i) == hat:
+    for h in world.hat_craft_order:
+        cost += world.hat_yarn_costs.get(h)
+        if h == hat:
             break
 
     return max(cost - state.count("Yarn", world.player), 0)
@@ -246,10 +246,12 @@ def set_rules(world: World):
             add_rule(location, lambda state: can_reach_subcon_main(state, w))
 
     # Spaceship
-    add_rule(mw.get_location("Spaceship - Mustache Girl", p),
-             lambda state: state.has("Time Piece (Barrel Battle)", p))
+    add_rule(mw.get_location("Spaceship - Rumbi", p),
+             lambda state: get_timepiece_count(state, w) >= 4)
     add_rule(mw.get_location("Spaceship - Cooking Cat", p),
              lambda state: get_timepiece_count(state, w) >= 5)
+    add_rule(mw.get_location("Mafia Boss Shop Item", p),
+             lambda state: get_timepiece_count(state, w) >= 12)
 
     # Mafia Town
     add_rule(mw.get_location("Mafia Town - Above Boats", p),
@@ -337,6 +339,9 @@ def set_rules(world: World):
     add_rule(mw.get_location("Alpine Skyline - The Birdhouse: Dweller Platforms Relic", p),
              lambda state: can_use_hat(state, w, HatType.DWELLER) or can_sdj(state, w))
 
+    add_rule(mw.get_location("Alpine Skyline - The Windmill: Time Trial", p),
+             lambda state: can_use_hat(state, w, HatType.DWELLER) or can_sdj(state, w))
+
     add_rule(mw.get_location("Alpine Skyline - The Twilight Bell: Ice Platform", p),
              lambda state: can_use_hat(state, w, HatType.ICE) or can_sdj(state, w))
 
@@ -358,9 +363,7 @@ def set_rules(world: World):
     add_rule(mw.get_location("Act Completion (Award Ceremony Boss)", p),
              lambda state: can_use_hookshot(state, w))
 
-    # Collecting the Award Ceremony time piece locks you out of this act so this item has to be junk
-    # The act itself also cannot be shuffled
-    mw.get_location("Act Completion (Award Ceremony)", p).progress_type = LocationProgressType.EXCLUDED
+    # mw.get_location("Act Completion (Award Ceremony)", p).progress_type = LocationProgressType.EXCLUDED
 
     # Subcon Forest
     add_rule(mw.get_location("Act Completion (Toilet of Doom)", p),

@@ -9,6 +9,12 @@ class ActRandomizer(Toggle):
     default = 1
 
 
+class RandomizeHatOrder(Toggle):
+    """Randomize the order that hats are stitched in."""
+    display_name = "Randomize Hat Order"
+    default = 1
+
+
 class BetterCompassBadge(Toggle):
     """If enabled, start with the Compass Badge. In Archipelago, the Compass Badge will track all items in the world
     (instead of just Relics). Recommended if you're not familiar with where item locations are."""
@@ -184,6 +190,7 @@ class ParadeTrapWeight(Range):
 ahit_options: typing.Dict[str, type(Option)] = {
 
     "ActRandomizer":            ActRandomizer,
+    "RandomizeHatOrder":        RandomizeHatOrder,
     "BetterCompassBadge":       BetterCompassBadge,
     "ShuffleStorybookPages":    ShuffleStorybookPages,
     "StartingChapter":          StartingChapter,
