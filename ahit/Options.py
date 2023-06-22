@@ -16,7 +16,7 @@ class RandomizeHatOrder(Toggle):
 
 
 class BetterCompassBadge(Toggle):
-    """If enabled, start with the Compass Badge. In Archipelago, the Compass Badge will track all items in the world
+    """NOT IMPLEMENTED If enabled, start with the Compass Badge. In Archipelago, the Compass Badge will track all items in the world
     (instead of just Relics). Recommended if you're not familiar with where item locations are."""
     display_name = "Start with Compass Badge"
     default = 0
@@ -53,13 +53,13 @@ class CTRWithSprint(Toggle):
 
 # DLC
 class EnableDLC1(Toggle):
-    """Shuffle content from The Arctic Cruise (Chapter 6) into the game.
+    """NOT IMPLEMENTED Shuffle content from The Arctic Cruise (Chapter 6) into the game.
     DO NOT ENABLE THIS OPTION IF YOU DO NOT HAVE THE DLC INSTALLED!!!"""
     display_name = "Shuffle Chapter 6"
 
 
 class EnableDLC2(Toggle):
-    """Shuffle content from Nyakuza Metro (Chapter 7) into the game.
+    """NOT IMPLEMENTED Shuffle content from Nyakuza Metro (Chapter 7) into the game.
     DO NOT ENABLE THIS OPTION IF YOU DO NOT HAVE THE DLC INSTALLED!!!"""
     display_name = "Shuffle Chapter 7"
 
@@ -100,7 +100,7 @@ class Chapter5MaxCost(Range):
 
 # Death Wish
 class EnableDeathWish(Toggle):
-    """Shuffle Death Wish contracts into the game.
+    """NOT IMPLEMENTED Shuffle Death Wish contracts into the game.
     Each contract by default will have a single check granted upon completion.
     DO NOT ENABLE THIS OPTION IF YOU DO NOT HAVE THE DLC INSTALLED!!!"""
     display_name = "Enable Death Wish"
@@ -108,19 +108,19 @@ class EnableDeathWish(Toggle):
 
 
 class DWEnableBonus(Toggle):
-    """In Death Wish, allow the full completion of contracts to reward items."""
+    """NOT IMPLEMENTED In Death Wish, allow the full completion of contracts to reward items."""
     display_name = "Shuffle Death Wish Full Completions"
     default = 0
 
 
 class DWExcludeAnnoyingContracts(Toggle):
-    """Exclude Death Wish contracts from the pool that are particularly tedious or take a long time to reach/clear."""
+    """NOT IMPLEMENTED Exclude Death Wish contracts from the pool that are particularly tedious or take a long time to reach/clear."""
     display_name = "Exclude Annoying Death Wish Contracts"
     default = 1
 
 
 class DWExcludeAnnoyingBonuses(Toggle):
-    """If Death Wish full completions are shuffled in, exclude particularly tedious Death Wish full completions
+    """NOT IMPLEMENTED If Death Wish full completions are shuffled in, exclude particularly tedious Death Wish full completions
     from the pool"""
     display_name = "Exclude Annoying Death Wish Full Completions"
     default = 1
