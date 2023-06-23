@@ -442,7 +442,7 @@ def set_act_indirect_connections(world: World):
 
     # Act 3 and 5 require contracts, 2 and 4 do not
     # The contract traps won't spawn on the map unless the player has the Contractual Obligations time piece
-    add_rule(w.mw.get_entrance("Subcon Forest - Act 3", p),
+    add_rule(mw.get_entrance("Subcon Forest - Act 3", p),
              lambda state: state.has("Time Piece (Contractual Obligations)", p))
     reg_act_connection(w, "Contractual Obligations", "Subcon Forest - Act 3")
     reg_act_connection(w, "The Subcon Well", "Subcon Forest - Act 3")
@@ -454,7 +454,7 @@ def set_act_indirect_connections(world: World):
     reg_act_connection(w, "The Subcon Well", "Subcon Forest - Act 4")
     reg_act_connection(w, "Mail Delivery Service", "Subcon Forest - Act 4")
 
-    add_rule(w.mw.get_entrance("Subcon Forest - Act 5", p),
+    add_rule(mw.get_entrance("Subcon Forest - Act 5", p),
              lambda state: state.has("Time Piece (Contractual Obligations)", p))
     reg_act_connection(w, "Contractual Obligations", "Subcon Forest - Act 5")
     reg_act_connection(w, "Toilet of Doom", "Subcon Forest - Act 5")
