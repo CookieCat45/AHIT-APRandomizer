@@ -123,7 +123,7 @@ event PreBeginPlay()
 		SetAPBits("ArchipelagoEnabled", 1);
 	}
 	
-	// We need to remove the player's time pieces that are from rifts, then give them back
+	// We need to remove the player's time pieces that are from rifts in vanilla, then give them back
 	// because otherwise the associated rift portals will disappear. Curse you, Hat_TimeRiftPortal!
 	if (IsArchipelagoEnabled() && !IsInSpaceship())
 	{
@@ -241,7 +241,7 @@ function OnPostInitGame()
 		// We need to do this early, before connecting, otherwise the game
 		// might empty the chest on us if it has an important item in vanilla.
 		// Example of this happening is the Hookshot Badge chest in the Subcon Well.
-		// This will also prevent the player from nabbing vanilla chest contents as well.
+		// This will also prevent the player from possibly nabbing vanilla chest contents as well.
 		foreach DynamicActors(class'Hat_TreasureChest_Base', chest)
 		{
 			if (chest.Opened || class<Hat_Collectible_Important>(chest.Content) == None)
