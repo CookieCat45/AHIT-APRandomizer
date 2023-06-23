@@ -61,11 +61,6 @@ class HatInTimeWorld(World):
         if self.multiworld.RandomizeHatOrder[self.player].value > 0:
             self.multiworld.random.shuffle(self.hat_craft_order)
 
-        minimum = self.multiworld.Chapter5MinCost[self.player].value
-        maximum = self.multiworld.Chapter5MaxCost[self.player].value
-        self.set_chapter_cost(ChapterIndex.FINALE, self.multiworld.random.randint(min(minimum, maximum), max(minimum, maximum)))
-        required_time_pieces = self.get_chapter_cost(ChapterIndex.FINALE)
-
         for name in ahit_items.keys():
             if name == "Yarn":
                 continue
@@ -76,22 +71,13 @@ class HatInTimeWorld(World):
             if ahit_items.get(name).classification == ItemClassification.filler:
                 continue
 
-            if ahit_items.get(name).classification == ItemClassification.trap:
-                continue
-
             itempool += self.create_multiple_items(name, item_frequencies.get(name, 1))
 
-        time_piece_count: int = 0
         for name in time_pieces.keys():
             if not item_dlc_enabled(self, name):
                 continue
 
-            time_piece = self.create_item(name)
-            if time_piece_count > required_time_pieces:
-                time_piece.classification = ItemClassification.filler
-
-            itempool += [time_piece]
-            time_piece_count += 1
+            itempool += [self.create_item(name)]
 
         itempool += self.create_junk_items(get_total_locations(self)-len(itempool))
         self.multiworld.itempool += itempool
