@@ -281,10 +281,6 @@ def set_rules(world: World):
              lambda state: can_use_hookshot(state, w))
 
     # Subcon Forest
-    # For some reason this only shows up in Act 1
-    add_rule(mw.get_location("Subcon Forest - Cherry Bomb Bone Cage", p),
-             lambda state: state.can_reach(mw.get_location("Act Completion (Contractual Obligations)", p)), p)
-
     add_rule(mw.get_location("Subcon Forest - Dweller Stump", p),
              lambda state: can_use_hat(state, w, HatType.DWELLER))
 
@@ -502,10 +498,10 @@ def set_rift_indirect_connections(world: World, regions: typing.Dict[str, Region
     for entrance in regions["Time Rift - Sleepy Subcon"].entrances:
         add_rule(entrance, lambda state: has_combo(state, w, RelicType.UFO))
 
-    for entrance in mw.get_region("Time Rift - The Twilight Bell", p).entrances:
+    for entrance in regions["Time Rift - The Twilight Bell"].entrances:
         add_rule(entrance, lambda state: state.can_reach(mw.get_location("Act Completion (The Twilight Bell)", p)))
 
-    for entrance in mw.get_region("Time Rift - Curly Tail Trail", p).entrances:
+    for entrance in regions["Time Rift - Curly Tail Trail"].entrances:
         add_rule(entrance, lambda state: state.can_reach(mw.get_location("Act Completion (The Windmill)", p)))
 
     for entrance in regions["Time Rift - Alpine Skyline"].entrances:
