@@ -381,6 +381,7 @@ def get_alpine_entrance(world: World) -> Entrance:
             return region.entrances[0]
 
 
+# Might not be needed anymore?
 def reg_act_connection(world: World, region_name: str, unlocked_entrance: str):
     region = world.multiworld.get_region(region_name, world.player)
     entrance = world.multiworld.get_entrance(unlocked_entrance, world.player)
@@ -439,6 +440,10 @@ def set_act_indirect_connections(world: World):
     reg_act_connection(w, "Queen Vanessa's Manor", "Subcon Forest - Act 2")
     reg_act_connection(w, "Mail Delivery Service", "Subcon Forest - Act 2")
 
+    # Act 3 and 5 require contracts, 2 and 4 do not
+    # The contract traps won't spawn on the map unless the player has the Contractual Obligations time piece
+    add_rule(w.mw.get_entrance("Subcon Forest - Act 3", p),
+             lambda state: state.has("Time Piece (Contractual Obligations)", p))
     reg_act_connection(w, "Contractual Obligations", "Subcon Forest - Act 3")
     reg_act_connection(w, "The Subcon Well", "Subcon Forest - Act 3")
     reg_act_connection(w, "Queen Vanessa's Manor", "Subcon Forest - Act 3")
@@ -449,6 +454,8 @@ def set_act_indirect_connections(world: World):
     reg_act_connection(w, "The Subcon Well", "Subcon Forest - Act 4")
     reg_act_connection(w, "Mail Delivery Service", "Subcon Forest - Act 4")
 
+    add_rule(w.mw.get_entrance("Subcon Forest - Act 5", p),
+             lambda state: state.has("Time Piece (Contractual Obligations)", p))
     reg_act_connection(w, "Contractual Obligations", "Subcon Forest - Act 5")
     reg_act_connection(w, "Toilet of Doom", "Subcon Forest - Act 5")
     reg_act_connection(w, "Queen Vanessa's Manor", "Subcon Forest - Act 5")
