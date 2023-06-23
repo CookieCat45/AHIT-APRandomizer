@@ -433,7 +433,8 @@ def create_region(world: World, name: str) -> Region:
 
     for (key, data) in location_table.items():
         if data.region == name:
-            if key in storybook_pages.keys() and world.multiworld.ShuffleStorybookPages[world.player].value is False:
+            if key in storybook_pages.keys() \
+            and world.multiworld.ShuffleStorybookPages[world.player].value is False:
                 continue
 
             location = HatInTimeLocation(world.player, key, data.id, reg)
