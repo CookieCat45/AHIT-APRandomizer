@@ -197,7 +197,7 @@ def set_rules(world: World):
         "Mafia Town - Act 7": lambda state: can_clear_act(state, w, "Mafia Town - Act 4"),
 
         # Not available in Heating Up Mafia Town
-        "Mafia Town - Purple Time Rift": lambda state: has_combo(state, w, RelicType.BURGER),
+        # "Mafia Town - Purple Time Rift": lambda state: has_combo(state, w, RelicType.BURGER),
 
         # Battle of the Birds ------------------------------------------------------------------------------------------
         "Battle of the Birds - Act 2": lambda state: can_clear_act(state, w, "Battle of the Birds - Act 1"),
@@ -215,7 +215,7 @@ def set_rules(world: World):
         "Battle of the Birds - Act 6B": lambda state: can_clear_act(state, w, "Battle of the Birds - Act 4")
         and can_clear_act(state, w, "Battle of the Birds - Act 5"),
 
-        "Battle of the Birds - Purple Time Rift": lambda state: has_combo(state, w, RelicType.TRAIN),
+        # "Battle of the Birds - Purple Time Rift": lambda state: has_combo(state, w, RelicType.TRAIN),
 
         # Subcon Forest ------------------------------------------------------------------------------------------------
 
@@ -227,11 +227,11 @@ def set_rules(world: World):
         "Subcon Forest - Act 4": lambda state: can_reach_subcon_main(state, w),
         "Subcon Forest - Act 5": lambda state: can_reach_subcon_main(state, w),
 
-        "Subcon Forest - Purple Time Rift": lambda state: has_combo(state, w, RelicType.UFO),
+        # "Subcon Forest - Purple Time Rift": lambda state: has_combo(state, w, RelicType.UFO),
 
         # Alpine Skyline -----------------------------------------------------------------------------------------------
         "Alpine Skyline - Act 5": lambda state: can_clear_alpine(state, w),
-        "Alpine Skyline - Purple Time Rift": lambda state: has_combo(state, w, RelicType.CRAYON),
+        # "Alpine Skyline - Purple Time Rift": lambda state: has_combo(state, w, RelicType.CRAYON),
     }
     for entrance in mw.get_entrances():
         if entrance.name in act_rules.keys():
@@ -489,6 +489,9 @@ def set_rift_indirect_connections(world: World, regions: typing.Dict[str, Region
         add_rule(entrance, lambda state: can_clear_act(state, world, "Mafia Town - Act 6"))
         reg_act_connection(w, mw.get_entrance("Mafia Town - Act 6", p).connected_region.name, entrance.name)
 
+    for entrance in regions["Time Rift - Mafia of Cooks"].entrances:
+        add_rule(entrance, lambda state: has_combo(state, w, RelicType.BURGER))
+
     for entrance in regions["Time Rift - The Owl Express"].entrances:
         add_rule(entrance, lambda state: can_clear_act(state, world, "Battle of the Birds - Act 2"))
         add_rule(entrance, lambda state: can_clear_act(state, world, "Battle of the Birds - Act 3"))
@@ -501,6 +504,9 @@ def set_rift_indirect_connections(world: World, regions: typing.Dict[str, Region
         reg_act_connection(w, mw.get_entrance("Battle of the Birds - Act 4", p).connected_region.name, entrance.name)
         reg_act_connection(w, mw.get_entrance("Battle of the Birds - Act 5", p).connected_region.name, entrance.name)
 
+    for entrance in regions["Time Rift - Dead Bird Studio"].entrances:
+        add_rule(entrance, lambda state: has_combo(state, w, RelicType.TRAIN))
+
     for entrance in regions["Time Rift - Pipe"].entrances:
         add_rule(entrance, lambda state: can_clear_act(state, world, "Subcon Forest - Act 2"))
         reg_act_connection(w, mw.get_entrance("Subcon Forest - Act 2", p).connected_region.name, entrance.name)
@@ -509,6 +515,11 @@ def set_rift_indirect_connections(world: World, regions: typing.Dict[str, Region
         add_rule(entrance, lambda state: can_clear_act(state, world, "Subcon Forest - Act 4"))
         reg_act_connection(w, mw.get_entrance("Subcon Forest - Act 4", p).connected_region.name, entrance.name)
 
+    for entrance in regions["Time Rift - Sleepy Subcon"].entrances:
+        add_rule(entrance, lambda state: has_combo(state, w, RelicType.UFO))
+
+    for entrance in regions["Time Rift - Alpine Skyline"].entrances:
+        add_rule(entrance, lambda state: has_combo(state, w, RelicType.CRAYON))
 
 # Basically the same as above, but without the need of the dict since we are just setting defaults
 # Called if Act Rando is disabled
