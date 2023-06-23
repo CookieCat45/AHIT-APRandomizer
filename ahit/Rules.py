@@ -108,12 +108,6 @@ def can_clear_alpine(state: CollectionState, world: World) -> bool:
             and state.can_reach(world.multiworld.get_location("Act Completion (The Windmill)", player=world.player)))
 
 
-def reg_act_connection(world: World, region_name: str, unlocked_entrance: str):
-    region = world.multiworld.get_region(region_name, world.player)
-    entrance = world.multiworld.get_entrance(unlocked_entrance, world.player)
-    world.multiworld.register_indirect_condition(region, entrance)
-
-
 def set_rules(world: World):
     w = world
     mw = world.multiworld
@@ -139,10 +133,6 @@ def set_rules(world: World):
         loop_count += 1
         value = lowest_cost + (cost_increment * loop_count)
         w.set_chapter_cost(chapter, mw.random.randint(value, min(value+cost_increment, highest_cost)))
-
-    minimum = mw.Chapter5MinCost[p].value
-    maximum = mw.Chapter5MaxCost[p].value
-    w.set_chapter_cost(ChapterIndex.FINALE, mw.random.randint(min(minimum, maximum), max(minimum, maximum)))
 
     add_rule(mw.get_entrance("-> Mafia Town", p),
              lambda state: get_timepiece_count(state, w) >= w.get_chapter_cost(ChapterIndex.MAFIA))
@@ -172,8 +162,6 @@ def set_rules(world: World):
     if mw.ActRandomizer[p].value == 0:
         set_default_rift_connections(w)
 
-    # Blue Time Rifts (except for ones on the Spaceship) have to be handled differently because they only unlock
-    # after completing certain Acts (aka regions).
     act_rules = {
 
         # Note that these are act entrances, not their corresponding exit regions
@@ -196,9 +184,6 @@ def set_rules(world: World):
         "Mafia Town - Act 6": lambda state: can_clear_act(state, w, "Mafia Town - Act 4"),
         "Mafia Town - Act 7": lambda state: can_clear_act(state, w, "Mafia Town - Act 4"),
 
-        # Not available in Heating Up Mafia Town
-        "Mafia Town - Purple Time Rift": lambda state: has_combo(state, w, RelicType.BURGER),
-
         # Battle of the Birds ------------------------------------------------------------------------------------------
         "Battle of the Birds - Act 2": lambda state: can_clear_act(state, w, "Battle of the Birds - Act 1"),
         "Battle of the Birds - Act 3": lambda state: can_clear_act(state, w, "Battle of the Birds - Act 1"),
@@ -215,23 +200,17 @@ def set_rules(world: World):
         "Battle of the Birds - Act 6B": lambda state: can_clear_act(state, w, "Battle of the Birds - Act 4")
         and can_clear_act(state, w, "Battle of the Birds - Act 5"),
 
-        "Battle of the Birds - Purple Time Rift": lambda state: has_combo(state, w, RelicType.TRAIN),
-
         # Subcon Forest ------------------------------------------------------------------------------------------------
 
-        # Most acts in Subcon are either contract-exclusive or can be entered from almost any act
-
-        # Only need to be able to reach the forest for these to get the contracts or access the entrances.
+        # Acts 3 and 5 require their contracts, but 2 and 4 can be entered from any act besides finale.
+        # Access to Contractual Obligations is required to get any contracts to begin with, however.
         "Subcon Forest - Act 2": lambda state: can_reach_subcon_main(state, w),
-        "Subcon Forest - Act 3": lambda state: can_reach_subcon_main(state, w),
+        "Subcon Forest - Act 3": lambda state: state.can_reach(mw.get_region("Contractual Obligations", p)),
         "Subcon Forest - Act 4": lambda state: can_reach_subcon_main(state, w),
-        "Subcon Forest - Act 5": lambda state: can_reach_subcon_main(state, w),
-
-        "Subcon Forest - Purple Time Rift": lambda state: has_combo(state, w, RelicType.UFO),
+        "Subcon Forest - Act 5": lambda state: state.can_reach(mw.get_region("Contractual Obligations", p)),
 
         # Alpine Skyline -----------------------------------------------------------------------------------------------
         "Alpine Skyline - Act 5": lambda state: can_clear_alpine(state, w),
-        "Alpine Skyline - Purple Time Rift": lambda state: has_combo(state, w, RelicType.CRAYON),
     }
     for entrance in mw.get_entrances():
         if entrance.name in act_rules.keys():
@@ -251,7 +230,8 @@ def set_rules(world: World):
     add_rule(mw.get_location("Spaceship - Cooking Cat", p),
              lambda state: get_timepiece_count(state, w) >= 5)
     add_rule(mw.get_location("Mafia Boss Shop Item", p),
-             lambda state: get_timepiece_count(state, w) >= 12)
+             lambda state: get_timepiece_count(state, w) >= 12
+             and get_timepiece_count(state, w) >= w.get_chapter_cost(ChapterIndex.BIRDS))
 
     # Mafia Town
     add_rule(mw.get_location("Mafia Town - Above Boats", p),
@@ -396,6 +376,12 @@ def get_alpine_entrance(world: World) -> Entrance:
             return region.entrances[0]
 
 
+def reg_act_connection(world: World, region_name: str, unlocked_entrance: str):
+    region = world.multiworld.get_region(region_name, world.player)
+    entrance = world.multiworld.get_entrance(unlocked_entrance, world.player)
+    world.multiworld.register_indirect_condition(region, entrance)
+
+
 def set_act_indirect_connections(world: World):
     w = world
     mw = world.multiworld
@@ -449,9 +435,6 @@ def set_act_indirect_connections(world: World):
     reg_act_connection(w, "Mail Delivery Service", "Subcon Forest - Act 2")
 
     reg_act_connection(w, "Contractual Obligations", "Subcon Forest - Act 3")
-    reg_act_connection(w, "The Subcon Well", "Subcon Forest - Act 3")
-    reg_act_connection(w, "Queen Vanessa's Manor", "Subcon Forest - Act 3")
-    reg_act_connection(w, "Mail Delivery Service", "Subcon Forest - Act 3")
 
     reg_act_connection(w, "Contractual Obligations", "Subcon Forest - Act 4")
     reg_act_connection(w, "Toilet of Doom", "Subcon Forest - Act 4")
@@ -459,9 +442,6 @@ def set_act_indirect_connections(world: World):
     reg_act_connection(w, "Mail Delivery Service", "Subcon Forest - Act 4")
 
     reg_act_connection(w, "Contractual Obligations", "Subcon Forest - Act 5")
-    reg_act_connection(w, "Toilet of Doom", "Subcon Forest - Act 5")
-    reg_act_connection(w, "Queen Vanessa's Manor", "Subcon Forest - Act 5")
-    reg_act_connection(w, "The Subcon Well", "Subcon Forest - Act 5")
 
     reg_act_connection(w, mw.get_entrance("Subcon Forest - Act 1", p).connected_region.name, "Subcon Forest - Act 6")
     reg_act_connection(w, mw.get_entrance("Subcon Forest - Act 2", p).connected_region.name, "Subcon Forest - Act 6")
@@ -489,6 +469,9 @@ def set_rift_indirect_connections(world: World, regions: typing.Dict[str, Region
         add_rule(entrance, lambda state: can_clear_act(state, world, "Mafia Town - Act 6"))
         reg_act_connection(w, mw.get_entrance("Mafia Town - Act 6", p).connected_region.name, entrance.name)
 
+    for entrance in regions["Time Rift - Mafia of Cooks"].entrances:
+        add_rule(entrance, lambda state: has_combo(state, w, RelicType.BURGER))
+
     for entrance in regions["Time Rift - The Owl Express"].entrances:
         add_rule(entrance, lambda state: can_clear_act(state, world, "Battle of the Birds - Act 2"))
         add_rule(entrance, lambda state: can_clear_act(state, world, "Battle of the Birds - Act 3"))
@@ -501,6 +484,9 @@ def set_rift_indirect_connections(world: World, regions: typing.Dict[str, Region
         reg_act_connection(w, mw.get_entrance("Battle of the Birds - Act 4", p).connected_region.name, entrance.name)
         reg_act_connection(w, mw.get_entrance("Battle of the Birds - Act 5", p).connected_region.name, entrance.name)
 
+    for entrance in regions["Time Rift - Dead Bird Studio"].entrances:
+        add_rule(entrance, lambda state: has_combo(state, w, RelicType.TRAIN))
+
     for entrance in regions["Time Rift - Pipe"].entrances:
         add_rule(entrance, lambda state: can_clear_act(state, world, "Subcon Forest - Act 2"))
         reg_act_connection(w, mw.get_entrance("Subcon Forest - Act 2", p).connected_region.name, entrance.name)
@@ -508,6 +494,18 @@ def set_rift_indirect_connections(world: World, regions: typing.Dict[str, Region
     for entrance in regions["Time Rift - Village"].entrances:
         add_rule(entrance, lambda state: can_clear_act(state, world, "Subcon Forest - Act 4"))
         reg_act_connection(w, mw.get_entrance("Subcon Forest - Act 4", p).connected_region.name, entrance.name)
+
+    for entrance in regions["Time Rift - Sleepy Subcon"].entrances:
+        add_rule(entrance, lambda state: has_combo(state, w, RelicType.UFO))
+
+    for entrance in regions["Time Rift - The Twilight Bell"].entrances:
+        add_rule(entrance, lambda state: state.can_reach(mw.get_location("Act Completion (The Twilight Bell)", p)))
+
+    for entrance in regions["Time Rift - Curly Tail Trail"].entrances:
+        add_rule(entrance, lambda state: state.can_reach(mw.get_location("Act Completion (The Windmill)", p)))
+
+    for entrance in regions["Time Rift - Alpine Skyline"].entrances:
+        add_rule(entrance, lambda state: has_combo(state, w, RelicType.CRAYON))
 
 
 # Basically the same as above, but without the need of the dict since we are just setting defaults
@@ -525,6 +523,9 @@ def set_default_rift_connections(world: World):
         add_rule(entrance, lambda state: can_clear_act(state, world, "Mafia Town - Act 6"))
         reg_act_connection(w, mw.get_region("Heating Up Mafia Town", p).name, entrance.name)
 
+    for entrance in mw.get_region("Time Rift - Mafia of Cooks", p).entrances:
+        add_rule(entrance, lambda state: has_combo(state, w, RelicType.BURGER))
+
     for entrance in mw.get_region("Time Rift - The Owl Express", p).entrances:
         add_rule(entrance, lambda state: can_clear_act(state, world, "Battle of the Birds - Act 2"))
         add_rule(entrance, lambda state: can_clear_act(state, world, "Battle of the Birds - Act 3"))
@@ -537,6 +538,9 @@ def set_default_rift_connections(world: World):
         reg_act_connection(w, mw.get_entrance("Battle of the Birds - Act 4", p).connected_region.name, entrance.name)
         reg_act_connection(w, mw.get_entrance("Battle of the Birds - Act 5", p).connected_region.name, entrance.name)
 
+    for entrance in mw.get_region("Time Rift - Dead Bird Studio", p).entrances:
+        add_rule(entrance, lambda state: has_combo(state, w, RelicType.TRAIN))
+
     for entrance in mw.get_region("Time Rift - Pipe", p).entrances:
         add_rule(entrance, lambda state: can_clear_act(state, world, "Subcon Forest - Act 2"))
         reg_act_connection(w, mw.get_region("The Subcon Well", p).name, entrance.name)
@@ -544,3 +548,15 @@ def set_default_rift_connections(world: World):
     for entrance in mw.get_region("Time Rift - Village", p).entrances:
         add_rule(entrance, lambda state: can_clear_act(state, world, "Subcon Forest - Act 4"))
         reg_act_connection(w, mw.get_region("Queen Vanessa's Manor", p).name, entrance.name)
+
+    for entrance in mw.get_region("Time Rift - Sleepy Subcon", p).entrances:
+        add_rule(entrance, lambda state: has_combo(state, w, RelicType.UFO))
+
+    for entrance in mw.get_region("Time Rift - The Twilight Bell", p).entrances:
+        add_rule(entrance, lambda state: state.can_reach(mw.get_location("Act Completion (The Twilight Bell)", p)))
+
+    for entrance in mw.get_region("Time Rift - Curly Tail Trail", p).entrances:
+        add_rule(entrance, lambda state: state.can_reach(mw.get_location("Act Completion (The Windmill)", p)))
+
+    for entrance in mw.get_region("Time Rift - Alpine Skyline", p).entrances:
+        add_rule(entrance, lambda state: has_combo(state, w, RelicType.CRAYON))
