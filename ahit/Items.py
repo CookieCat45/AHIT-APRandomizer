@@ -58,7 +58,7 @@ ahit_items = {
     "Badge Pin": ItemData(300043, ItemClassification.useful),
 
     # Other
-    # "Rift Token": ItemData(300032, ItemClassification.progression),
+    "Rift Token": ItemData(300032, ItemClassification.filler),
     "Umbrella": ItemData(300033, ItemClassification.progression),
 
     # Garbage items
@@ -143,6 +143,7 @@ junk_weights = {
     "50 Pons": 10,
     "Health Pon": 35,
     "100 Pons": 5,
+    "Rift Token": 15,
 }
 
 item_table = {
