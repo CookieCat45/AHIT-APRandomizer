@@ -354,6 +354,10 @@ def randomize_act_entrances(world: World):
                 time_rifts.append(region)
 
         rift_dict: typing.Dict[str, Region] = {}
+        chapter_rift_block_list: typing.List[ChapterIndex] = []
+        block_attempts: int = 0
+        last_rift_index: ChapterIndex = ChapterIndex.SPACESHIP
+        last_target_index: ChapterIndex = ChapterIndex.SPACESHIP
         while len(entrance_list) > 0 or len(region_list) > 0 or len(time_rifts) > 0:
             entrance = entrance_list[world.multiworld.random.randint(0, len(entrance_list) - 1)]
 
@@ -366,8 +370,36 @@ def randomize_act_entrances(world: World):
                 if act_chapters[rift_region.name] == act_chapters[target_region.name]:
                     continue
 
-                rift_entrances: typing.List[Entrance] = []
+                cont: bool = False
+                if "Time Rift" not in target_region.name:
 
+                    # If target act is from chapter 1 or 3,
+                    # can't have more than one non-rift act from the target act's chapter in a Time Rift
+                    # in the same chapter.
+                    rift_chapter_index = [index for index, name in chapter_regions.items() if name == act_chapters[rift_region.name]][0]
+                    target_chapter_index = [index for index, name in chapter_regions.items() if name == act_chapters[target_region.name]][0]
+
+                    if rift_chapter_index is not ChapterIndex.SPACESHIP \
+                       and target_chapter_index is ChapterIndex.MAFIA or target_chapter_index is ChapterIndex.SUBCON:
+                        for i in range(len(chapter_rift_block_list)):
+                            ci: ChapterIndex = chapter_rift_block_list[i]
+                            if rift_chapter_index == ci and i % 2 == 0 \
+                               and chapter_rift_block_list[i+1] == target_chapter_index:
+                                cont = block_attempts < 300
+                                if last_rift_index is rift_chapter_index and last_target_index is target_chapter_index:
+                                    block_attempts += 1
+
+                                last_rift_index = rift_chapter_index
+                                last_target_index = target_chapter_index
+
+                        if cont is False and block_attempts < 300:
+                            chapter_rift_block_list.append(rift_chapter_index)
+                            chapter_rift_block_list.append(target_chapter_index)
+
+                if cont:
+                    continue
+
+                rift_entrances: typing.List[Entrance] = []
                 for e in rift_region.entrances:
                     rift_entrances.append(e)
 
@@ -491,3 +523,7 @@ def create_region_and_connect(world: World,
 def get_first_chapter_region(world: World) -> Region:
     start_chapter: ChapterIndex = world.multiworld.StartingChapter[world.player]
     return world.multiworld.get_region(chapter_regions.get(start_chapter), world.player)
+
+
+def get_act_original_chapter(world: World, act_name: str) -> Region:
+    return world.multiworld.get_region(act_chapters[act_name], world.player)

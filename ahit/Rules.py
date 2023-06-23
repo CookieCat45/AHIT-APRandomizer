@@ -64,9 +64,10 @@ def has_combo(state: CollectionState, world: World, relic: RelicType) -> bool:
 
 
 def can_clear_act(state: CollectionState, world: World, act_entrance: str) -> bool:
-    for location in world.multiworld.get_entrance(act_entrance, world.player).connected_region.locations:
+    entrance: Entrance = world.multiworld.get_entrance(act_entrance, world.player)
+    for location in entrance.connected_region.locations:
         if "Act Completion" in location.name:
-            return state.can_reach(location, player=world.player)
+            return state.can_reach(entrance, player=world.player) and location.access_rule(state)
 
     return True  # Likely a free roam act
 
@@ -106,12 +107,6 @@ def can_clear_alpine(state: CollectionState, world: World) -> bool:
             and state.can_reach(world.multiworld.get_location("Act Completion (The Lava Cake)", player=world.player))
             and state.can_reach(world.multiworld.get_location("Act Completion (The Twilight Bell)", player=world.player))
             and state.can_reach(world.multiworld.get_location("Act Completion (The Windmill)", player=world.player)))
-
-
-def reg_act_connection(world: World, region_name: str, unlocked_entrance: str):
-    region = world.multiworld.get_region(region_name, world.player)
-    entrance = world.multiworld.get_entrance(unlocked_entrance, world.player)
-    world.multiworld.register_indirect_condition(region, entrance)
 
 
 def set_rules(world: World):
@@ -166,9 +161,7 @@ def set_rules(world: World):
              lambda state: get_timepiece_count(state, w) >= w.get_chapter_cost(ChapterIndex.FINALE)
              and can_use_hat(state, w, HatType.BREWING) and can_use_hat(state, w, HatType.DWELLER))
 
-    # Now act access
     set_act_indirect_connections(w)
-
     if mw.ActRandomizer[p].value == 0:
         set_default_rift_connections(w)
 
@@ -178,10 +171,10 @@ def set_rules(world: World):
 
         # Note that these are act entrances, not their corresponding exit regions
         "Spaceship - Time Rift A": lambda state: can_use_hat(state, w, HatType.BREWING)
-        and state.can_reach(mw.get_region("Battle of the Birds", player=p)),
+        and get_timepiece_count(state, w) >= w.get_chapter_cost(ChapterIndex.BIRDS),
 
         "Spaceship - Time Rift B": lambda state: can_use_hat(state, w, HatType.DWELLER)
-        and state.can_reach(mw.get_region("Alpine Skyline", player=p)),
+        and get_timepiece_count(state, w) >= w.get_chapter_cost(ChapterIndex.ALPINE),
 
         # Mafia Town ---------------------------------------------------------------------------------------------------
         "Mafia Town - Act 2": lambda state: can_clear_act(state, w, "Mafia Town - Act 1"),
@@ -195,9 +188,6 @@ def set_rules(world: World):
 
         "Mafia Town - Act 6": lambda state: can_clear_act(state, w, "Mafia Town - Act 4"),
         "Mafia Town - Act 7": lambda state: can_clear_act(state, w, "Mafia Town - Act 4"),
-
-        # Not available in Heating Up Mafia Town
-        # "Mafia Town - Purple Time Rift": lambda state: has_combo(state, w, RelicType.BURGER),
 
         # Battle of the Birds ------------------------------------------------------------------------------------------
         "Battle of the Birds - Act 2": lambda state: can_clear_act(state, w, "Battle of the Birds - Act 1"),
@@ -215,8 +205,6 @@ def set_rules(world: World):
         "Battle of the Birds - Act 6B": lambda state: can_clear_act(state, w, "Battle of the Birds - Act 4")
         and can_clear_act(state, w, "Battle of the Birds - Act 5"),
 
-        # "Battle of the Birds - Purple Time Rift": lambda state: has_combo(state, w, RelicType.TRAIN),
-
         # Subcon Forest ------------------------------------------------------------------------------------------------
 
         # Most acts in Subcon are either contract-exclusive or can be entered from almost any act
@@ -227,11 +215,8 @@ def set_rules(world: World):
         "Subcon Forest - Act 4": lambda state: can_reach_subcon_main(state, w),
         "Subcon Forest - Act 5": lambda state: can_reach_subcon_main(state, w),
 
-        # "Subcon Forest - Purple Time Rift": lambda state: has_combo(state, w, RelicType.UFO),
-
         # Alpine Skyline -----------------------------------------------------------------------------------------------
         "Alpine Skyline - Act 5": lambda state: can_clear_alpine(state, w),
-        # "Alpine Skyline - Purple Time Rift": lambda state: has_combo(state, w, RelicType.CRAYON),
     }
     for entrance in mw.get_entrances():
         if entrance.name in act_rules.keys():
@@ -396,6 +381,12 @@ def get_alpine_entrance(world: World) -> Entrance:
             return region.entrances[0]
 
 
+def reg_act_connection(world: World, region_name: str, unlocked_entrance: str):
+    region = world.multiworld.get_region(region_name, world.player)
+    entrance = world.multiworld.get_entrance(unlocked_entrance, world.player)
+    world.multiworld.register_indirect_condition(region, entrance)
+
+
 def set_act_indirect_connections(world: World):
     w = world
     mw = world.multiworld
@@ -520,6 +511,7 @@ def set_rift_indirect_connections(world: World, regions: typing.Dict[str, Region
 
     for entrance in regions["Time Rift - Alpine Skyline"].entrances:
         add_rule(entrance, lambda state: has_combo(state, w, RelicType.CRAYON))
+
 
 # Basically the same as above, but without the need of the dict since we are just setting defaults
 # Called if Act Rando is disabled
