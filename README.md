@@ -12,9 +12,9 @@ You will need the Steam release of A Hat in Time.
 
 2. In the Steam console, enter the following command: `download_depot 253230 253232 7770543545116491859`. Wait for the console to say the download is finished.
 
-3. Once the download finishes, go to `steamapps/content` in Steam's program folder.
+3. Once the download finishes, go to `steamapps/content/app_253230` in Steam's program folder.
 
-4. There should be a folder named `app_253230`. Rename it to `HatinTime_AP` and move it to your `steamapps/common` folder.
+4. There should be a folder named `depot_253232`. Rename it to `HatinTime_AP` and move it to your `steamapps/common` folder.
 
 5. In the `HatinTime_AP` folder, navigate to `Binaries/Win64` and create a new file: `steam_appid.txt`. In this new text file, input the number 253230 on the first line.
 
