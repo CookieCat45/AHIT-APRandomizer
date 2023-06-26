@@ -377,8 +377,10 @@ def randomize_act_entrances(world: World):
                     # If target act is from chapter 1 or 3,
                     # can't have more than one non-rift act from the target act's chapter in a Time Rift
                     # in the same chapter.
-                    rift_chapter_index = [index for index, name in chapter_regions.items() if name == act_chapters[rift_region.name]][0]
-                    target_chapter_index = [index for index, name in chapter_regions.items() if name == act_chapters[target_region.name]][0]
+                    rift_chapter_index = [index for index, name in chapter_regions.items()
+                                          if name == act_chapters[rift_region.name]][0]
+                    target_chapter_index = [index for index, name in chapter_regions.items()
+                                            if name == act_chapters[target_region.name]][0]
 
                     if rift_chapter_index is not ChapterIndex.SPACESHIP \
                        and target_chapter_index is ChapterIndex.MAFIA or target_chapter_index is ChapterIndex.SUBCON:
@@ -467,7 +469,7 @@ def create_region(world: World, name: str) -> Region:
     for (key, data) in location_table.items():
         if data.region == name:
             if key in storybook_pages.keys() \
-            and world.multiworld.ShuffleStorybookPages[world.player].value is False:
+               and world.multiworld.ShuffleStorybookPages[world.player].value == 0:
                 continue
 
             location = HatInTimeLocation(world.player, key, data.id, reg)

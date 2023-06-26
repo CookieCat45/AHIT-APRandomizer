@@ -19,11 +19,11 @@ def item_dlc_enabled(world: World, item: str) -> bool:
 
     if data.dlc_flags == HatDLC.none:
         return True
-    elif data.dlc_flags == HatDLC.dlc1 and world.multiworld.EnableDLC1[world.player].value is True:
+    elif data.dlc_flags == HatDLC.dlc1 and world.multiworld.EnableDLC1[world.player].value > 0:
         return True
-    elif data.dlc_flags == HatDLC.dlc2 and world.multiworld.EnableDLC2[world.player].value is True:
+    elif data.dlc_flags == HatDLC.dlc2 and world.multiworld.EnableDLC2[world.player].value > 0:
         return True
-    elif data.dlc_flags == HatDLC.death_wish and world.multiworld.EnableDeathWish[world.player].value is True:
+    elif data.dlc_flags == HatDLC.death_wish and world.multiworld.EnableDeathWish[world.player].value > 0:
         return True
 
     return False

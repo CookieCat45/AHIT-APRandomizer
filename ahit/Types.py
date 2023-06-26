@@ -2,6 +2,7 @@ from enum import IntEnum, IntFlag
 
 
 class HatType(IntEnum):
+    NONE = -1
     SPRINT = 0
     BREWING = 1
     ICE = 2

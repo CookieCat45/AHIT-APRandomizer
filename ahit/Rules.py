@@ -1,9 +1,9 @@
 from ..AutoWorld import World, CollectionState
-from ..generic.Rules import add_rule
+from ..generic.Rules import add_rule, set_rule
 from .Items import time_pieces
-from .Locations import ahit_locations
+from .Locations import location_table
 from .Types import HatType, RelicType, ChapterIndex
-from BaseClasses import Location, Entrance, LocationProgressType, Region
+from BaseClasses import Location, Entrance, Region
 import typing
 
 
@@ -22,7 +22,7 @@ def get_remaining_hat_cost(state: CollectionState, world: World, hat: HatType) -
 
 
 def can_sdj(state: CollectionState, world: World):
-    return world.multiworld.SDJLogic[world.player].value is True and can_use_hat(state, world, HatType.SPRINT)
+    return can_use_hat(state, world, HatType.SPRINT)
 
 
 def can_use_hookshot(state: CollectionState, world: World):
@@ -165,10 +165,7 @@ def set_rules(world: World):
     if mw.ActRandomizer[p].value == 0:
         set_default_rift_connections(w)
 
-    # Blue Time Rifts (except for ones on the Spaceship) have to be handled differently because they only unlock
-    # after completing certain Acts (aka regions).
     act_rules = {
-
         # Note that these are act entrances, not their corresponding exit regions
         "Spaceship - Time Rift A": lambda state: can_use_hat(state, w, HatType.BREWING)
         and get_timepiece_count(state, w) >= w.get_chapter_cost(ChapterIndex.BIRDS),
@@ -218,170 +215,77 @@ def set_rules(world: World):
         # Alpine Skyline -----------------------------------------------------------------------------------------------
         "Alpine Skyline - Act 5": lambda state: can_clear_alpine(state, w),
     }
+
     for entrance in mw.get_entrances():
         if entrance.name in act_rules.keys():
             add_rule(entrance, act_rules[entrance.name])
 
     location: Location
-    for loc in ahit_locations.keys():
+    for loc in location_table.keys():
         location = mw.get_location(loc, p)
         if location.parent_region.name == "Mafia Town":
             add_rule(location, lambda state: can_reach_mafia_town(state, w))
         elif location.parent_region.name == "Subcon Forest" and "Boss Arena Chest" not in location.name:
             add_rule(location, lambda state: can_reach_subcon_main(state, w))
 
-    # Spaceship
-    add_rule(mw.get_location("Spaceship - Rumbi", p),
-             lambda state: get_timepiece_count(state, w) >= 4)
-    add_rule(mw.get_location("Spaceship - Cooking Cat", p),
-             lambda state: get_timepiece_count(state, w) >= 5)
-    add_rule(mw.get_location("Mafia Boss Shop Item", p),
-             lambda state: get_timepiece_count(state, w) >= 12)
+        data = location_table[loc]
+        for hat in data.required_hats:
+            if hat is not HatType.NONE:
+                add_rule(location, lambda state: can_use_hat(state, w, hat))
 
-    # Mafia Town
-    add_rule(mw.get_location("Mafia Town - Above Boats", p),
-             lambda state: can_use_hookshot(state, w))
-    add_rule(mw.get_location("Mafia Town - Clock Tower Chest", p),
-             lambda state: can_use_hookshot(state, w))
-    add_rule(mw.get_location("Mafia Town - Top of Ruined Tower", p),
-             lambda state: can_use_hat(state, w, HatType.ICE))
-    add_rule(mw.get_location("Mafia Town - Ice Hat Cage", p),
-             lambda state: can_use_hat(state, w, HatType.ICE))
-    add_rule(mw.get_location("Mafia Town - Hot Air Balloon", p),
-             lambda state: can_use_hat(state, w, HatType.ICE))
-    add_rule(mw.get_location("Mafia Town - Top of Lighthouse", p),
-             lambda state: can_use_hookshot(state, w))
-    add_rule(mw.get_location("Mafia Town - Blue Vault Brewing Crate", p),
-             lambda state: can_use_hat(state, w, HatType.BREWING))
-    add_rule(mw.get_location("Mafia Town - Secret Cave", p),
-             lambda state: can_use_hat(state, w, HatType.BREWING))
+        if data.required_tps > 0:
+            add_rule(location, lambda state: get_timepiece_count(state, w) >= data.required_tps)
+
+        if data.hookshot:
+            add_rule(location, lambda state: can_use_hookshot(state, w))
+
     add_rule(mw.get_location("Mafia Town - Behind HQ Chest", p),
              lambda state: state.can_reach("Down with the Mafia!", player=p)
              or state.can_reach(mw.get_location("Act Completion (Heating Up Mafia Town)", player=p)))
 
-    add_rule(mw.get_location("Mafia HQ - Hallway Brewing Crate", p),
-             lambda state: can_use_hat(state, w, HatType.BREWING))
-    add_rule(mw.get_location("Mafia HQ - Secret Room", p),
-             lambda state: can_use_hat(state, w, HatType.ICE))
-
-    # Battle of the Birds
-    add_rule(mw.get_location("Murder on the Owl Express - Raven Suite Room", p),
-             lambda state: can_use_hat(state, w, HatType.BREWING))
-
-    add_rule(mw.get_location("Dead Bird Studio Basement - Window Platform", p),
-             lambda state: can_use_hookshot(state, w))
-    add_rule(mw.get_location("Dead Bird Studio Basement - Cardboard Conductor", p),
-             lambda state: can_use_hookshot(state, w))
-    add_rule(mw.get_location("Dead Bird Studio Basement - Above Conductor Sign", p),
-             lambda state: can_use_hookshot(state, w))
-    add_rule(mw.get_location("Dead Bird Studio Basement - Disco Room", p),
-             lambda state: can_use_hookshot(state, w))
-    add_rule(mw.get_location("Dead Bird Studio Basement - Small Room", p),
-             lambda state: can_use_hookshot(state, w))
-    add_rule(mw.get_location("Dead Bird Studio Basement - Tightrope", p),
-             lambda state: can_use_hookshot(state, w))
-    add_rule(mw.get_location("Dead Bird Studio Basement - Cameras", p),
-             lambda state: can_use_hookshot(state, w))
-    add_rule(mw.get_location("Dead Bird Studio Basement - Locked Room", p),
-             lambda state: can_use_hookshot(state, w))
-
-    # Subcon Forest
-    add_rule(mw.get_location("Subcon Forest - Dweller Stump", p),
-             lambda state: can_use_hat(state, w, HatType.DWELLER))
-
-    add_rule(mw.get_location("Subcon Forest - Dweller Floating Rocks", p),
-             lambda state: can_use_hat(state, w, HatType.DWELLER))
-
-    add_rule(mw.get_location("Subcon Forest - Dweller Platforming Tree A", p),
-             lambda state: can_use_hat(state, w, HatType.DWELLER))  # Can be skipped, a bit tricky tho
-
-    add_rule(mw.get_location("Subcon Forest - Dweller Platforming Tree B", p),
-             lambda state: can_use_hat(state, w, HatType.DWELLER) or can_sdj(state, w))
-
-    add_rule(mw.get_location("Subcon Forest - Giant Time Piece", p),
-             lambda state: can_use_hat(state, w, HatType.DWELLER))
-
-    add_rule(mw.get_location("Subcon Forest - Green and Purple Dweller Rocks", p),
-             lambda state: can_use_hat(state, w, HatType.DWELLER))
-
-    add_rule(mw.get_location("Subcon Forest - Dweller Shack", p),
-             lambda state: can_use_hat(state, w, HatType.DWELLER))
-
-    add_rule(mw.get_location("Subcon Forest - Tall Tree Hookshot Swing", p),
-             lambda state: can_use_hat(state, w, HatType.DWELLER)
-             and can_use_hookshot(state, w))
-
-    add_rule(mw.get_location("Subcon Forest - Noose Treehouse", p),
-             lambda state: can_use_hookshot(state, w))
-
-    add_rule(mw.get_location("Subcon Forest - Boss Arena Chest", p),
-             lambda state: can_reach_subcon_arena(state, w))
-
-    # Alpine Skyline
-    add_rule(mw.get_location("Alpine Skyline - The Birdhouse: Brewing Crate House", p),
-             lambda state: can_use_hat(state, w, HatType.BREWING))
-
-    add_rule(mw.get_location("Alpine Skyline - The Birdhouse: Dweller Platforms Relic", p),
-             lambda state: can_use_hat(state, w, HatType.DWELLER) or can_sdj(state, w))
-
-    add_rule(mw.get_location("Alpine Skyline - The Windmill: Time Trial", p),
-             lambda state: can_use_hat(state, w, HatType.DWELLER) or can_sdj(state, w))
-
-    add_rule(mw.get_location("Alpine Skyline - The Twilight Bell: Ice Platform", p),
-             lambda state: can_use_hat(state, w, HatType.ICE) or can_sdj(state, w))
-
-    # --------------------------------------------- Act completions --------------------------------------------- #
-
-    # Spaceship
-    add_rule(mw.get_location("Act Completion (Time Rift - Gallery)", p),
-             lambda state: can_use_hat(state, w, HatType.BREWING) or can_sdj(state, w))
-
-    # Mafia Town
     add_rule(mw.get_location("Act Completion (Cheating the Race)", p),
              lambda state: can_use_hat(state, w, HatType.TIME_STOP)
              or mw.CTRWithSprint[p].value > 0 and can_use_hat(state, w, HatType.SPRINT))
 
-    # Battle of the Birds
-    add_rule(mw.get_location("Act Completion (Train Rush)", p),
-             lambda state: can_use_hookshot(state, w))
+    add_rule(mw.get_location("Subcon Forest - Boss Arena Chest", p),
+             lambda state: can_reach_subcon_arena(state, w))
 
-    add_rule(mw.get_location("Act Completion (Award Ceremony Boss)", p),
-             lambda state: can_use_hookshot(state, w))
+    for entrance in get_alpine_entrances(w):
+        add_rule(entrance, lambda state: can_use_hookshot(state, w))
 
-    # mw.get_location("Act Completion (Award Ceremony)", p).progress_type = LocationProgressType.EXCLUDED
+    # set SDJ rules last
+    if mw.SDJLogic[p].value > 0:
+        set_sdj_rules(world)
 
-    # Subcon Forest
-    add_rule(mw.get_location("Act Completion (Toilet of Doom)", p),
-             lambda state: can_use_hookshot(state, w))
-
-    add_rule(mw.get_location("Act Completion (Mail Delivery Service)", p),
-             lambda state: can_use_hat(state, w, HatType.SPRINT))
-
-    # Alpine Skyline
-    add_rule(mw.get_location("Act Completion (The Illness has Spread)", p),
-             lambda state: can_use_hookshot(state, w))  # Just in case of act rando
-
-    add_rule(mw.get_location("Act Completion (Time Rift - The Twilight Bell)", p),
-             lambda state: can_use_hat(state, w, HatType.DWELLER))
-
-    add_rule(mw.get_location("Act Completion (Time Rift - Curly Tail Trail)", p),
-             lambda state: can_use_hat(state, w, HatType.ICE) or can_sdj(state, w))
-
-    # Other stuff
-    mw.completion_condition[p] = lambda state: \
-        state.can_reach(mw.get_location("Act Completion (Time's End - The Finale)", player=p))
-
-    alpine_entrance: Entrance = get_alpine_entrance(w)
-    add_rule(alpine_entrance, lambda state: can_use_hookshot(state, w))
+    mw.completion_condition[p] = lambda state: can_use_hat(state, w, HatType.BREWING) \
+        and can_use_hat(state, w, HatType.DWELLER) \
+        and can_use_hookshot(state, w) \
+        and get_timepiece_count(state, w) >= w.get_chapter_cost(ChapterIndex.FINALE)
 
 
-def get_alpine_entrance(world: World) -> Entrance:
+def set_sdj_rules(world: World):
+    set_rule(world.multiworld.get_location("Alpine Skyline - The Birdhouse: Dweller Platforms Relic", world.player),
+             lambda state: can_use_hat(state, world, HatType.DWELLER) or can_sdj(state, world))
+
+    set_rule(world.multiworld.get_location("Alpine Skyline - The Windmill: Time Trial", world.player),
+             lambda state: can_use_hat(state, world, HatType.DWELLER) or can_sdj(state, world))
+
+    set_rule(world.multiworld.get_location("Alpine Skyline - The Twilight Bell: Ice Platform", world.player),
+             lambda state: can_use_hat(state, world, HatType.ICE) or can_sdj(state, world))
+
+    set_rule(world.multiworld.get_location("Act Completion (Time Rift - Gallery)", world.player),
+             lambda state: can_use_hat(state, world, HatType.BREWING) or can_sdj(state, world))
+
+    set_rule(world.multiworld.get_location("Act Completion (Time Rift - Curly Tail Trail)", world.player),
+             lambda state: can_use_hat(state, world, HatType.ICE) or can_sdj(state, world))
+
+
+def get_alpine_entrances(world: World) -> typing.List[Entrance]:
     for region in world.multiworld.get_regions(world.player):
         if region.name == "Alpine Free Roam":
-            return region.entrances[0]
+            return region.entrances
 
 
-# Might not be needed anymore?
 def reg_act_connection(world: World, region_name: str, unlocked_entrance: str):
     region = world.multiworld.get_region(region_name, world.player)
     entrance = world.multiworld.get_entrance(unlocked_entrance, world.player)

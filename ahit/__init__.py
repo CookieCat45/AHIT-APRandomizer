@@ -46,38 +46,23 @@ class HatInTimeWorld(World):
 
         self.topology_present = self.multiworld.ActRandomizer[self.player].value
         yarn_pool: typing.List[Item] = self.create_multiple_items("Yarn", self.multiworld.YarnAvailable[self.player].value)
-        total_yarn_required = 0
-        for value in self.hat_yarn_costs.values():
-            total_yarn_required += value
-
-        count = 0
-        for yarn in yarn_pool:
-            count += 1
-            if count > total_yarn_required:
-                yarn.classification = ItemClassification.filler
-
         itempool += yarn_pool
 
         if self.multiworld.RandomizeHatOrder[self.player].value > 0:
             self.multiworld.random.shuffle(self.hat_craft_order)
 
-        for name in ahit_items.keys():
+        for name in item_table.keys():
             if name == "Yarn":
                 continue
 
             if not item_dlc_enabled(self, name):
                 continue
 
-            if ahit_items.get(name).classification == ItemClassification.filler:
+            item_type: ItemClassification = item_table.get(name).classification
+            if item_type is ItemClassification.filler or item_type is ItemClassification.trap:
                 continue
 
             itempool += self.create_multiple_items(name, item_frequencies.get(name, 1))
-
-        for name in time_pieces.keys():
-            if not item_dlc_enabled(self, name):
-                continue
-
-            itempool += [self.create_item(name)]
 
         itempool += self.create_junk_items(get_total_locations(self)-len(itempool))
         self.multiworld.itempool += itempool
