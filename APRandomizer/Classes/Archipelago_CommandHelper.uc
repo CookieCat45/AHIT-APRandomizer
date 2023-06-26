@@ -42,7 +42,10 @@ exec function ap_connect()
 {
 	if (`AP.Client == None)
 		`AP.CreateClient();
-
+	
+	if (`AP.IsFullyConnected())
+		return;
+	
 	`AP.Client.Connect();
 }
 

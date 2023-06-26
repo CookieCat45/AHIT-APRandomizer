@@ -95,7 +95,7 @@ act_chapters = {
     "The Finale":                       "Time's End"
 }
 
-# Hat_ChapterActInfo, from the game files
+# Hat_ChapterActInfo, from the game files to be used in act shuffle
 chapter_act_info = {
     "Time Rift - Gallery":          "hatintime_chapterinfo.spaceship.Spaceship_WaterRift_Gallery",
     "Time Rift - The Lab":          "hatintime_chapterinfo.spaceship.Spaceship_WaterRift_MailRoom",
@@ -117,7 +117,7 @@ chapter_act_info = {
     "Train Rush":                   "hatintime_chapterinfo.BattleOfTheBirds.BattleOfTheBirds_TrainRush",
     "The Big Parade":               "hatintime_chapterinfo.BattleOfTheBirds.BattleOfTheBirds_Parade",
     "Award Ceremony":               "hatintime_chapterinfo.BattleOfTheBirds.BattleOfTheBirds_AwardCeremony",
-    "Dead Bird Studio Basement":    "DeadBirdBasement",  # Dead Bird Studio Basement is different
+    "Dead Bird Studio Basement":    "DeadBirdBasement",  # Dead Bird Studio Basement has no ChapterActInfo
     "Time Rift - Dead Bird Studio": "hatintime_chapterinfo.BattleOfTheBirds.BattleOfTheBirds_CaveRift_Basement",
     "Time Rift - The Owl Express":  "hatintime_chapterinfo.BattleOfTheBirds.BattleOfTheBirds_WaterRift_Panels",
     "Time Rift - The Moon":         "hatintime_chapterinfo.BattleOfTheBirds.BattleOfTheBirds_WaterRift_Parade",
@@ -168,6 +168,7 @@ first_chapter_act_blacklist = [
     "Time Rift - Gallery",
 ]
 
+# Acts blacklisted in act shuffle
 # entrance: region
 blacklisted_acts = {
     "Battle of the Birds - Act 6A": "Award Ceremony",

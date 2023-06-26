@@ -33,12 +33,33 @@ function OpenInputText(HUD H, string strText, class<Hat_ConversationType_Base> C
 
 function bool OnClick(HUD H, bool release)
 {
-    local string ip;
-    local string port;
-    
     if (!release)
         return false;
     
+    if (Hat_HUD(H).IsGamepad())
+        return false;
+    
+    OnEnter(H);
+    return Super.OnClick(H, release);
+}
+
+// For gamepads, since A is the same button to enter text
+function bool OnAltClick(HUD H, bool release)
+{
+    if (!release)
+        return false;
+    
+    if (!Hat_HUD(H).IsGamepad())
+        return false;
+    
+    OnEnter(H);
+    return Super.OnClick(H, release);
+}
+
+function OnEnter(HUD H)
+{
+    local string ip, port;
+
     Answer = m_hBubbleTalker.InputInstance.Result;
     switch (BubbleType)
     {
@@ -48,7 +69,7 @@ function bool OnClick(HUD H, bool release)
                 m_hBubbleTalker.Destroy();
                 `AP.OpenPasswordBubble(0.5);
                 CloseHUD(H);
-
+            
             break;
         
         case BubbleType_Password:
@@ -73,8 +94,6 @@ function bool OnClick(HUD H, bool release)
             CloseHUD(H);
             break;
     }
-    
-    return Super.OnClick(H, release);
 }
 
 function Timer_OpenInputText(HUD H)

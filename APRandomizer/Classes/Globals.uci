@@ -7,6 +7,10 @@
 
 `define CODE_CONTINUATION 0 		// (00000000) - Continuation frame
 
+`define CODE_PING 137               // (10001001) - Ping
+
+`define CODE_PONG 138               // (10001010) - Pong
+
 `define CODE_TEXT 1 				// (00000001) - Text frame (use CODE_CONTINUATION to continue a text message)
 
 `define CODE_CONTINUATION_FIN 128 	// (10000000) - Continuation frame with FIN bit set (ends a multi-fragment message)

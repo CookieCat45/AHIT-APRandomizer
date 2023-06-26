@@ -53,7 +53,7 @@ ahit_items = {
     "Hookshot Badge": ItemData(300027, ItemClassification.progression),
     "Item Magnet Badge": ItemData(300028, ItemClassification.useful),
     "No Bonk Badge": ItemData(300029, ItemClassification.useful),
-    "Compass Badge": ItemData(300030, ItemClassification.useful),
+    # "Compass Badge": ItemData(300030, ItemClassification.useful),
     "Scooter Badge": ItemData(300031, ItemClassification.useful),
     "Badge Pin": ItemData(300043, ItemClassification.useful),
 
@@ -136,6 +136,7 @@ time_pieces = {
 }
 
 item_frequencies = {
+    "Badge Pin": 2
 }
 
 junk_weights = {

@@ -93,7 +93,9 @@ simulated function bool OnCollected(Actor Collector)
 	
 	// Save
 	if (OriginalCollectibleName != "")
+	{
 		SetOriginalLevelBit();
+	}
 		
 	`SaveManager.SaveToFile();
 	return Super.OnCollected(Collector);
@@ -101,11 +103,22 @@ simulated function bool OnCollected(Actor Collector)
 
 function SetOriginalLevelBit()
 {
+	if (InStr(OriginalCollectibleName, "AP_Camera") != -1)
+	{
+		`AP.SetAPBits(OriginalCollectibleName, 1);
+		return;
+	}
+	
 	class'Hat_SaveBitHelper'.static.SetLevelBits(OriginalCollectibleName, 1, class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename(string(GetLevelName())), `SaveManager.GetCurrentSaveData());
 }
 
 function bool HasOriginalLevelBit()
 {
+	if (InStr(OriginalCollectibleName, "AP_Camera") != -1)
+	{
+		return `AP.HasAPBit(OriginalCollectibleName, 1);
+	}
+
 	return class'Hat_SaveBitHelper'.static.HasLevelBit(OriginalCollectibleName, 1, class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename(string(GetLevelName())), `SaveManager.GetCurrentSaveData());
 }
 

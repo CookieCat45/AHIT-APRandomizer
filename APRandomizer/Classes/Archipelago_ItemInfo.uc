@@ -290,6 +290,11 @@ optional out class inventoryOverride) // Item inventory class override. Mainly f
 			worldClass = class'Archipelago_RandomizedItem_Umbrella';
 			return true;
 		
+		case 300043:
+			itemName = "Badge Pin";
+			worldClass = class'Archipelago_RandomizedItem_BadgePin';
+			return true;
+		
 		default:
 			return false;
 	}
@@ -455,22 +460,27 @@ static function string GetTimePieceFromItemID(int id, optional out int IsAct, op
 			
 		case 300082:
 			displayName = "Time Rift - The Twilight Bell";
+			IsAct = 0;
 			return "TimeRift_Water_Alp_Goats";
 			
 		case 300083:
 			displayName = "Time Rift - Curly Tail Trail";
+			IsAct = 0;
 			return "TimeRift_Water_AlpineSkyline_Cats";
 			
 		case 300084:
 			displayName = "Time Rift - Alpine Skyline";
+			IsAct = 0;
 			return "TimeRift_Cave_Alps";
 			
 		case 300085:
 			displayName = "Time Rift - Gallery";
+			IsAct = 0;
 			return "Spaceship_WaterRift_Gallery";
 			
 		case 300086:
 			displayName = "Time Rift - The Lab";
+			IsAct = 0;
 			return "Spaceship_WaterRift_MailRoom";
 			
 		// Time's End

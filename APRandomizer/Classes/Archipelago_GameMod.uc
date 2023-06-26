@@ -7,14 +7,18 @@ var Archipelago_TcpLink Client;
 var Archipelago_BroadcastHandler Broadcaster;
 var Archipelago_SlotData SlotData;
 var Archipelago_ItemResender ItemResender;
-var int PlayerSlot;
 var bool ActMapChange;
 var bool IsItemTimePiece; // used to tell if a time piece being given to us is from AP or not
+var bool CollectiblesShuffled;
 var array<string> PlayerNames;
-var array<string> TakenTimePieces; // see PreBeginPlay()
+
+// see PreBeginPlay()
+var array<string> TakenTimePieces;
+var array<Hat_SnatcherContract_Act> TakenContracts;
 
 var config int DebugMode;
 var config int DisableInjection;
+var const editconst Vector SpaceshipSpawnLocation;
 
 struct immutable ShuffledAct
 {
@@ -47,6 +51,12 @@ const StoryBookPageIDRange = 340000;
 const RumbiYarnCheck = 301000;
 const CookingCatRelicCheck = 301001;
 const UmbrellaCheck = 301002;
+
+// These have to be hardcoded because camera badge item disappears if you have the camera badge
+const CameraBadgeCheck1 = 302003;
+const CameraBadgeCheck2 = 302004;
+var const editconst Vector Camera1Loc;
+var const editconst Vector Camera2Loc;
 
 // Traps
 var transient int BabyCount;
@@ -106,33 +116,61 @@ function CreateClient(optional float delay=0.0)
 		SetTimer(delay, false, NameOf(CreateClient));
 		return;
 	}
-
+	
 	client = Spawn(class'Archipelago_TcpLink');
 }
 
 event PreBeginPlay()
 {
 	local Hat_ChapterActInfo act;
+	local Hat_SaveGame save;
 	Super.PreBeginPlay();
 	
 	if (bool(DisableInjection) || `GameManager.GetCurrentMapFilename() ~= `GameManager.TitleScreenMapName)
 		return;
 	
-	if (!IsArchipelagoEnabled() && `SaveManager.GetCurrentSaveData().TotalPlayTime <= 0.0)
+	save = `SaveManager.GetCurrentSaveData();
+	if (!IsArchipelagoEnabled() && save.TotalPlayTime <= 0.0)
 	{
 		SetAPBits("ArchipelagoEnabled", 1);
 	}
 	
-	// We need to remove the player's time pieces that are from rifts, then give them back
-	// because otherwise the associated rift portals will disappear. Curse you, Hat_TimeRiftPortal!
 	if (IsArchipelagoEnabled() && !IsInSpaceship())
 	{
+		// We need to remove the player's time pieces that are from rifts in vanilla, then give them back
+		// because otherwise the associated rift portals will disappear. Curse you, Hat_TimeRiftPortal!
 		foreach `GameManager.GetChapterInfo().ChapterActInfo(act)
 		{
 			if (act.IsBonus && `SaveManager.HasTimePiece(act.hourglass))
 			{
-				`SaveManager.GetCurrentSaveData().RemoveTimePiece(act.hourglass);
+				save.RemoveTimePiece(act.hourglass);
 				TakenTimePieces.AddItem(act.hourglass);
+			}
+		}
+		
+		// Similar situation for Snatcher's contract traps. If the player is entering Subcon with no contracts,
+		// none of Snatcher's contract traps will spawn (Hat_SnatcherContractSummon) and the player will not be able 
+		// to get contracts until they either complete Vanessa's Manor (which softlocks them out of the act in act rando) 
+		// or Contractual Obligations.
+		if (`GameManager.GetCurrentMapFilename() ~= "subconforest")
+		{
+			if (save.SnatcherContracts.Length == 0 && save.CompletedSnatcherContracts.Length == 0
+				&& save.TurnedInSnatcherContracts.Length == 0)
+			{
+				// Give a dummy contract.
+				// The PlayerController hasn't spawned yet, so this will generate an Accessed None warning, but W/E.
+				save.GiveContract(class'Hat_SnatcherContract_Act', GetALocalPlayerController());
+			}
+		}
+		
+		// If we're going to Alps, make sure we go to the intro if we should
+		if (`GameManager.GetChapterInfo().ChapterID == 4 && `GameManager.GetCurrentAct() == 1 
+			&& !class'Hat_SaveBitHelper'.static.HasActBit("ForcedAlpineFinale", 1))
+		{
+			if (!class'Hat_SaveBitHelper'.static.HasLevelBit("Actless_FreeRoam_Intro_Complete", 1, "AlpsAndSails"))
+			{
+				`GameManager.SetCurrentAct(99);
+				`GameManager.SetCurrentCheckpoint(-1, false);
 			}
 		}
 	}
@@ -162,11 +200,13 @@ event PostBeginPlay()
 function OnPostInitGame()
 {
 	local string path;
-	local Hat_TreasureChest_Base chest;
-	local Hat_SaveGame_Base save;
-	local Actor a;
 	local int i, saveCount;
+	local Hat_BackpackItem item;
+	local Hat_TreasureChest_Base chest;
+	local Hat_SaveGame save;
+	local Hat_Player ply;
 	local Hat_NPC mu;
+	local Actor a;
 	
 	// If on titlescreen, find any Archipelago-enabled save files and do this stuff 
 	// to prevent the game from forcing the player into Mafia Town.
@@ -176,14 +216,14 @@ function OnPostInitGame()
 		
 		for (i = 0; i < saveCount; i++)
 		{
-			save = `SaveManager.GetSaveSlot(i);
+			save = Hat_SaveGame(`SaveManager.GetSaveSlot(i));
 			if (save == None)
 				continue;
 			
 			if (HasAPBit("ArchipelagoEnabled", 1, save))
 			{
 				//class'Hat_SaveBitHelper'.static.SetLevelBits("hub_cinematics", 0, "hub_spaceship", save);
-				Hat_SaveGame(save).AllowSaving = false;
+				save.AllowSaving = false;
 			}
 		}
 	}
@@ -196,25 +236,34 @@ function OnPostInitGame()
 		SetTimer(1.0, true, NameOf(PrintItemsNearPlayer));
 	}
 	
+	SetTimer(60.0, true, NameOf(KeepConnectionAlive));
+	
 	if (IsInSpaceship())
 	{
 		// Stop Mustache Girl tutorial cutscene (it breaks when removing the yarn)
 		// The player can still get the yarn by smacking Rumbi after getting 4 time pieces.
 		foreach DynamicActors(class'Hat_NPC', mu)
 		{
-			if (mu.IsA('Hat_NPC_MustacheGirl'))
+			if (mu.IsA('Hat_NPC_MustacheGirl') && string(mu.Name) ~= "Hat_NPC_MustacheGirl_0")
 			{
-				if (string(mu.Name) ~= "Hat_NPC_MustacheGirl_0")
-				{
-					// Set this level bit to 0 so that Rumbi will drop the yarn
-					class'Hat_SaveBitHelper'.static.SetLevelBits("mu_preawakening_intruder_tutorial", 0);
-					mu.ShutDown();
-					break;
-				}
+				// Set this level bit to 0 so that Rumbi will drop the yarn
+				class'Hat_SaveBitHelper'.static.SetLevelBits("mu_preawakening_intruder_tutorial", 0);
+				mu.ShutDown();
+				break;
 			}
 		}
 		
 		SetTimer(0.01, false, NameOf(ForceStandVisibility));
+		
+		// When returning to hub from levels in act rando, the player may get softlocked behind chapter doors
+		// because the game will spawn them at the telescope for that act's chapter. So, always go to the bedroom.
+		foreach DynamicActors(class'Hat_Player', ply)
+		{
+			if (ply.IsA('Hat_Player_MustacheGirl'))
+				continue;
+			
+			ply.SetLocation(SpaceshipSpawnLocation);
+		}
 	}
 	else
 	{
@@ -233,6 +282,12 @@ function OnPostInitGame()
 				if (a.IsA('Hat_Collectible_VaultCode_Base') || a.IsA('Hat_Collectible_Sticker'))
 					continue;
 				
+				if (a.IsA('Hat_Collectible_InstantCamera'))
+				{
+					a.Destroy();
+					continue;
+				}
+
 				// Hide all regular collectibles, just in case
 				a.ShutDown();
 			}
@@ -241,7 +296,7 @@ function OnPostInitGame()
 		// We need to do this early, before connecting, otherwise the game
 		// might empty the chest on us if it has an important item in vanilla.
 		// Example of this happening is the Hookshot Badge chest in the Subcon Well.
-		// This will also prevent the player from nabbing vanilla chest contents as well.
+		// This will also prevent the player from possibly nabbing vanilla chest contents as well.
 		foreach DynamicActors(class'Hat_TreasureChest_Base', chest)
 		{
 			if (chest.Opened || class<Hat_Collectible_Important>(chest.Content) == None)
@@ -263,7 +318,27 @@ function OnPostInitGame()
 		TakenTimePieces.Length = 0;
 	}
 	
-	// check if our slot data is already saved to disk
+	// If we load a new save file with at least 1 time piece, the game will force the umbrella into our inventory.
+	save = `SaveManager.GetCurrentSaveData();
+	for (i = 0; i < save.MyBackpack2017.Weapons.Length; i++)
+	{
+		item = save.MyBackpack2017.Weapons[i];
+		if (item != None)
+		{
+			if (class<Hat_Weapon_Umbrella>(item.BackpackClass) != None 
+			&& class<Archipelago_Weapon_Umbrella>(item.BackpackClass) == None)
+			{
+				Hat_PlayerController(GetALocalPlayerController()).MyLoadout.RemoveBackpack(item);
+			}
+		}
+	}
+	
+	// Remove our dummy contract from earlier.
+	if (save.SnatcherContracts.Find(class'Hat_SnatcherContract_Act') != -1)
+	{
+		save.SnatcherContracts.RemoveItem(class'Hat_SnatcherContract_Act');
+	}
+	
 	SlotData = new class'Archipelago_SlotData';
 	path = "APRandomizer/slot_data"$`SaveManager.GetCurrentSaveData().CreationTimeStamp;
 	
@@ -333,6 +408,19 @@ function OpenConnectBubble(optional float delay=0.0)
 	bubble.OpenInputText(hud, "Please enter IP:Port.", class'Hat_ConversationType_Regular', 'a', 25);
 }
 
+function KeepConnectionAlive()
+{
+	local JsonObject json;
+	if (!IsFullyConnected())
+		return;
+	
+	json = new class'JsonObject';
+	json.SetStringValue("cmd", "Bounce");
+	json.SetIntValue("slot", SlotData.PlayerSlot);
+	client.SendBinaryMessage(EncodeJson2(json));
+	json = None;
+}
+
 // Called by client the moment a "Connected" packet is received from the Archipelago server.
 // Slot data is not available at this point.
 function OnPreConnected()
@@ -378,6 +466,7 @@ function LoadSlotData(JsonObject json)
 	if (SlotData.Initialized)
 		return;
 	
+	SlotData.ConnectedOnce = true;
 	SlotData.ActRando = json.GetBoolValue("ActRandomizer");
 	SlotData.ShuffleStorybookPages = json.GetBoolValue("ShuffleStorybookPages");
 	SlotData.DeathLink = json.GetBoolValue("death_link");
@@ -579,12 +668,12 @@ function OnPreOpenHUD(HUD InHUD, out class<Object> InHUDElement)
 	{
 		SetTimer(0.0001, false, NameOf(CheckShopOverride), self, Hat_HUD(InHUD));
 	}
-	if (InHUDElement == class'Hat_HUDMenuActSelect')
+	else if (InHUDElement == class'Hat_HUDMenuActSelect')
 	{
 		class'Hat_SaveBitHelper'.static.SetLevelBits("Chapter3_Finale", 0, "hub_spaceship");
 		InHUDElement = class'Archipelago_HUDMenuActSelect';
 	}
-	else if (InHUDElement == class'Hat_HUDElementActTitleCard' && SlotData.ActRando && !ActMapChange)
+	else if (InHUDElement == class'Hat_HUDElementActTitleCard' && SlotData != None && SlotData.ActRando && !ActMapChange)
 	{
 		SetTimer(0.0001, false, NameOf(CheckActTitleCard), self, Hat_HUD(InHUD));
 	}
@@ -629,8 +718,8 @@ function CheckActTitleCard(Hat_HUD hud)
 		else
 		{
 			chapterId = newAct.ChapterInfo.ChapterID;
-			actId = newAct.ActID;
 			map = newAct.MapName;
+			actId = newAct.ActID;
 		}
 		
 		`GameManager.LoadNewAct(chapterId, actId);
@@ -701,6 +790,7 @@ function OnTimePieceCollected(string Identifier)
 	SendLocationCheck(id);
 }
 
+// This is mainly because of Alpine Skyline's finale having an ActID of 1 -.-
 function Hat_ChapterActInfo GetActualCurrentAct()
 {
 	local Hat_ChapterInfo chapter;
@@ -710,7 +800,7 @@ function Hat_ChapterActInfo GetActualCurrentAct()
 	chapter = `GameManager.GetChapterInfo();
 	map = `GameManager.GetCurrentMapFilename();
 	chapter.ConditionalUpdateActList();
-	
+
 	if (InStr(map, "timerift_", false, true) == 0)
 	{
 		foreach chapter.ChapterActInfo(act)
@@ -718,6 +808,19 @@ function Hat_ChapterActInfo GetActualCurrentAct()
 			DebugMessage(map $" " $act.MapName);
 			if (act.MapName ~= map)
 				return act;
+		}
+	}
+	else if (chapter.ChapterID == 4)
+	{
+		// After the Alpine intro, the free roam and finale share the same act ID of 1 (which is obviously stupid).
+		// Fortunately, there's an act bit that forces the Alpine finale to be enabled, so we can simply check for that.
+		if (class'Hat_SaveBitHelper'.static.HasActBit("ForcedAlpineFinale", 1))
+		{
+			return Hat_ChapterActInfo(DynamicLoadObject("hatintime_chapterinfo.AlpineSkyline.AlpineSkyline_Finale", class'Hat_ChapterActInfo'));
+		}
+		else
+		{
+			return Hat_ChapterActInfo(DynamicLoadObject("hatintime_chapterinfo.AlpineSkyline.AlpineSkyline_IntroMountain", class'Hat_ChapterActInfo'));
 		}
 	}
 	
@@ -927,6 +1030,9 @@ function ShuffleCollectibles()
 	local array<int> locationArray;
 	local array<class<Object>> shopItemClasses;
 	local class<Object> shopItem;
+
+	if (CollectiblesShuffled)
+		return;
 	
 	foreach DynamicActors(class'Hat_Collectible_Important', collectible)
 	{
@@ -939,6 +1045,13 @@ function ShuffleCollectibles()
 		{
 			DebugMessage("[ShuffleCollectibles] Found item: " $collectible.GetLevelName() $"."$collectible.Name $ObjectToLocationId(collectible));
 		}
+	}
+	
+	if (`GameManager.GetCurrentMapFilename() ~= "mafia_town")
+	{
+		DebugMessage("[ShuffleCollectibles] Adding camera badge locations");
+		locationArray.AddItem(CameraBadgeCheck1);
+		locationArray.AddItem(CameraBadgeCheck2);
 	}
 	
 	// We can spawn the items when we receive a LocationInfo packet from the server; we still need the XYZ locations of the collectibles on the map
@@ -971,6 +1084,8 @@ function ShuffleCollectibles()
 	
 	if (ChestArray.Length > 0 || BulliedNPCArray.Length > 0)
 		SetTimer(0.5, true, NameOf(IterateChestArray));
+	
+	CollectiblesShuffled = true;
 }
 
 function bool GetShopItemClassFromLocation(int locationId, out class<Archipelago_ShopItem_Base> outClass)
@@ -1169,6 +1284,7 @@ function OnLoadoutChanged(PlayerController controller, Object loadout, Object ba
 	{
 		Hat_Loadout(loadout).RemoveBackpack(item);
 		SendLocationCheck(UmbrellaCheck);
+		SetAPBits("UmbrellaCheck", 1);
 	}
 }
 
@@ -1664,7 +1780,8 @@ function BeatGame()
 	json = new class'JsonObject';
 	json.SetStringValue("cmd", "StatusUpdate");
 	json.SetIntValue("status", 30);
-	client.SendBinaryMessage("["$class'JsonObject'.static.EncodeJson(json)$"]");
+	client.SendBinaryMessage(EncodeJson2(json));
+	json = None;
 }
 
 function bool IsArchipelagoEnabled()
@@ -1673,6 +1790,14 @@ function bool IsArchipelagoEnabled()
 		return false;
 	
 	return HasAPBit("ArchipelagoEnabled", 1);
+}
+
+// Archipelago requires JSON messages to be encased in []
+function string EncodeJson2(JsonObject json)
+{
+	local string message;
+	message = "["$class'JsonObject'.static.EncodeJson(json)$"]";
+	return message;
 }
 
 function bool IsFullyConnected()
@@ -1903,6 +2028,9 @@ defaultproperties
 	ParadeTrapMembers = 4;
 	ParadeTrapDelay = 1;
 	ParadeTrapSpread = 1;
+	SpaceshipSpawnLocation = (x=-2011, y=-1808, z=38);
+	Camera1Loc = (x=-5367,y=6471,z=-468);
+	Camera2Loc = (x=5767,y=6763,z=-496);
 	
 	UnlockScreenNumbers[0] = Texture2D'APRandomizer_content.unlock_screen_numbers_00';
 	UnlockScreenNumbers[1] = Texture2D'APRandomizer_content.unlock_screen_numbers_01';

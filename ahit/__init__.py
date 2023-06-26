@@ -126,15 +126,11 @@ class HatInTimeWorld(World):
         return slot_data
 
     def create_item(self, name: str) -> Item:
-        if name in time_pieces.keys():
-            data = time_pieces[name]
-        else:
-            data = ahit_items[name]
-            
+        data = item_table[name]
         return HatInTimeItem(name, data.classification, data.code, self.player)
 
     def create_multiple_items(self, name: str, count: int = 1) -> typing.List[Item]:
-        data = ahit_items[name] or time_pieces[name]
+        data = item_table[name]
         itemlist: typing.List[Item] = []
 
         for i in range(count):

@@ -8,30 +8,34 @@ var transient int BracketCounter;
 var transient bool ParsingMessage;
 var transient bool ConnectingToAP;
 var transient bool FullyConnected;
+var transient bool Refused;
 
 const MaxSentMessageLength = 246;
 
 event PostBeginPlay()
 {
 	Super.PostBeginPlay();
-
-	if (`AP.SlotData.SlotName == "")
+	
+	if (`AP.SlotData.ConnectedOnce)
 	{
-		`AP.OpenSlotNameBubble();
+		Connect();
 	}
 	else
 	{
-		Connect();
+		`AP.OpenSlotNameBubble(1.0);
 	}
 }
 
 function Connect()
 {
+	if (FullyConnected)
+		return;
+	
 	`AP.ScreenMessage("Connecting to host: " $`AP.SlotData.Host$":"$`AP.SlotData.Port);
     Resolve(`AP.SlotData.Host);
 	
 	ClearTimer(NameOf(TimedOut));
-	SetTimer(6.0, false, NameOf(TimedOut));
+	SetTimer(10.0, false, NameOf(TimedOut));
 }
 
 event Resolved(IpAddr Addr)
@@ -41,24 +45,24 @@ event Resolved(IpAddr Addr)
 	
     if (!Open(Addr))
     {
-        `AP.ScreenMessage("Failed to open connection to "$`AP.SlotData.Host $":"$`AP.SlotData.Port $", retrying...");
-		SetTimer(5.0, false, NameOf(Connect));
+        `AP.ScreenMessage("Failed to open connection to "$`AP.SlotData.Host $":"$`AP.SlotData.Port);
+		`AP.OpenConnectBubble(1.0);
     }
 }
 
 function TimedOut()
 {
-	if (!FullyConnected)
+	if (!FullyConnected && !ConnectingToAP)
 	{
-		`AP.ScreenMessage("Connection attempt to " $`AP.SlotData.Host$":" $`AP.SlotData.Port $" timed out, retrying...");
-		Connect();
+		`AP.ScreenMessage("Connection attempt to " $`AP.SlotData.Host$":" $`AP.SlotData.Port $" timed out");
+		`AP.OpenConnectBubble(1.0);
 	}
 }
 
 event ResolveFailed()
 {
-    `AP.ScreenMessage("Unable to resolve " $`AP.SlotData.Host $":"$`AP.SlotData.Port $". Retrying in 5 seconds...");
-	SetTimer(5.0, false, NameOf(Connect));
+    `AP.ScreenMessage("Unable to resolve " $`AP.SlotData.Host $":"$`AP.SlotData.Port);
+	`AP.OpenConnectBubble(1.0);
 }
 
 event Opened()
@@ -84,8 +88,8 @@ event Opened()
 // this should be our HTTP response from the server
 event ReceivedLine(string message)
 {
-	ReceiveMode = RMODE_Manual;
-
+	ReceiveMode = RMODE_Manual; // event mode seems to cause problems
+	
 	if (!FullyConnected && !ConnectingToAP)
 	{
 		ConnectToAP();
@@ -96,11 +100,10 @@ function ConnectToAP()
 {
 	local JsonObject json;
 	local JsonObject jsonVersion;
-	local string message;
 	
 	ConnectingToAP = true;
 	CurrentMessage = "";
-
+	
 	json = new class'JsonObject';
 	json.SetStringValue("cmd", "Connect");
 	json.SetStringValue("game", "A Hat in Time");
@@ -114,13 +117,13 @@ function ConnectToAP()
 	jsonVersion = new class'JsonObject';
 	jsonVersion.SetStringValue("major", "0");
 	jsonVersion.SetStringValue("minor", "4");
-	jsonVersion.SetStringValue("build", "0");
+	jsonVersion.SetStringValue("build", "1");
 	jsonVersion.SetStringValue("class", "Version");
 	json.SetObject("version", jsonVersion);
 	
-	message = class'JsonObject'.static.EncodeJson(json);
-	message = "["$message$"]";
-	SendBinaryMessage(message);
+	SendBinaryMessage(`AP.EncodeJson2(json));
+	json = None;
+	jsonVersion = None;
 }
 
 event Tick(float d)
@@ -128,16 +131,48 @@ event Tick(float d)
 	local byte byteMessage[255];
 	local int count;
 	local int i;
-	local string character;
+	local string character, pong;
 	
-	// Messages from the AP server are not null-terminated, so it must be done this way. 
+	// Messages from the AP server are not null-terminated, so it must be done this way.
 	// We can only read 255 bytes from the socket at a time.
+	// Also Unrealscript doesn't like [] in JSON.
 	if (IsDataPending())
 	{
 		count = ReadBinary(255, byteMessage);
 		
 		if (count > 0)
 		{
+			// Check for a ping first
+			if (!ParsingMessage)
+			{
+				for (i = 0; i < count; i++)
+				{
+					CurrentMessage $= Chr(byteMessage[i]);
+				}
+				
+				for (i = 0; i < Len(CurrentMessage); i++)
+				{
+					if (Asc(Mid("a"$CurrentMessage, i, 1)) == `CODE_PING)
+					{
+						// Need to send the same data back as a pong
+						// This is a dumb way to do it, but whatever works.
+						`AP.DebugMessage("Received ping: " $NumberString(CurrentMessage));
+						pong = Mid(CurrentMessage, InStr(CurrentMessage, Chr(`CODE_PING), false, true));
+						pong = Mid(pong, 2);
+						`AP.DebugMessage("Sending pong: " $NumberString(pong));
+						SendBinaryMessage(pong, false, true);
+						break;
+					}
+				}
+				
+				CurrentMessage = "";
+				if (pong != "")
+				{
+					Super.Tick(d);
+					return;
+				}
+			}
+			
 			for (i = 0; i < count; i++)
 			{
 				character = Chr(byteMessage[i]);
@@ -170,31 +205,25 @@ event Tick(float d)
 				}
 			}
 		}
-		else if (Len(CurrentMessage) > 0)
-		{
-			//ParseJSON(CurrentMessage);
-			ClearDataBuffer();
-		}
 	}
 	
 	Super.Tick(d);
 }
 
-// for clearing leftover unread data on the socket, usually on level change
-function ClearDataBuffer()
+function string NumberString(string src)
 {
-	local int count;
-	local byte byteArray[255];
-	do
+	local string result;
+	local int i;
+	for (i = 0; i < Len(src); i++)
 	{
-		count = ReadBinary(255, byteArray);
-	} until (count <= 1);
+		result $= string(Asc(Mid("a"$src, i, 1))) $" ";
+	}
 	
-	CurrentMessage = "";
-	BracketCounter = 0;
-	ParsingMessage = false;
+	return result;
 }
 
+// ALL JsonObjects MUST be set to None after use!!!!!!!
+// The engine will never garbage collect them on its own if they are referenced, even locally!
 function ParseJSON(string json)
 {
 	local bool b;
@@ -223,7 +252,7 @@ function ParseJSON(string json)
 		case "Connected":
 			`AP.OnPreConnected();
 			`AP.ScreenMessage("Successfully connected to " $`AP.SlotData.Host $":"$`AP.SlotData.Port);
-			`AP.PlayerSlot = jsonObj.GetIntValue("slot");
+			`AP.SlotData.PlayerSlot = jsonObj.GetIntValue("slot");
 			FullyConnected = true;
 			ConnectingToAP = false;
 			
@@ -291,6 +320,8 @@ function ParseJSON(string json)
 		case "ConnectionRefused":
 			ConnectingToAP = false;
 			`AP.ScreenMessage("Connection refused by server. Check to make sure your slot name, password, etc. are correct.");
+			Refused = true;
+			Close();
 			break;
 		
 		
@@ -303,7 +334,7 @@ function ParseJSON(string json)
 			OnLocationInfoCommand(json);
 			break;
 		
-
+		
 		case "Bounce":
 			OnBounceCommand(json);
 			break;
@@ -312,6 +343,9 @@ function ParseJSON(string json)
 		default:
 			break;
 	}
+
+	jsonObj = None;
+	jsonChild = None;
 }
 
 function bool IsValidMessageType(string msgType)
@@ -319,15 +353,15 @@ function bool IsValidMessageType(string msgType)
 	return (msgType != "ItemSend" && msgType != "Hint" && msgType != "player_id");
 }
 
+// TODO: Cache locations and their items per map so we don't have to do this every time.
 function OnLocationInfoCommand(string json)
 {
 	local bool b;
-	local int i, itemId, locId, count;
-	local string itemName, timePieceId, s;
+	local int i, locId, count;
+	local string s;
 	local JsonObject jsonObj, jsonChild;
 	local Archipelago_RandomizedItem_Base item;
 	local Hat_Collectible_Important collectible;
-	local class worldClass;
 	local class<Archipelago_ShopItem_Base> shopItemClass;
 	
 	`AP.ReplOnce(json, "locations", "locations_0", json, true);
@@ -348,7 +382,6 @@ function OnLocationInfoCommand(string json)
 	}
 	
 	jsonObj = class'JsonObject'.static.DecodeJson(json);
-	//`AP.DebugMessage("Count: "$count);
 	
 	for (i = 0; i <= count; i++)
 	{
@@ -361,8 +394,8 @@ function OnLocationInfoCommand(string json)
 			if (!`AP.GetShopItemInfo(shopItemClass))
 			{
 				`AP.CreateShopItemInfo(shopItemClass, 
-				jsonChild.GetIntValue("item"),
-				jsonChild.GetIntValue("flags"));
+					jsonChild.GetIntValue("item"),
+					jsonChild.GetIntValue("flags"));
 			}
 		}
 		else
@@ -376,66 +409,104 @@ function OnLocationInfoCommand(string json)
 				if (locId == jsonChild.GetIntValue("location"))
 				{
 					`AP.DebugMessage("Replacing item: "$collectible $", Location ID: "$locId);
-					itemId = jsonChild.GetIntValue("item");
-					b = class'Archipelago_ItemInfo'.static.GetNativeItemData(itemId, itemName, worldClass);
 					
-					if (!b) // not a regular item
-					{
-						timePieceId = class'Archipelago_ItemInfo'.static.GetTimePieceFromItemID(itemId, , itemName);
-						
-						if (timePieceId != "")
-						{
-							worldClass = class'Archipelago_RandomizedItem_TimeObject';
-						}
-						else
-						{
-							// belongs to another game that isn't A Hat in Time
-							worldClass = class'Archipelago_RandomizedItem_Misc';
-						}
-					}
-				
-					item = Archipelago_RandomizedItem_Base(Spawn(class<Actor>(worldClass), , , collectible.Location, , , true));
+					CreateItem(locId, 
+						jsonChild.GetIntValue("item"),
+						jsonChild.GetIntValue("flags"),
+						jsonChild.GetIntValue("player"),
+						collectible);
 					
-					if (worldClass != class'Archipelago_RandomizedItem_Misc')
-					{
-						item.ItemDisplayName = itemName;
-					}
-					else
-					{
-						switch (jsonChild.GetIntValue("flags"))
-						{
-							case ItemFlag_Important:
-								item.ItemDisplayName = "AP Item - Important"; 
-								break;
-								
-							case ItemFlag_ImportantSkipBalancing:
-								item.ItemDisplayName = "AP Item - Important"; 
-								break;
-							
-							case ItemFlag_Useful: 
-								item.ItemDisplayName = "AP Item - Useful"; 
-								break;
-							
-							default: 
-								item.ItemDisplayName = "AP Item"; 
-								break;
-						}
-					}
-					
-					item.OriginalCollectibleName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename(string(collectible.GetLevelName()))$"."$collectible.Name;
-					collectible.Destroy(); // now we can get rid of this
-					
-					item.LocationId = locId;
-					item.ItemId = itemId;
-					item.ItemFlags = jsonChild.GetIntValue("flags");
-					item.ItemOwner = jsonChild.GetIntValue("player");
-					item.OwnItem = (`AP.PlayerSlot == item.ItemOwner);
-					
-					item.Init();
+					collectible.Destroy();
 				}
+			}
+			
+			locId = jsonChild.GetIntValue("location");
+			if (locId == `AP.CameraBadgeCheck1 || locId == `AP.CameraBadgeCheck2)
+			{
+				if (locId == `AP.CameraBadgeCheck1 && `AP.HasAPBit("Camera1Check", 1)
+				|| locId == `AP.CameraBadgeCheck2 && `AP.HasAPBit("Camera2Check", 1))
+					continue;
+				
+				item = CreateItem(locId, 
+					jsonChild.GetIntValue("item"),
+					jsonChild.GetIntValue("flags"),
+					jsonChild.GetIntValue("player"),
+					,
+					locId == `AP.CameraBadgeCheck1 ? `AP.Camera1Loc : `AP.Camera2Loc);
+				
+				item.OriginalCollectibleName = locId == `AP.CameraBadgeCheck1 ? "AP_Camera1Check" : "AP_Camera2Check";
+				item.Init();
 			}
 		}		
 	}
+	
+	jsonObj = None;
+	jsonChild = None;
+}
+
+function Archipelago_RandomizedItem_Base CreateItem(int locId, int itemId, int flags, int player, 
+	optional Hat_Collectible_Important collectible, optional Vector pos)
+{
+	local string timePieceId, itemName;
+	local class worldClass;
+	local Archipelago_RandomizedItem_Base item;
+	
+	if (!class'Archipelago_ItemInfo'.static.GetNativeItemData(itemId, itemName, worldClass)) // not a regular item
+	{
+		timePieceId = class'Archipelago_ItemInfo'.static.GetTimePieceFromItemID(itemId, , itemName);
+		
+		if (timePieceId != "")
+		{
+			worldClass = class'Archipelago_RandomizedItem_TimeObject';
+		}
+		else
+		{
+			// belongs to another game that isn't A Hat in Time
+			worldClass = class'Archipelago_RandomizedItem_Misc';
+		}
+	}
+	
+	item = Archipelago_RandomizedItem_Base(Spawn(class<Actor>(worldClass), , , collectible != None ? collectible.Location : pos, , , true));
+	item.LocationId = locId;
+	item.ItemId = itemId;
+	item.ItemFlags = flags;
+	item.ItemOwner = player;
+	item.OwnItem = (`AP.SlotData.PlayerSlot == player);
+	
+	if (collectible != None)
+	{
+		item.OriginalCollectibleName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename(string(collectible.GetLevelName()))$"."$collectible.Name;
+	}
+
+	item.Init();
+					
+	if (worldClass != class'Archipelago_RandomizedItem_Misc')
+	{
+		item.ItemDisplayName = itemName;
+	}
+	else
+	{
+		switch (flags)
+		{
+			case ItemFlag_Important:
+				item.ItemDisplayName = "AP Item - Important"; 
+				break;
+				
+			case ItemFlag_ImportantSkipBalancing:
+				item.ItemDisplayName = "AP Item - Important"; 
+				break;
+			
+			case ItemFlag_Useful: 
+				item.ItemDisplayName = "AP Item - Useful"; 
+				break;
+			
+			default: 
+				item.ItemDisplayName = "AP Item"; 
+				break;
+		}
+	}
+	
+	return item;
 }
 
 function OnReceivedItemsCommand(string json, optional bool connection)
@@ -444,7 +515,7 @@ function OnReceivedItemsCommand(string json, optional bool connection)
 	local string timePieceId, timePieceName, s;
 	local JsonObject jsonObj, jsonChild;
 	local bool b;
-
+	
 	`AP.ReplOnce(json, "items", "items_0", json, true);
 	b = true;
 	count = 0;
@@ -470,9 +541,14 @@ function OnReceivedItemsCommand(string json, optional bool connection)
 	if (connection)
 	{
 		if (index > count)
+		{
+			jsonObj = None;
 			return;
+		}
 		else
+		{
 			start = index;
+		}	
 	}
 	else
 	{
@@ -502,6 +578,8 @@ function OnReceivedItemsCommand(string json, optional bool connection)
 	}
 	
 	`AP.SetAPBits("LastItemIndex", index+total);
+	jsonObj = None;
+	jsonChild = None;
 }
 
 function GrantTimePiece(string timePieceId, bool IsAct, string itemName)
@@ -675,10 +753,13 @@ function OnBounceCommand(string json)
 		if (jsonChild != None)
 			`AP.ScreenMessage("You were myurrderrred by: " $jsonChild.GetStringValue("source"));
 	}
+
+	jsonObj = None;
+	jsonChild = None;
 }
 
 // the optional boolean is for recursion, do not use it
-function SendBinaryMessage(string message, optional bool continuation)
+function SendBinaryMessage(string message, optional bool continuation, optional bool pong)
 {
 	local byte byteMessage[255];
 	local string buffer;
@@ -718,7 +799,11 @@ function SendBinaryMessage(string message, optional bool continuation)
 		buffer = message;
 		totalSent = length;
 		
-		if (continuation) // End our continuation message
+		if (pong)
+		{
+			byteMessage[0] = `CODE_PONG;
+		}
+		else if (continuation) // End our continuation message
 		{
 			byteMessage[0] = `CODE_CONTINUATION_FIN;
 			//`log("[DEBUG] Sending message (CODE_CONTINUATION_FIN): "$buffer);
@@ -770,15 +855,16 @@ function SendBinaryMessage(string message, optional bool continuation)
 event Closed()
 {
 	// Destroy ourselves and create a new client. 
-	// Reconnecting with the same client object after closing a connection does not work (for some reason).
-    `AP.ScreenMessage("Connection was closed. Reconnecting...");
+	// Reconnecting with the same client object after closing a connection does not work for some reason.
+	if (!Refused)
+   		`AP.ScreenMessage("Connection was closed. Reconnecting in 5 seconds...");
+
 	Destroy();
 }
 
 event Destroyed()
 {
-	// Notify AP
-	//`AP.CreateClient(3.0);
+	`AP.CreateClient(5.0);
 	Super.Destroyed();
 }
 

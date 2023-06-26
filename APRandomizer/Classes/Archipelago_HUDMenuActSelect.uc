@@ -416,6 +416,7 @@ simulated function BuildSpecialHourglasses(HUD H)
 			if (!ChapterInfo.ChapterActInfo[i].IsBonus && ChapterInfo.ChapterActInfo[i].ActID == s.ActID)
 				s.ChapterActInfo = ChapterInfo.ChapterActInfo[i];
 		
+		/*
 		// Called in AlpsAndSails.umap's intro mountain
 		if (ChapterInfo.ActIDAfterIntro > 0)
 		{
@@ -425,6 +426,8 @@ simulated function BuildSpecialHourglasses(HUD H)
 			if (!class'Hat_SeqCond_HasUntouchedChapter'.static.IsUntouched(ChapterInfo, 1, false))
 				s.ActID = ChapterInfo.ActIDAfterIntro;
 		}
+		*/
+		
 		s.PlanetRotation = ChapterInfo.GetActPlanetRotation(1);
 		s.InstancedIcon = None;
 		
@@ -676,4 +679,29 @@ function Array<Hat_ChapterActInfo> GetCompletedRequiredActs(Hat_ChapterInfo ci, 
 	}
 	
 	return Results;
+}
+
+function bool PayTimePiece(string TimePieceID)
+{
+	local Hat_SaveGame save;
+    local SaveGameTimeObjectInfo t;
+	local int i;
+    if (TimePieceID == "") return false;
+    //if (HasTimePiece(TimePieceID)) return false;
+    if (HasPaidTimePiece(TimePieceID)) return false;
+	
+	save = `SaveManager.GetCurrentSaveData();
+	
+	for (i = 0; i < save.TimeObjects.Length; i++)
+	{
+		if (Locs(save.TimeObjects[i].ID) != Locs(TimePieceID)) continue;
+		save.TimeObjects[i].Paid = true;
+		return true;
+	}
+	//if (!HasPaid) return false;
+    
+    t.ID = TimePieceID;
+	t.Paid = true;
+    save.TimeObjects.AddItem(t);
+    return true;
 }
