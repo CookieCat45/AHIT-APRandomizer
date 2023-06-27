@@ -1,8 +1,7 @@
 from ..AutoWorld import World, CollectionState
 from ..generic.Rules import add_rule, set_rule
-from .Items import time_pieces
-from .Locations import location_table
-from .Types import HatType, RelicType, ChapterIndex
+from .Locations import location_table, humt_locations
+from .Types import HatType, ChapterIndex
 from BaseClasses import Location, Entrance, Region
 import typing
 
@@ -29,38 +28,12 @@ def can_use_hookshot(state: CollectionState, world: World):
     return state.has("Hookshot Badge", world.player)
 
 
-def get_timepiece_count(state: CollectionState, world: World) -> int:
-    count: int = 0
-    for (name) in time_pieces.keys():
-        if state.has(name, world.player):
-            count += 1
-
-    return count
+def has_relic_combo(state: CollectionState, world: World, relic: str) -> bool:
+    return state.has_group(relic, world.player, len(world.item_name_groups[relic]))
 
 
-def has_combo(state: CollectionState, world: World, relic: RelicType) -> bool:
-    if relic == RelicType.BURGER:
-        return state.has("Relic (Burger Patty)", world.player) and state.has("Relic (Burger Cushion)", world.player)
-
-    if relic == RelicType.TRAIN:
-        return state.has("Relic (Mountain Set)", world.player) and state.has("Relic (Train)", world.player)
-
-    if relic == RelicType.UFO:
-        return state.has("Relic (UFO)", world.player) and state.has("Relic (Cow)", world.player) and \
-               state.has("Relic (Cool Cow)", world.player) and state.has("Relic (Tin-foil Hat Cow)", world.player)
-
-    if relic == RelicType.CRAYON:
-        return state.has("Relic (Crayon Box)", world.player) and state.has("Relic (Red Crayon)", world.player) and \
-               state.has("Relic (Blue Crayon)", world.player) and state.has("Relic (Green Crayon)", world.player)
-
-    if relic == RelicType.CAKE:
-        return state.has("Relic (Cake Stand)", world.player) and state.has("Relic (Cake)", world.player) and \
-               state.has("Relic (Cake Slice)", world.player) and state.has("Relic (Shortcake)", world.player)
-
-    if relic == RelicType.NECKLACE:
-        return state.has("Relic (Necklace Bust)", world.player) and state.has("Relic (Necklace)", world.player)
-
-    return False
+def get_relic_count(state: CollectionState, world: World, relic: str) -> int:
+    return state.count_group(relic, world.player)
 
 
 def can_clear_act(state: CollectionState, world: World, act_entrance: str) -> bool:
@@ -84,7 +57,7 @@ def can_reach_mafia_night(state: CollectionState, world: World) -> bool:
         or state.can_reach("Down with the Mafia!", player=world.player)
 
 
-def can_reach_mafia_town(state: CollectionState, world: World, lava: bool = True) -> bool:
+def can_reach_mafia_town(state: CollectionState, world: World, lava: bool = False) -> bool:
     return can_reach_mafia_day(state, world) or can_reach_mafia_night(state, world) \
            or (lava and state.can_reach("Heating Up Mafia Town", player=world.player))
 
@@ -126,30 +99,31 @@ def set_rules(world: World):
 
     lowest_cost = mw.LowestChapterCost[p].value
     highest_cost = mw.HighestChapterCost[p].value
-    chapter_count = 4
-    cost_increment = highest_cost // chapter_count
+    cost_increment = mw.ChapterCostIncrement[p].value
     loop_count = 0
 
     for chapter in chapter_list:
-        loop_count += 1
-        value = lowest_cost + (cost_increment * loop_count)
+        value = mw.random.randint(lowest_cost + (cost_increment * loop_count),
+                                  min(highest_cost, lowest_cost + (cost_increment * (loop_count+1))))
+
         w.set_chapter_cost(chapter, mw.random.randint(value, min(value+cost_increment, highest_cost)))
+        loop_count += 1
 
     minimum = mw.Chapter5MinCost[p].value
     maximum = mw.Chapter5MaxCost[p].value
     w.set_chapter_cost(ChapterIndex.FINALE, mw.random.randint(min(minimum, maximum), max(minimum, maximum)))
 
     add_rule(mw.get_entrance("-> Mafia Town", p),
-             lambda state: get_timepiece_count(state, w) >= w.get_chapter_cost(ChapterIndex.MAFIA))
+             lambda state: state.has_group("Time Pieces", p, w.get_chapter_cost(ChapterIndex.MAFIA)))
 
     add_rule(mw.get_entrance("-> Battle of the Birds", p),
-             lambda state: get_timepiece_count(state, w) >= w.get_chapter_cost(ChapterIndex.BIRDS))
+             lambda state: state.has_group("Time Pieces", p, w.get_chapter_cost(ChapterIndex.BIRDS)))
 
     add_rule(mw.get_entrance("-> Subcon Forest", p),
-             lambda state: get_timepiece_count(state, w) >= w.get_chapter_cost(ChapterIndex.SUBCON))
+             lambda state: state.has_group("Time Pieces", p, w.get_chapter_cost(ChapterIndex.SUBCON)))
 
     add_rule(mw.get_entrance("-> Alpine Skyline", p),
-             lambda state: get_timepiece_count(state, w) >= w.get_chapter_cost(ChapterIndex.ALPINE))
+             lambda state: state.has_group("Time Pieces", p, w.get_chapter_cost(ChapterIndex.ALPINE)))
 
     add_rule(mw.get_entrance("-> The Birdhouse", p),
              lambda state: can_use_hat(state, w, HatType.BREWING))
@@ -158,7 +132,7 @@ def set_rules(world: World):
              lambda state: can_use_hat(state, w, HatType.DWELLER))
 
     add_rule(mw.get_entrance("-> Time's End", p),
-             lambda state: get_timepiece_count(state, w) >= w.get_chapter_cost(ChapterIndex.FINALE)
+             lambda state: state.has_group("Time Pieces", p, w.get_chapter_cost(ChapterIndex.FINALE))
              and can_use_hat(state, w, HatType.BREWING) and can_use_hat(state, w, HatType.DWELLER))
 
     set_act_indirect_connections(w)
@@ -168,10 +142,10 @@ def set_rules(world: World):
     act_rules = {
         # Note that these are act entrances, not their corresponding exit regions
         "Spaceship - Time Rift A": lambda state: can_use_hat(state, w, HatType.BREWING)
-        and get_timepiece_count(state, w) >= w.get_chapter_cost(ChapterIndex.BIRDS),
+        and state.has_group("Time Pieces", p, w.get_chapter_cost(ChapterIndex.BIRDS)),
 
         "Spaceship - Time Rift B": lambda state: can_use_hat(state, w, HatType.DWELLER)
-        and get_timepiece_count(state, w) >= w.get_chapter_cost(ChapterIndex.ALPINE),
+        and state.has_group("Time Pieces", p, w.get_chapter_cost(ChapterIndex.ALPINE)),
 
         # Mafia Town ---------------------------------------------------------------------------------------------------
         "Mafia Town - Act 2": lambda state: can_clear_act(state, w, "Mafia Town - Act 1"),
@@ -199,18 +173,22 @@ def set_rules(world: World):
         "Battle of the Birds - Act 6A": lambda state: can_clear_act(state, w, "Battle of the Birds - Act 4")
         and can_clear_act(state, w, "Battle of the Birds - Act 5"),
 
-        "Battle of the Birds - Act 6B": lambda state: can_clear_act(state, w, "Battle of the Birds - Act 4")
-        and can_clear_act(state, w, "Battle of the Birds - Act 5"),
+        "Battle of the Birds - Act 6B": lambda state: can_clear_act(state, w, "Battle of the Birds - Act 6A"),
 
         # Subcon Forest ------------------------------------------------------------------------------------------------
 
-        # Most acts in Subcon are either contract-exclusive or can be entered from almost any act
-
-        # Only need to be able to reach the forest for these to get the contracts or access the entrances.
+        # You only need to be able to reach the forest for these to get the contracts or access the entrances.
+        # TODO: add an option to shuffle contracts into pool as items instead
         "Subcon Forest - Act 2": lambda state: can_reach_subcon_main(state, w),
         "Subcon Forest - Act 3": lambda state: can_reach_subcon_main(state, w),
         "Subcon Forest - Act 4": lambda state: can_reach_subcon_main(state, w),
         "Subcon Forest - Act 5": lambda state: can_reach_subcon_main(state, w),
+
+        "Subcon Forest - Act 6": lambda state: can_clear_act(state, w, "Subcon Forest - Act 1")
+        and can_clear_act(state, w, "Subcon Forest - Act 2")
+        and can_clear_act(state, w, "Subcon Forest - Act 3")
+        and can_clear_act(state, w, "Subcon Forest - Act 4")
+        and can_clear_act(state, w, "Subcon Forest - Act 5"),
 
         # Alpine Skyline -----------------------------------------------------------------------------------------------
         "Alpine Skyline - Act 5": lambda state: can_clear_alpine(state, w),
@@ -221,36 +199,47 @@ def set_rules(world: World):
             add_rule(entrance, act_rules[entrance.name])
 
     location: Location
-    for loc in location_table.keys():
-        location = mw.get_location(loc, p)
-        if location.parent_region.name == "Mafia Town":
-            add_rule(location, lambda state: can_reach_mafia_town(state, w))
-        elif location.parent_region.name == "Subcon Forest" and "Boss Arena Chest" not in location.name:
+    for (key, data) in location_table.items():
+        location = mw.get_location(key, p)
+        if data.region == "Mafia Town":
+            add_rule(location, lambda state: can_reach_mafia_town(state, w, bool(key in humt_locations)))
+        elif data.region == "Subcon Forest":
             add_rule(location, lambda state: can_reach_subcon_main(state, w))
 
-        data = location_table[loc]
         for hat in data.required_hats:
             if hat is not HatType.NONE:
                 add_rule(location, lambda state: can_use_hat(state, w, hat))
 
         if data.required_tps > 0:
-            add_rule(location, lambda state: get_timepiece_count(state, w) >= data.required_tps)
+            add_rule(location, lambda state: state.has_group("Time Pieces", p, data.required_tps))
 
         if data.hookshot:
             add_rule(location, lambda state: can_use_hookshot(state, w))
 
-    add_rule(mw.get_location("Mafia Town - Behind HQ Chest", p),
+    # ----- Special Rules ----- #
+
+    set_rule(mw.get_location("Mafia Town - Behind HQ Chest", p),
              lambda state: state.can_reach("Down with the Mafia!", player=p)
-             or state.can_reach(mw.get_location("Act Completion (Heating Up Mafia Town)", player=p)))
+             or state.can_reach("Heating Up Mafia Town", player=p))
+
+    # For some reason, the brewing crate is removed in HUMT
+    set_rule(mw.get_location("Mafia Town - Secret Cave", p),
+             lambda state: state.can_reach("Heating Up Mafia Town", player=p)
+             or (can_reach_mafia_town(state, w) and can_use_hat(state, w, HatType.BREWING)))
+
+    # Can bounce across the lava to get this without Hookshot (need to die though :P)
+    set_rule(mw.get_location("Mafia Town - Above Boats", p),
+             lambda state: state.can_reach("Heating Up Mafia Town", player=p)
+             or (can_reach_mafia_town(state, w) and can_use_hookshot(state, w)))
 
     add_rule(mw.get_location("Act Completion (Cheating the Race)", p),
              lambda state: can_use_hat(state, w, HatType.TIME_STOP)
              or mw.CTRWithSprint[p].value > 0 and can_use_hat(state, w, HatType.SPRINT))
 
-    add_rule(mw.get_location("Subcon Forest - Boss Arena Chest", p),
+    set_rule(mw.get_location("Subcon Forest - Boss Arena Chest", p),
              lambda state: can_reach_subcon_arena(state, w))
 
-    for entrance in get_alpine_entrances(w):
+    for entrance in mw.get_region("Alpine Free Roam", p).entrances:
         add_rule(entrance, lambda state: can_use_hookshot(state, w))
 
     # set SDJ rules last
@@ -260,7 +249,7 @@ def set_rules(world: World):
     mw.completion_condition[p] = lambda state: can_use_hat(state, w, HatType.BREWING) \
         and can_use_hat(state, w, HatType.DWELLER) \
         and can_use_hookshot(state, w) \
-        and get_timepiece_count(state, w) >= w.get_chapter_cost(ChapterIndex.FINALE)
+        and state.has_group("Time Pieces", p, w.get_chapter_cost(ChapterIndex.FINALE))
 
 
 def set_sdj_rules(world: World):
@@ -278,12 +267,6 @@ def set_sdj_rules(world: World):
 
     set_rule(world.multiworld.get_location("Act Completion (Time Rift - Curly Tail Trail)", world.player),
              lambda state: can_use_hat(state, world, HatType.ICE) or can_sdj(state, world))
-
-
-def get_alpine_entrances(world: World) -> typing.List[Entrance]:
-    for region in world.multiworld.get_regions(world.player):
-        if region.name == "Alpine Free Roam":
-            return region.entrances
 
 
 def reg_act_connection(world: World, region_name: str, unlocked_entrance: str):
@@ -386,7 +369,7 @@ def set_rift_indirect_connections(world: World, regions: typing.Dict[str, Region
         reg_act_connection(w, mw.get_entrance("Mafia Town - Act 6", p).connected_region.name, entrance.name)
 
     for entrance in regions["Time Rift - Mafia of Cooks"].entrances:
-        add_rule(entrance, lambda state: has_combo(state, w, RelicType.BURGER))
+        add_rule(entrance, lambda state: has_relic_combo(state, w, "Burger"))
 
     for entrance in regions["Time Rift - The Owl Express"].entrances:
         add_rule(entrance, lambda state: can_clear_act(state, world, "Battle of the Birds - Act 2"))
@@ -401,7 +384,7 @@ def set_rift_indirect_connections(world: World, regions: typing.Dict[str, Region
         reg_act_connection(w, mw.get_entrance("Battle of the Birds - Act 5", p).connected_region.name, entrance.name)
 
     for entrance in regions["Time Rift - Dead Bird Studio"].entrances:
-        add_rule(entrance, lambda state: has_combo(state, w, RelicType.TRAIN))
+        add_rule(entrance, lambda state: has_relic_combo(state, w, "Train"))
 
     for entrance in regions["Time Rift - Pipe"].entrances:
         add_rule(entrance, lambda state: can_clear_act(state, world, "Subcon Forest - Act 2"))
@@ -412,10 +395,10 @@ def set_rift_indirect_connections(world: World, regions: typing.Dict[str, Region
         reg_act_connection(w, mw.get_entrance("Subcon Forest - Act 4", p).connected_region.name, entrance.name)
 
     for entrance in regions["Time Rift - Sleepy Subcon"].entrances:
-        add_rule(entrance, lambda state: has_combo(state, w, RelicType.UFO))
+        add_rule(entrance, lambda state: has_relic_combo(state, w, "UFO"))
 
     for entrance in regions["Time Rift - Alpine Skyline"].entrances:
-        add_rule(entrance, lambda state: has_combo(state, w, RelicType.CRAYON))
+        add_rule(entrance, lambda state: has_relic_combo(state, w, "Crayon"))
 
 
 # Basically the same as above, but without the need of the dict since we are just setting defaults

@@ -135,6 +135,15 @@ time_pieces = {
     "Time Piece (Time's End - The Finale)": ItemData(300087, ItemClassification.progression),
 }
 
+relic_groups = {
+    "Burger": {"Relic (Burger Patty)", "Relic (Burger Cushion)"},
+    "Train": {"Relic (Mountain Set)", "Relic (Train)"},
+    "UFO": {"Relic (UFO)", "Relic (Cow)", "Relic (Cool Cow)", "Relic (Tin-foil Hat Cow)"},
+    "Crayon": {"Relic (Crayon Box)", "Relic (Red Crayon)", "Relic (Blue Crayon)", "Relic (Green Crayon)"},
+    "Cake": {"Relic (Cake Stand)", "Relic (Cake)", "Relic (Cake Slice)", "Relic (Shortcake)"},
+    "Necklace": {"Relic (Necklace Bust)", "Relic (Necklace)"},
+}
+
 item_frequencies = {
     "Badge Pin": 2
 }
@@ -144,7 +153,7 @@ junk_weights = {
     "50 Pons": 10,
     "Health Pon": 35,
     "100 Pons": 5,
-    "Rift Token": 15,
+    "Rift Token": 20,
 }
 
 item_table = {

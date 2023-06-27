@@ -30,7 +30,8 @@ class ShuffleStorybookPages(Toggle):
 
 
 class StartingChapter(Choice):
-    """Determines which chapter you will be guaranteed to be able to enter at the beginning of the game."""
+    """Determines which chapter you will be guaranteed to be able to enter at the beginning of the game.
+    Please note that in act randomizer, only 1 and 2 are allowed."""
     display_name = "Starting Chapter"
     option_1 = 1
     option_2 = 2
@@ -64,21 +65,29 @@ class EnableDLC2(Toggle):
     display_name = "Shuffle Chapter 7"
 
 
+class ChapterCostIncrement(Range):
+    """Lower values mean chapter costs increase slower. Higher values make the cost differences more steep."""
+    display_name = "Chapter Cost Increment"
+    range_start = 1
+    range_end = 5
+    default = 3
+
+
 class LowestChapterCost(Range):
     """Value determining the lowest possible cost for a chapter.
     Chapter costs will, progressively, be calculated based on this value (except for Chapter 5)."""
     display_name = "Lowest Possible Chapter Cost"
     range_start = 0
-    range_end = 10
-    default = 0
+    range_end = 6
+    default = 4
 
 
 class HighestChapterCost(Range):
     """Value determining the highest possible cost for a chapter.
     Chapter costs will, progressively, be calculated based on this value (except for Chapter 5)."""
     display_name = "Highest Possible Chapter Cost"
-    range_start = 0
-    range_end = 40
+    range_start = 16
+    range_end = 30
     default = 20
 
 
@@ -146,9 +155,9 @@ class YarnCostMax(Range):
 class YarnAvailable(Range):
     """How much yarn is available to collect in the item pool."""
     display_name = "Yarn Available"
-    range_start = 20
-    range_end = 85
-    default = 60
+    range_start = 30
+    range_end = 75
+    default = 45
 
 
 # Traps
@@ -203,6 +212,7 @@ ahit_options: typing.Dict[str, type(Option)] = {
 
     "LowestChapterCost":        LowestChapterCost,
     "HighestChapterCost":       HighestChapterCost,
+    "ChapterCostIncrement":     ChapterCostIncrement,
 
     "Chapter5MinCost":          Chapter5MinCost,
     "Chapter5MaxCost":          Chapter5MaxCost,

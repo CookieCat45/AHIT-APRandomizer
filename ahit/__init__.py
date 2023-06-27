@@ -1,5 +1,5 @@
 from BaseClasses import Item, ItemClassification, Region
-from .Items import HatInTimeItem, ahit_items, time_pieces, item_frequencies, item_dlc_enabled, item_table, junk_weights
+from .Items import HatInTimeItem, item_table, time_pieces, item_frequencies, item_dlc_enabled, junk_weights, relic_groups
 from .Regions import create_region, create_regions, connect_regions, randomize_act_entrances, chapter_act_info
 from .Locations import HatInTimeLocation, location_table, get_total_locations
 from .Types import HatDLC, HatType, ChapterIndex
@@ -39,6 +39,17 @@ class HatInTimeWorld(World):
 
     act_connections: typing.Dict[str, str] = {}
 
+    def generate_early(self):
+        # If our starting chapter is 4, and act rando is off, force hookshot into inventory.
+        # Starting chapter 3/4 is banned in act rando, because it will often cause a generation failure.
+        start_chapter: int = self.multiworld.StartingChapter[self.player].value
+        if start_chapter == 4 or start_chapter == 3:
+            if self.multiworld.ActRandomizer[self.player].value == 0:
+                if start_chapter == 4:
+                    self.multiworld.push_precollected(self.create_item("Hookshot Badge"))
+            else:
+                self.multiworld.StartingChapter[self.player].value = self.multiworld.random.randint(1, 2)
+
     def create_items(self):
         # Item Pool
         itempool: typing.List[Item] = []
@@ -51,6 +62,10 @@ class HatInTimeWorld(World):
         if self.multiworld.RandomizeHatOrder[self.player].value > 0:
             self.multiworld.random.shuffle(self.hat_craft_order)
 
+        self.item_name_groups = {"Time Pieces": set({})}
+        for key, relics in relic_groups.items():
+            self.item_name_groups.setdefault(key, set(relics))
+
         for name in item_table.keys():
             if name == "Yarn":
                 continue
@@ -61,6 +76,9 @@ class HatInTimeWorld(World):
             item_type: ItemClassification = item_table.get(name).classification
             if item_type is ItemClassification.filler or item_type is ItemClassification.trap:
                 continue
+
+            if name in time_pieces.keys():
+                self.item_name_groups["Time Pieces"].add(name)
 
             itempool += self.create_multiple_items(name, item_frequencies.get(name, 1))
 
@@ -130,8 +148,8 @@ class HatInTimeWorld(World):
         trap_list: typing.Dict[str, int] = {}
         ic: ItemClassification
 
-        for name in ahit_items.keys():
-            ic = ahit_items.get(name).classification
+        for name in item_table.keys():
+            ic = item_table.get(name).classification
             if ic == ItemClassification.filler:
                 junk_list[name] = junk_weights.get(name)
             elif trap_chance > 0 and ic == ItemClassification.trap:
@@ -155,14 +173,21 @@ class HatInTimeWorld(World):
     def calculate_yarn_costs(self):
         min_yarn_cost = int(min(self.multiworld.YarnCostMin[self.player].value, self.multiworld.YarnCostMax[self.player].value))
         max_yarn_cost = int(max(self.multiworld.YarnCostMin[self.player].value, self.multiworld.YarnCostMax[self.player].value))
-        max_possible_cost = max_yarn_cost * 5
-        available_yarn = self.multiworld.YarnAvailable[self.player].value
-        if max_possible_cost > available_yarn:
-            self.multiworld.YarnAvailable[self.player].value += max_possible_cost - available_yarn
 
+        max_cost: int = 0
         for i in range(5):
             cost = self.multiworld.random.randint(min(min_yarn_cost, max_yarn_cost), max(max_yarn_cost, min_yarn_cost))
             self.hat_yarn_costs.update({HatType(i): cost})
+            max_cost += cost
+
+        available_yarn = self.multiworld.YarnAvailable[self.player].value
+        if max_cost > available_yarn:
+            self.multiworld.YarnAvailable[self.player].value = max_cost
+            available_yarn = max_cost
+
+        # make sure we always have at least 8 extra
+        if max_cost + 8 > available_yarn:
+            self.multiworld.YarnAvailable[self.player].value += (max_cost + 8) - available_yarn
 
     def set_chapter_cost(self, chapter: ChapterIndex, cost: int):
         self.chapter_timepiece_costs.update({chapter: cost})

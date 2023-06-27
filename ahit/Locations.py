@@ -5,8 +5,8 @@ from typing import Optional, NamedTuple, Dict, List
 
 
 class LocData(NamedTuple):
-    id: Optional[int]
-    region: Optional[str]
+    id: int
+    region: str
     required_hats: Optional[List[HatType]] = [HatType.NONE]
     required_tps: Optional[int] = 0
     hookshot: Optional[bool] = False
@@ -76,7 +76,8 @@ ahit_locations = {
     "Mafia Town - Top of Ruined Tower": LocData(304607, "Mafia Town", required_hats=[HatType.ICE]),
     "Mafia Town - Ice Hat Cage": LocData(304831, "Mafia Town", required_hats=[HatType.ICE]),
     "Mafia Town - Hot Air Balloon": LocData(304829, "Mafia Town", required_hats=[HatType.ICE]),
-    "Mafia Town - Camera Badge": LocData(310024, "Mafia Town"),
+    "Mafia Town - Camera Badge 1": LocData(302003, "Mafia Town"),
+    "Mafia Town - Camera Badge 2": LocData(302004, "Mafia Town"),
     "Mafia Town - Chest Beneath Aqueduct": LocData(303489, "Mafia Town"),
     "Mafia Town - Secret Cave": LocData(305220, "Mafia Town", required_hats=[HatType.BREWING]),
     "Mafia Town - Crow Chest": LocData(303532, "Mafia Town"),
@@ -128,7 +129,7 @@ ahit_locations = {
     "Dead Bird Studio Basement - Locked Room": LocData(305819, "Dead Bird Studio Basement", hookshot=True),
 
     # 320000 range - Subcon Forest
-    "Subcon Forest - Cherry Bomb Bone Cage": LocData(324761, "Subcon Forest"),
+    "Subcon Forest - Cherry Bomb Bone Cage": LocData(324761, "Contractual Obligations"),
     "Subcon Forest - Village Tree Top Ice Cube": LocData(325078, "Subcon Forest"),
     "Subcon Forest - Village Graveyard Ice Cube": LocData(325077, "Subcon Forest"),
     "Subcon Forest - Village House Top": LocData(325471, "Subcon Forest"),
@@ -146,7 +147,7 @@ ahit_locations = {
     "Subcon Forest - Dweller Floating Rocks": LocData(324464, "Subcon Forest", required_hats=[HatType.DWELLER]),
     "Subcon Forest - Dweller Platforming Tree A": LocData(324709, "Subcon Forest", required_hats=[HatType.DWELLER]),
     "Subcon Forest - Dweller Platforming Tree B": LocData(324855, "Subcon Forest", required_hats=[HatType.DWELLER]),
-    "Subcon Forest - Giant Time Piece": LocData(325473, "Subcon Forest", required_hats=[HatType.DWELLER]),
+    "Subcon Forest - Giant Time Piece": LocData(325473, "Subcon Forest"),
     "Subcon Forest - Gallows": LocData(325472, "Subcon Forest"),
     "Subcon Forest - Green and Purple Dweller Rocks": LocData(325082, "Subcon Forest", required_hats=[HatType.DWELLER]),
     "Subcon Forest - Dweller Shack": LocData(324463, "Subcon Forest", required_hats=[HatType.DWELLER]),
@@ -308,6 +309,31 @@ shop_locations = {
     "Badge Seller - Item 10": LocData(301012, "Badge Seller"),
     "Mafia Boss Shop Item": LocData(301013, "Spaceship", required_tps=12),
 }
+
+# These are the only locations in Heating Up Mafia Town that are available
+humt_locations = [
+    "Mafia Town - Crow Chest",
+    "Mafia Town - Behind Faucet",
+    "Mafia Town - Slip Slide Chest",
+    "Mafia Town - Beach Patio",
+    "Mafia Town - Yellow Sphere Building Chest",
+    "Mafia Town - Cargo Ship",
+    "Mafia Town - Top of Lighthouse",
+    "Mafia Town - Steel Beam Nest",
+    "Mafia Town - Dweller Boxes",
+    "Mafia Town - Chest Beneath Aqueduct",
+    "Mafia Town - Ledge Chest",
+    "Mafia Town - Beneath Scaffolding",
+    "Mafia Town - On Scaffolding",
+    "Mafia Town - Wood Cage",
+    "Mafia Town - Clock Tower Chest",
+    "Mafia Town - Secret Cave",
+    "Mafia Town - Top of Ruined Tower",
+    "Mafia Town - Mafia Geek Platform",
+    "Mafia Town - Behind HQ Chest",
+    "Mafia Town - Camera Badge 1",
+    "Mafia Town - Camera Badge 2",
+]
 
 location_table = {
     **ahit_locations,

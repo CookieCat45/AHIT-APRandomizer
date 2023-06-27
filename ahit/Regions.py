@@ -148,7 +148,8 @@ alpine_regions = [
     "The Twilight Bell",
 ]
 
-first_chapter_act_blacklist = [
+# The first four acts of a chapter in act rando can't be any of these
+first_chapter_blacklist = [
     "Cheating the Race",
 
     "Train Rush",
@@ -166,6 +167,17 @@ first_chapter_act_blacklist = [
     "Time Rift - Curly Tail Trail",
 
     "Time Rift - Gallery",
+]
+
+# One of the first 4 acts of a chapter in act rando must be one of these
+first_chapter_guaranteed_acts = [
+    "Welcome to Mafia Town",
+    "Barrel Battle",
+    "She Came from Outer Space",
+    "Down with the Mafia!",
+    "The Golden Vault",
+
+    "Contractual Obligations",
 ]
 
 # Acts blacklisted in act shuffle
@@ -333,19 +345,41 @@ def randomize_act_entrances(world: World):
 
         act_whitelist: typing.List[Region] = []
         for region in region_list.copy():
-            if region.name not in first_chapter_act_blacklist:
+            if region.name not in first_chapter_blacklist:
                 act_whitelist.append(region)
 
+        has_guaranteed_act: bool = False
+        count: int = 0
         first_chapter_entrances: typing.List[Entrance] = get_first_chapter_region(world).exits.copy()
         world.multiworld.random.shuffle(first_chapter_entrances)
 
         for entrance in first_chapter_entrances:
+            if "Act 1" not in entrance.name \
+             and "Act 2" not in entrance.name \
+             and "Act 3" not in entrance.name:
+                continue
+            
+            if entrance.name in blacklisted_acts.keys():
+                continue
+
             region: Region = act_whitelist[world.multiworld.random.randint(0, len(act_whitelist)-1)]
+            if not has_guaranteed_act:
+                if count >= 2 or world.multiworld.random.randint(0, 3) == 1:
+                    region = world.multiworld.get_region(
+                        first_chapter_guaranteed_acts
+                        [world.multiworld.random.randint(0, len(first_chapter_guaranteed_acts)-1)], world.player)
+                    has_guaranteed_act = True
+                elif region.name in first_chapter_guaranteed_acts:
+                    has_guaranteed_act = True
+
             world.update_chapter_act_info(entrance.connected_region, region)
             reconnect_regions(entrance, entrance.parent_region, region)
             entrance_list.remove(entrance)
             region_list.remove(region)
             act_whitelist.remove(region)
+            count += 1
+            if count >= 3:
+                break
 
         # Gather Time Rifts, so we can do them first, since they have certain restrictions
         # and the entrances to them are done differently
@@ -445,10 +479,10 @@ def get_act_entrances(world: World, exclude_blacklisted: bool = True) -> typing.
     entrance_list: typing.List[Entrance] = []
     for region in world.multiworld.get_regions(world.player):
         if region.name in act_entrances.values():
-            entrance: Entrance = region.entrances[0]
-            if entrance.name in act_entrances.keys():
-                if exclude_blacklisted is False or entrance.name not in blacklisted_acts.keys():
-                    entrance_list.append(entrance)
+            for entrance in region.entrances:
+                if entrance.name in act_entrances.keys():
+                    if exclude_blacklisted is False or entrance.name not in blacklisted_acts.keys():
+                        entrance_list.append(entrance)
 
     return entrance_list
 

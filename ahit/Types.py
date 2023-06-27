@@ -10,15 +10,6 @@ class HatType(IntEnum):
     TIME_STOP = 4
 
 
-class RelicType(IntEnum):
-    BURGER = 0
-    TRAIN = 1
-    UFO = 2
-    CRAYON = 3
-    CAKE = 4
-    NECKLACE = 5
-
-
 class HatDLC(IntFlag):
     none = 0b000
     dlc1 = 0b001
