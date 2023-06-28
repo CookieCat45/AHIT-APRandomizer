@@ -233,7 +233,7 @@ act_completions = {
     "Act Completion (Train Rush)": LocData(312481, "Train Rush", hookshot=True),
     "Act Completion (The Big Parade)": LocData(311157, "The Big Parade"),
     "Act Completion (Award Ceremony)": LocData(311488, "Award Ceremony"),
-    "Act Completion (Award Ceremony Boss)": LocData(312253, "Dead Bird Studio Basement", hookshot=True),
+    "Act Completion (Dead Bird Studio Basement)": LocData(312253, "Dead Bird Studio Basement", hookshot=True),
     "Act Completion (Time Rift - The Owl Express)": LocData(312807, "Time Rift - The Owl Express"),
     "Act Completion (Time Rift - The Moon)": LocData(312785, "Time Rift - The Moon"),
     "Act Completion (Time Rift - Dead Bird Studio)": LocData(312577, "Time Rift - Dead Bird Studio"),

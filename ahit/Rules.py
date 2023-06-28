@@ -38,11 +38,14 @@ def get_relic_count(state: CollectionState, world: World, relic: str) -> int:
 
 def can_clear_act(state: CollectionState, world: World, act_entrance: str) -> bool:
     entrance: Entrance = world.multiworld.get_entrance(act_entrance, world.player)
-    for location in entrance.connected_region.locations:
-        if "Act Completion" in location.name:
-            return state.can_reach(entrance, player=world.player) and location.access_rule(state)
+    if not state.can_reach(entrance, player=world.player):
+        return False
 
-    return True  # Likely a free roam act
+    if "Free Roam" in entrance.connected_region.name:
+        return True
+
+    name: str = format("Act Completion (%s)" % entrance.connected_region.name)
+    return world.multiworld.get_location(name, world.player).access_rule(state)
 
 
 def can_reach_mafia_day(state: CollectionState, world: World) -> bool:
