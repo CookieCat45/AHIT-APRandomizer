@@ -23,25 +23,14 @@ class HatInTimeWorld(World):
 
     option_definitions = ahit_options
 
-    hat_craft_order: typing.List[HatType] = [HatType.SPRINT, HatType.BREWING, HatType.ICE,
-                                             HatType.DWELLER, HatType.TIME_STOP]
-
-    hat_yarn_costs: typing.Dict[HatType, int] = {HatType.SPRINT: -1, HatType.BREWING: -1, HatType.ICE: -1,
-                                                 HatType.DWELLER: -1, HatType.TIME_STOP: -1}
-
-    chapter_timepiece_costs: typing.Dict[ChapterIndex, int] = {ChapterIndex.MAFIA: -1,
-                                                               ChapterIndex.BIRDS: -1,
-                                                               ChapterIndex.SUBCON: -1,
-                                                               ChapterIndex.ALPINE: -1,
-                                                               ChapterIndex.FINALE: -1,
-                                                               ChapterIndex.CRUISE: -1,
-                                                               ChapterIndex.METRO: -1}
-
+    hat_craft_order: typing.List[HatType]
+    hat_yarn_costs: typing.Dict[HatType, int]
+    chapter_timepiece_costs: typing.Dict[ChapterIndex, int]
     act_connections: typing.Dict[str, str] = {}
 
     def generate_early(self):
         # If our starting chapter is 4, and act rando is off, force hookshot into inventory.
-        # Starting chapter 3/4 is banned in act rando, because it will often cause a generation failure.
+        # Starting chapter 3/4 is banned in act rando, because they don't have enough starting acts
         start_chapter: int = self.multiworld.StartingChapter[self.player].value
         if start_chapter == 4 or start_chapter == 3:
             if self.multiworld.ActRandomizer[self.player].value == 0:
@@ -51,6 +40,12 @@ class HatInTimeWorld(World):
                 self.multiworld.StartingChapter[self.player].value = self.multiworld.random.randint(1, 2)
 
     def create_items(self):
+        self.hat_yarn_costs = {HatType.SPRINT: -1, HatType.BREWING: -1, HatType.ICE: -1,
+                               HatType.DWELLER: -1, HatType.TIME_STOP: -1}
+
+        self.hat_craft_order = [HatType.SPRINT, HatType.BREWING, HatType.ICE,
+                                HatType.DWELLER, HatType.TIME_STOP]
+
         # Item Pool
         itempool: typing.List[Item] = []
         self.calculate_yarn_costs()
@@ -89,6 +84,15 @@ class HatInTimeWorld(World):
         create_regions(self)
 
     def set_rules(self):
+        self.act_connections = {}
+        self.chapter_timepiece_costs = {ChapterIndex.MAFIA: -1,
+                                        ChapterIndex.BIRDS: -1,
+                                        ChapterIndex.SUBCON: -1,
+                                        ChapterIndex.ALPINE: -1,
+                                        ChapterIndex.FINALE: -1,
+                                        ChapterIndex.CRUISE: -1,
+                                        ChapterIndex.METRO: -1}
+
         if self.multiworld.ActRandomizer[self.player].value > 0:
             randomize_act_entrances(self)
 
@@ -177,7 +181,7 @@ class HatInTimeWorld(World):
         max_cost: int = 0
         for i in range(5):
             cost = self.multiworld.random.randint(min(min_yarn_cost, max_yarn_cost), max(max_yarn_cost, min_yarn_cost))
-            self.hat_yarn_costs.update({HatType(i): cost})
+            self.hat_yarn_costs[HatType(i)] = cost
             max_cost += cost
 
         available_yarn = self.multiworld.YarnAvailable[self.player].value
@@ -190,7 +194,7 @@ class HatInTimeWorld(World):
             self.multiworld.YarnAvailable[self.player].value += (max_cost + 8) - available_yarn
 
     def set_chapter_cost(self, chapter: ChapterIndex, cost: int):
-        self.chapter_timepiece_costs.update({chapter: cost})
+        self.chapter_timepiece_costs[chapter] = cost
 
     def get_chapter_cost(self, chapter: ChapterIndex) -> int:
         return self.chapter_timepiece_costs.get(chapter)
@@ -199,4 +203,4 @@ class HatInTimeWorld(World):
     def update_chapter_act_info(self, original_region: Region, new_region: Region):
         original_act_info = chapter_act_info[original_region.name]
         new_act_info = chapter_act_info[new_region.name]
-        self.act_connections.setdefault(original_act_info, new_act_info)
+        self.act_connections[original_act_info] = new_act_info

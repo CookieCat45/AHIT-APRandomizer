@@ -3,7 +3,7 @@ from BaseClasses import Region, Entrance
 from .Locations import HatInTimeLocation, location_table, storybook_pages
 from .Types import ChapterIndex
 import typing
-from .Rules import set_rift_indirect_connections
+from .Rules import set_rift_rules
 
 
 # ChapterIndex: region
@@ -36,18 +36,18 @@ act_entrances = {
     "Battle of the Birds - Act 3":              "Picture Perfect",
     "Battle of the Birds - Act 4":              "Train Rush",
     "Battle of the Birds - Act 5":              "The Big Parade",
-    "Battle of the Birds - Act 6A":             "Award Ceremony",
-    "Battle of the Birds - Act 6B":             "Dead Bird Studio Basement",
+    "Battle of the Birds - Finale A":             "Award Ceremony",
+    "Battle of the Birds - Finale B":             "Dead Bird Studio Basement",
 
     "Subcon Forest - Act 1":            "Contractual Obligations",
     "Subcon Forest - Act 2":            "The Subcon Well",
     "Subcon Forest - Act 3":            "Toilet of Doom",
     "Subcon Forest - Act 4":            "Queen Vanessa's Manor",
     "Subcon Forest - Act 5":            "Mail Delivery Service",
-    "Subcon Forest - Act 6":            "Your Contract has Expired",
+    "Subcon Forest - Finale":            "Your Contract has Expired",
 
     "Alpine Skyline - Free Roam":        "Alpine Free Roam",
-    "Alpine Skyline - Act 5":            "The Illness has Spread",
+    "Alpine Skyline - Finale":            "The Illness has Spread",
 }
 
 act_chapters = {
@@ -141,13 +141,6 @@ chapter_act_info = {
     "The Finale":                       "hatintime_chapterinfo.TheFinale.TheFinale_FinalBoss"
 }
 
-alpine_regions = [
-    "The Birdhouse",
-    "The Lava Cake",
-    "The Windmill",
-    "The Twilight Bell",
-]
-
 # The first four acts of a chapter in act rando can't be any of these
 first_chapter_blacklist = [
     "Cheating the Race",
@@ -183,7 +176,7 @@ first_chapter_guaranteed_acts = [
 # Acts blacklisted in act shuffle
 # entrance: region
 blacklisted_acts = {
-    "Battle of the Birds - Act 6A": "Award Ceremony",
+    "Battle of the Birds - Finale A": "Award Ceremony",
 }
 
 # region: list[Region]
@@ -232,16 +225,13 @@ def create_regions(world: World):
     create_region_and_connect(w, "Time's End", "-> Time's End", spaceship)
 
     mafia_town = create_region_and_connect(w, "Mafia Town", "-> Mafia Town", spaceship)
-    create_region_and_connect(w, "Welcome to Mafia Town", "Mafia Town - Act 1", mafia_town)
-    create_region_and_connect(w, "Barrel Battle", "Mafia Town - Act 2", mafia_town)
-    create_region_and_connect(w, "She Came from Outer Space", "Mafia Town - Act 3", mafia_town)
-    create_region_and_connect(w, "Down with the Mafia!", "Mafia Town - Act 4", mafia_town)
-    create_region_and_connect(w, "Heating Up Mafia Town", "Mafia Town - Act 6", mafia_town)
-    create_region_and_connect(w, "Cheating the Race", "Mafia Town - Act 5", mafia_town)
-    create_region_and_connect(w, "The Golden Vault", "Mafia Town - Act 7", mafia_town)
-    create_rift_connections(w, create_region(w, "Time Rift - Mafia of Cooks"))
-    create_rift_connections(w, create_region(w, "Time Rift - Sewers"))
-    create_rift_connections(w, create_region(w, "Time Rift - Bazaar"))
+    mt_act1 = create_region_and_connect(w, "Welcome to Mafia Town", "Mafia Town - Act 1", mafia_town)
+    mt_act2 = create_region_and_connect(w, "Barrel Battle", "Mafia Town - Act 2", mafia_town)
+    mt_act3 = create_region_and_connect(w, "She Came from Outer Space", "Mafia Town - Act 3", mafia_town)
+    mt_act4 = create_region_and_connect(w, "Down with the Mafia!", "Mafia Town - Act 4", mafia_town)
+    mt_act6 = create_region_and_connect(w, "Heating Up Mafia Town", "Mafia Town - Act 6", mafia_town)
+    mt_act5 = create_region_and_connect(w, "Cheating the Race", "Mafia Town - Act 5", mafia_town)
+    mt_act7 = create_region_and_connect(w, "The Golden Vault", "Mafia Town - Act 7", mafia_town)
 
     botb = create_region_and_connect(w, "Battle of the Birds", "-> Battle of the Birds", spaceship)
     create_region_and_connect(w, "Dead Bird Studio", "Battle of the Birds - Act 1", botb)
@@ -249,22 +239,19 @@ def create_regions(world: World):
     create_region_and_connect(w, "Picture Perfect", "Battle of the Birds - Act 3", botb)
     create_region_and_connect(w, "Train Rush", "Battle of the Birds - Act 4", botb)
     create_region_and_connect(w, "The Big Parade", "Battle of the Birds - Act 5", botb)
-    create_region_and_connect(w, "Award Ceremony", "Battle of the Birds - Act 6A", botb)
-    create_region_and_connect(w, "Dead Bird Studio Basement", "Battle of the Birds - Act 6B", botb)
+    create_region_and_connect(w, "Award Ceremony", "Battle of the Birds - Finale A", botb)
+    create_region_and_connect(w, "Dead Bird Studio Basement", "Battle of the Birds - Finale B", botb)
     create_rift_connections(w, create_region(w, "Time Rift - Dead Bird Studio"))
     create_rift_connections(w, create_region(w, "Time Rift - The Owl Express"))
     create_rift_connections(w, create_region(w, "Time Rift - The Moon"))
 
     subcon_forest = create_region_and_connect(w, "Subcon Forest", "-> Subcon Forest", spaceship)
-    create_region_and_connect(w, "Contractual Obligations", "Subcon Forest - Act 1", subcon_forest)
-    create_region_and_connect(w, "The Subcon Well", "Subcon Forest - Act 2", subcon_forest)
-    create_region_and_connect(w, "Toilet of Doom", "Subcon Forest - Act 3", subcon_forest)
-    create_region_and_connect(w, "Queen Vanessa's Manor", "Subcon Forest - Act 4", subcon_forest)
-    create_region_and_connect(w, "Mail Delivery Service", "Subcon Forest - Act 5", subcon_forest)
-    create_region_and_connect(w, "Your Contract has Expired", "Subcon Forest - Act 6", subcon_forest)
-    create_rift_connections(w, create_region(w, "Time Rift - Sleepy Subcon"))
-    create_rift_connections(w, create_region(w, "Time Rift - Pipe"))
-    create_rift_connections(w, create_region(w, "Time Rift - Village"))
+    sf_act1 = create_region_and_connect(w, "Contractual Obligations", "Subcon Forest - Act 1", subcon_forest)
+    sf_act2 = create_region_and_connect(w, "The Subcon Well", "Subcon Forest - Act 2", subcon_forest)
+    sf_act3 = create_region_and_connect(w, "Toilet of Doom", "Subcon Forest - Act 3", subcon_forest)
+    sf_act4 = create_region_and_connect(w, "Queen Vanessa's Manor", "Subcon Forest - Act 4", subcon_forest)
+    sf_act5 = create_region_and_connect(w, "Mail Delivery Service", "Subcon Forest - Act 5", subcon_forest)
+    create_region_and_connect(w, "Your Contract has Expired", "Subcon Forest - Finale", subcon_forest)
 
     # Alpine is all considered one act, besides finale/rifts
     alpine_skyline = create_region_and_connect(w, "Alpine Skyline",  "-> Alpine Skyline", spaceship)
@@ -273,31 +260,39 @@ def create_regions(world: World):
     create_region_and_connect(w, "The Lava Cake", "-> The Lava Cake", alpine_freeroam)
     create_region_and_connect(w, "The Windmill", "-> The Windmill", alpine_freeroam)
     create_region_and_connect(w, "The Twilight Bell", "-> The Twilight Bell", alpine_freeroam)
-    create_region_and_connect(w, "The Illness has Spread", "Alpine Skyline - Act 5", alpine_freeroam)
+    create_region_and_connect(w, "The Illness has Spread", "Alpine Skyline - Finale", alpine_freeroam)
     create_rift_connections(w, create_region(w, "Time Rift - Alpine Skyline"))
     create_rift_connections(w, create_region(w, "Time Rift - The Twilight Bell"))
     create_rift_connections(w, create_region(w, "Time Rift - Curly Tail Trail"))
     world.multiworld.get_region("Alpine Free Roam", w.player)
 
+    mt_area: Region = create_region(w, "Mafia Town Area")
+    connect_regions(mt_act1, mt_area, "Mafia Town Entrance WTMT", w.player)
+    connect_regions(mt_act2, mt_area, "Mafia Town Entrance BB", w.player)
+    connect_regions(mt_act3, mt_area, "Mafia Town Entrance SCFOS", w.player)
+    connect_regions(mt_act4, mt_area, "Mafia Town Entrance DWTM", w.player)
+    connect_regions(mt_act5, mt_area, "Mafia Town Entrance CTR", w.player)
+    connect_regions(mt_act7, mt_area, "Mafia Town Entrance TGV", w.player)
+
+    create_rift_connections(w, create_region(w, "Time Rift - Mafia of Cooks"))
+    create_rift_connections(w, create_region(w, "Time Rift - Sewers"))
+    create_rift_connections(w, create_region(w, "Time Rift - Bazaar"))
+
+    sf_area: Region = create_region(w, "Subcon Forest Area")
+    connect_regions(sf_act1, sf_area, "Subcon Forest Entrance CO", w.player)
+    connect_regions(sf_act2, sf_area, "Subcon Forest Entrance SW", w.player)
+    connect_regions(sf_act3, sf_area, "Subcon Forest Entrance TOD", w.player)
+    connect_regions(sf_act4, sf_area, "Subcon Forest Entrance QVM", w.player)
+    connect_regions(sf_act5, sf_area, "Subcon Forest Entrance MDS", w.player)
+
+    create_rift_connections(w, create_region(w, "Time Rift - Sleepy Subcon"))
+    create_rift_connections(w, create_region(w, "Time Rift - Pipe"))
+    create_rift_connections(w, create_region(w, "Time Rift - Village"))
+
     badge_seller = create_region(w, "Badge Seller")
-
-    connect_regions(mw.get_region("Welcome to Mafia Town", w.player), badge_seller,
-                    "Welcome to Mafia Town -> Badge Seller", w.player)
-
-    connect_regions(mw.get_region("Barrel Battle", w.player), badge_seller,
-                    "Barrel Battle -> Badge Seller", w.player)
-
-    connect_regions(mw.get_region("She Came from Outer Space", w.player), badge_seller,
-                    "She Came from Outer Space -> Badge Seller", w.player)
-
-    connect_regions(mw.get_region("Down with the Mafia!", w.player), badge_seller,
-                    "Down with the Mafia! -> Badge Seller", w.player)
-
-    connect_regions(mw.get_region("Cheating the Race", w.player), badge_seller,
-                    "Cheating the Race -> Badge Seller", w.player)
-
-    connect_regions(mw.get_region("The Golden Vault", w.player), badge_seller,
-                    "The Golden Vault -> Badge Seller", w.player)
+    connect_regions(mt_area, badge_seller, "Mafia Town Area -> Badge Seller", w.player)
+    connect_regions(mt_act6, badge_seller, "Heating Up Mafia Town -> Badge Seller", w.player)
+    connect_regions(sf_area, badge_seller, "Subcon Forest Area -> Badge Seller", w.player)
 
     connect_regions(mw.get_region("Dead Bird Studio", w.player), badge_seller,
                     "Dead Bird Studio -> Badge Seller", w.player)
@@ -308,23 +303,10 @@ def create_regions(world: World):
     connect_regions(mw.get_region("Train Rush", w.player), badge_seller,
                     "Train Rush -> Badge Seller", w.player)
 
-    connect_regions(mw.get_region("Contractual Obligations", w.player), badge_seller,
-                    "Contractual Obligations -> Badge Seller", w.player)
-
-    connect_regions(mw.get_region("The Subcon Well", w.player), badge_seller,
-                    "The Subcon Well -> Badge Seller", w.player)
-
-    connect_regions(mw.get_region("Toilet of Doom", w.player), badge_seller,
-                    "Toilet of Doom -> Badge Seller", w.player)
-
-    connect_regions(mw.get_region("Queen Vanessa's Manor", w.player), badge_seller,
-                    "Queen Vanessa's Manor -> Badge Seller", w.player)
-
-    connect_regions(mw.get_region("Mail Delivery Service", w.player), badge_seller,
-                    "Mail Delivery Service -> Badge Seller", w.player)
-
     connect_regions(mw.get_region("Alpine Free Roam", w.player), badge_seller,
                     "Alpine Free Roam -> Badge Seller", w.player)
+
+    mw.get_region("Time Rift - Sewers", w.player)
 
 
 def create_rift_connections(world: World, region: Region):
@@ -352,6 +334,7 @@ def randomize_act_entrances(world: World):
         count: int = 0
         first_chapter_entrances: typing.List[Entrance] = get_first_chapter_region(world).exits.copy()
         world.multiworld.random.shuffle(first_chapter_entrances)
+        world.multiworld.random.shuffle(act_whitelist)
 
         for entrance in first_chapter_entrances:
             if "Act 1" not in entrance.name \
@@ -381,61 +364,49 @@ def randomize_act_entrances(world: World):
             if count >= 3:
                 break
 
-        # Gather Time Rifts, so we can do them first, since they have certain restrictions
-        # and the entrances to them are done differently
         time_rifts: typing.List[Region] = []
         for region in world.multiworld.get_regions(world.player):
             if "Time Rift" in region.name and region.name in rift_access_regions.keys():
                 time_rifts.append(region)
 
         rift_dict: typing.Dict[str, Region] = {}
-        chapter_rift_block_list: typing.List[ChapterIndex] = []
         block_attempts: int = 0
-        last_rift_index: ChapterIndex = ChapterIndex.SPACESHIP
-        last_target_index: ChapterIndex = ChapterIndex.SPACESHIP
+        chapter_rift_blocks: typing.Dict[ChapterIndex, typing.List[ChapterIndex]] = {ChapterIndex.MAFIA: [],
+                                                                                     ChapterIndex.BIRDS: [],
+                                                                                     ChapterIndex.SUBCON: [],
+                                                                                     ChapterIndex.ALPINE: []}
+
         while len(entrance_list) > 0 or len(region_list) > 0 or len(time_rifts) > 0:
             entrance = entrance_list[world.multiworld.random.randint(0, len(entrance_list) - 1)]
 
             # Rifts first
             if len(time_rifts) > 0:
                 rift_region = time_rifts[world.multiworld.random.randint(0, len(time_rifts)-1)]
-                target_region = region_list[world.multiworld.random.randint(0, len(region_list) - 1)]
+                target_region = region_list[world.multiworld.random.randint(0, len(region_list)-1)]
 
                 # Make sure the target region and Time Rift do not share the same original chapter
                 if act_chapters[rift_region.name] == act_chapters[target_region.name]:
                     continue
 
-                cont: bool = False
                 if "Time Rift" not in target_region.name:
 
-                    # If target act is from chapter 1 or 3,
-                    # can't have more than one non-rift act from the target act's chapter in a Time Rift
-                    # in the same chapter.
                     rift_chapter_index = [index for index, name in chapter_regions.items()
                                           if name == act_chapters[rift_region.name]][0]
                     target_chapter_index = [index for index, name in chapter_regions.items()
                                             if name == act_chapters[target_region.name]][0]
 
+                    # If target act is from chapter 1 or 3,
+                    # we can't have more than one non-rift act from the target act's chapter in a Time Rift
+                    # in the same chapter.
+                    if target_chapter_index in chapter_rift_blocks[rift_chapter_index] and block_attempts < 300:
+                        block_attempts += 1
+                        continue
+
                     if rift_chapter_index is not ChapterIndex.SPACESHIP \
                        and target_chapter_index is ChapterIndex.MAFIA or target_chapter_index is ChapterIndex.SUBCON:
-                        for i in range(len(chapter_rift_block_list)):
-                            ci: ChapterIndex = chapter_rift_block_list[i]
-                            if rift_chapter_index == ci and i % 2 == 0 \
-                               and chapter_rift_block_list[i+1] == target_chapter_index:
-                                cont = block_attempts < 300
-                                if last_rift_index is rift_chapter_index and last_target_index is target_chapter_index:
-                                    block_attempts += 1
+                        chapter_rift_blocks[rift_chapter_index] += [target_chapter_index]
 
-                                last_rift_index = rift_chapter_index
-                                last_target_index = target_chapter_index
-
-                        if cont is False and block_attempts < 300:
-                            chapter_rift_block_list.append(rift_chapter_index)
-                            chapter_rift_block_list.append(target_chapter_index)
-
-                if cont:
-                    continue
-
+                # Grab the Time Rift's current entrances
                 rift_entrances: typing.List[Entrance] = []
                 for e in rift_region.entrances:
                     rift_entrances.append(e)
@@ -452,7 +423,7 @@ def randomize_act_entrances(world: World):
 
                 world.update_chapter_act_info(rift_region, target_region)
 
-                # Store in our dict, so we know which region to connect the indirect connections to, as well as rules
+                # Store in our dict (see set_rift_indirect_connections)
                 rift_dict.setdefault(rift_region.name, target_region)
 
                 time_rifts.remove(rift_region)
@@ -472,7 +443,7 @@ def randomize_act_entrances(world: World):
             blacklisted_region: Region = world.multiworld.get_region(blacklisted_acts[name], world.player)
             world.update_chapter_act_info(blacklisted_region, blacklisted_region)
 
-        set_rift_indirect_connections(world, rift_dict)
+        set_rift_rules(world, rift_dict)
 
 
 def get_act_entrances(world: World, exclude_blacklisted: bool = True) -> typing.List[Entrance]:
@@ -507,7 +478,6 @@ def create_region(world: World, name: str) -> Region:
                 continue
 
             location = HatInTimeLocation(world.player, key, data.id, reg)
-            location.parent_region = reg
             reg.locations.append(location)
 
     world.multiworld.regions.append(reg)
