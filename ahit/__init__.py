@@ -1,6 +1,7 @@
 from BaseClasses import Item, ItemClassification, Region
 from .Items import HatInTimeItem, item_table, time_pieces, item_frequencies, item_dlc_enabled, junk_weights, relic_groups
-from .Regions import create_region, create_regions, connect_regions, randomize_act_entrances, chapter_act_info
+from .Regions import create_region, create_regions, connect_regions, randomize_act_entrances, chapter_act_info, \
+    create_event_location
 from .Locations import HatInTimeLocation, location_table, get_total_locations
 from .Types import HatDLC, HatType, ChapterIndex
 from .Options import ahit_options
@@ -97,6 +98,7 @@ class HatInTimeWorld(World):
             randomize_act_entrances(self)
 
         set_rules(self)
+        self.create_events()
 
     def write_spoiler(self, spoiler_handle: typing.TextIO):
         for i in self.chapter_timepiece_costs.keys():
@@ -144,6 +146,27 @@ class HatInTimeWorld(World):
             itemlist += [HatInTimeItem(name, data.classification, data.code, self.player)]
 
         return itemlist
+
+    def create_events(self):
+        w = self
+        mw = self.multiworld
+        p = self.player
+        # birdhouse = mw.get_region("The Birdhouse", p)
+        # lava_cake = mw.get_region("The Lava Cake", p)
+        windmill = mw.get_region("The Windmill", p)
+        twilight_bell = mw.get_region("The Twilight Bell", p)
+
+        # birdhouse_event = create_event_location("Birdhouse Cleared", birdhouse, w)
+        # birdhouse_event.access_rule = mw.get_location("Act Completion (The Birdhouse)", w.player).access_rule
+
+        # lava_cake_event = create_event_location("Lava Cake Cleared", lava_cake, w)
+        # lava_cake_event.access_rule = mw.get_location("Act Completion (The Lava Cake)", w.player).access_rule
+
+        windmill_event = create_event_location("Windmill Cleared", windmill, w)
+        windmill_event.access_rule = mw.get_location("Act Completion (The Windmill)", w.player).access_rule
+
+        twilight_bell_event = create_event_location("Twilight Bell Cleared", twilight_bell, w)
+        twilight_bell_event.access_rule = mw.get_location("Act Completion (The Twilight Bell)", w.player).access_rule
 
     def create_junk_items(self, count: int) -> typing.List[Item]:
         trap_chance = self.multiworld.TrapChance[self.player].value

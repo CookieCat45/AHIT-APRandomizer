@@ -1,6 +1,7 @@
 from ..AutoWorld import World
-from BaseClasses import Region, Entrance
+from BaseClasses import Region, Entrance, ItemClassification, Location
 from .Locations import HatInTimeLocation, location_table, storybook_pages
+from .Items import HatInTimeItem
 from .Types import ChapterIndex
 import typing
 from .Rules import set_rift_rules
@@ -256,14 +257,18 @@ def create_regions(world: World):
     # Alpine is all considered one act, besides finale/rifts
     alpine_skyline = create_region_and_connect(w, "Alpine Skyline",  "-> Alpine Skyline", spaceship)
     alpine_freeroam = create_region_and_connect(w, "Alpine Free Roam", "Alpine Skyline - Free Roam", alpine_skyline)
-    create_region_and_connect(w, "The Birdhouse", "-> The Birdhouse", alpine_freeroam)
-    create_region_and_connect(w, "The Lava Cake", "-> The Lava Cake", alpine_freeroam)
-    create_region_and_connect(w, "The Windmill", "-> The Windmill", alpine_freeroam)
-    create_region_and_connect(w, "The Twilight Bell", "-> The Twilight Bell", alpine_freeroam)
+
+    birdhouse = create_region_and_connect(w, "The Birdhouse", "-> The Birdhouse", alpine_freeroam)
+    lava_cake = create_region_and_connect(w, "The Lava Cake", "-> The Lava Cake", alpine_freeroam)
+    windmill = create_region_and_connect(w, "The Windmill", "-> The Windmill", alpine_freeroam)
+    twilight_bell = create_region_and_connect(w, "The Twilight Bell", "-> The Twilight Bell", alpine_freeroam)
+
     create_region_and_connect(w, "The Illness has Spread", "Alpine Skyline - Finale", alpine_freeroam)
     create_rift_connections(w, create_region(w, "Time Rift - Alpine Skyline"))
     create_rift_connections(w, create_region(w, "Time Rift - The Twilight Bell"))
     create_rift_connections(w, create_region(w, "Time Rift - Curly Tail Trail"))
+
+    # force recache
     world.multiworld.get_region("Alpine Free Roam", w.player)
 
     mt_area: Region = create_region(w, "Mafia Town Area")
@@ -306,6 +311,7 @@ def create_regions(world: World):
     connect_regions(mw.get_region("Alpine Free Roam", w.player), badge_seller,
                     "Alpine Free Roam -> Badge Seller", w.player)
 
+    # force recache
     mw.get_region("Time Rift - Sewers", w.player)
 
 
@@ -316,6 +322,13 @@ def create_rift_connections(world: World, region: Region):
         entrance_name = "{name} Portal - Entrance {num}"
         connect_regions(act_region, region, entrance_name.format(name=region.name, num=i), world.player)
         i += 1
+
+
+def create_event_location(name: str, region: Region, world: World) -> Location:
+    event = HatInTimeLocation(world.player, name, None, region)
+    region.locations.append(event)
+    event.place_locked_item(HatInTimeItem(name, ItemClassification.progression, None, world.player))
+    return event
 
 
 def randomize_act_entrances(world: World):
