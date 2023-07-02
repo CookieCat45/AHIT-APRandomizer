@@ -295,6 +295,26 @@ optional out class inventoryOverride) // Item inventory class override. Mainly f
 			worldClass = class'Archipelago_RandomizedItem_BadgePin';
 			return true;
 		
+		case 300200:
+			itemName = "Snatcher's Contract (The Subcon Well)";
+			worldClass = class'Archipelago_RandomizedItem_Contract';
+			return true;
+		
+		case 300201:
+			itemName = "Snatcher's Contract (Toilet of Doom)";
+			worldClass = class'Archipelago_RandomizedItem_Contract';
+			return true;
+		
+		case 300202:
+			itemName = "Snatcher's Contract (Queen Vanessa's Manor)";
+			worldClass = class'Archipelago_RandomizedItem_Contract';
+			return true;
+
+		case 300203:
+			itemName = "Snatcher's Contract (Mail Delivery Service)";
+			worldClass = class'Archipelago_RandomizedItem_Contract';
+			return true;
+		
 		default:
 			return false;
 	}
@@ -303,7 +323,7 @@ optional out class inventoryOverride) // Item inventory class override. Mainly f
 static function string GetTimePieceFromItemID(int id, optional out int IsAct, optional out string displayName)
 {
 	IsAct = 1;
-
+	
 	switch (id)
 	{
 		// -------------------------------------------------- MAFIA TOWN ------------------------------------------------------------- \\
@@ -490,5 +510,48 @@ static function string GetTimePieceFromItemID(int id, optional out int IsAct, op
 		
 		default:
 			return "";
+	}
+}
+
+// Contract location IDs and item IDs are the same for each
+static function int GetContractID(class<Hat_SnatcherContract_Act> contract)
+{
+	switch (contract)
+	{
+		case class'Hat_SnatcherContract_IceWall':
+			return 300200;
+		
+		case class'Hat_SnatcherContract_Toilet':
+			return 300201;
+		
+		case class'Hat_SnatcherContract_Vanessa':
+			return 300202;
+		
+		case class'Hat_SnatcherContract_MailDelivery':
+			return 300203;
+
+		default:
+			return 0;
+	}
+}
+
+static function class<Hat_SnatcherContract_Act> GetContractFromID(int id)
+{
+	switch (id)
+	{
+		case 300200:
+			return class'Hat_SnatcherContract_IceWall';
+		
+		case 300201:
+			return class'Hat_SnatcherContract_Toilet';
+
+		case 300202:
+			return class'Hat_SnatcherContract_Vanessa';
+		
+		case 300203:
+			return class'Hat_SnatcherContract_MailDelivery';
+
+		default:
+			return None;
 	}
 }

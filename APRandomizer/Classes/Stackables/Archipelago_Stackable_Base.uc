@@ -13,7 +13,7 @@ simulated event PostBeginPlay()
 
 function bool CanCarryBeDropped()
 {
-	return true; // always droppable to avoid messing with other carryables
+	return false;
 }
 
 function OnPickUp(Actor p)

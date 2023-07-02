@@ -28,6 +28,9 @@ def get_total_locations(world: World) -> int:
            and world.multiworld.ShuffleStorybookPages[world.player].value == 0:
             continue
 
+        if name in contract_locations.keys() and world.multiworld.ShuffleActContracts[world.player].value == 0:
+            continue
+
         total += 1
 
     return total
@@ -51,9 +54,9 @@ def location_dlc_enabled(world: World, location: str) -> bool:
 ahit_locations = {
     "Spaceship - Rumbi": LocData(301000, "Spaceship", required_tps=4),
     "Spaceship - Cooking Cat": LocData(301001, "Spaceship", required_tps=5),
-    "Mafia Town - Umbrella": LocData(301002, "Welcome to Mafia Town"),
 
     # 300000 range - Mafia Town/Batle of the Birds
+    "Mafia Town - Umbrella": LocData(301002, "Welcome to Mafia Town"),
     "Mafia Town - Red Vault": LocData(302848, "Mafia Town Area"),
     "Mafia Town - Dweller Boxes": LocData(304462, "Mafia Town Area"),
     "Mafia Town - Old Man (Steel Beams)": LocData(303832, "Mafia Town Area"),
@@ -130,12 +133,12 @@ ahit_locations = {
 
     # 320000 range - Subcon Forest
     "Subcon Forest - Cherry Bomb Bone Cage": LocData(324761, "Contractual Obligations"),
-    "Subcon Forest - Village Tree Top Ice Cube": LocData(325078, "Subcon Forest Area"),
-    "Subcon Forest - Village Graveyard Ice Cube": LocData(325077, "Subcon Forest Area"),
-    "Subcon Forest - Village House Top": LocData(325471, "Subcon Forest Area"),
-    "Subcon Forest - Village Ice Cube House": LocData(325469, "Subcon Forest Area"),
-    "Subcon Forest - Village Snatcher Statue Chest": LocData(323730, "Subcon Forest Area"),
-    "Subcon Forest - Village Stump Platform Chest": LocData(323729, "Subcon Forest Area"),
+    "Subcon Village - Tree Top Ice Cube": LocData(325078, "Subcon Forest Area"),
+    "Subcon Village - Graveyard Ice Cube": LocData(325077, "Subcon Forest Area"),
+    "Subcon Village - House Top": LocData(325471, "Subcon Forest Area"),
+    "Subcon Village - Ice Cube House": LocData(325469, "Subcon Forest Area"),
+    "Subcon Village - Snatcher Statue Chest": LocData(323730, "Subcon Forest Area"),
+    "Subcon Village - Stump Platform Chest": LocData(323729, "Subcon Forest Area"),
     "Subcon Forest - Giant Mushroom Climb": LocData(325470, "Subcon Forest Area"),
     "Subcon Forest - Swamp Near Well": LocData(324762, "Subcon Forest Area"),
     "Subcon Forest - Swamp Tree A": LocData(324763, "Subcon Forest Area"),
@@ -162,7 +165,7 @@ ahit_locations = {
     "Subcon Forest - Triple Spider Bounce": LocData(324765, "Subcon Forest Area"),
     "Subcon Forest - Noose Treehouse": LocData(324856, "Subcon Forest Area", hookshot=True),
     "Subcon Forest - Ice Cube Shack": LocData(324465, "Subcon Forest Area"),
-    "Subcon Forest - Long Tree Climb Chest": LocData(323734, "Subcon Forest Area"),
+    "Subcon Forest - Long Tree Climb Chest": LocData(323734, "Subcon Forest Area", required_hats=[HatType.DWELLER]),
     "Subcon Forest - Boss Arena Chest": LocData(323735, "Subcon Forest Area"),
     "Subcon Well - Hookshot Badge Chest": LocData(324114, "The Subcon Well"),
     "Subcon Well - Above Chest": LocData(324612, "The Subcon Well"),
@@ -175,8 +178,8 @@ ahit_locations = {
     "Queen Vanessa's Manor - Chandelier": LocData(325546, "Queen Vanessa's Manor"),
 
     # 330000 range - Alpine Skyline
-    "Alpine Skyline - Goat Village: Below Hookpoint": LocData(334856, "Alpine Free Roam"),
-    "Alpine Skyline - Goat Village: Hidden Branch": LocData(334855, "Alpine Free Roam"),
+    "Alpine Skyline - Goat Village: Below Hookpoint": LocData(334856, "Goat Village"),
+    "Alpine Skyline - Goat Village: Hidden Branch": LocData(334855, "Goat Village"),
     "Alpine Skyline - Goat Refinery": LocData(333635, "Alpine Free Roam"),
     "Alpine Skyline - Bird Pass Fork": LocData(335911, "Alpine Free Roam"),
     "Alpine Skyline - Yellow Band Hills": LocData(335756, "Alpine Free Roam"),
@@ -190,7 +193,7 @@ ahit_locations = {
     "Alpine Skyline - The Birdhouse: Alpine Crow Mini-Gauntlet": LocData(335886, "The Birdhouse"),
     "Alpine Skyline - The Birdhouse: Outer Edge": LocData(335492, "The Birdhouse"),
 
-    "Alpine Skyline - Mystifying Time Mesa: Zipline": LocData(337058, "Alpine Free Roam"),  # Possibly requires Sprint?
+    "Alpine Skyline - Mystifying Time Mesa: Zipline": LocData(337058, "Alpine Free Roam"),
     "Alpine Skyline - Mystifying Time Mesa: Gate Puzzle": LocData(336052, "Alpine Free Roam"),
     "Alpine Skyline - Ember Summit": LocData(336311, "Alpine Free Roam"),
     "Alpine Skyline - The Lava Cake: Center Fence Cage": LocData(335448, "The Lava Cake"),
@@ -203,7 +206,7 @@ ahit_locations = {
                                                                 required_hats=[HatType.ICE]),
     "Alpine Skyline - Goat Outpost Horn": LocData(334760, "Alpine Free Roam"),
     "Alpine Skyline - Windy Passage": LocData(334776, "Alpine Free Roam"),
-    "Alpine Skyline - The Windmill: Time Trial": LocData(336395, "The Windmill", required_hats=[HatType.DWELLER]),
+    # "Alpine Skyline - The Windmill: Time Trial": LocData(336395, "The Windmill", required_hats=[HatType.DWELLER]),
     "Alpine Skyline - The Windmill: Entrance": LocData(335783, "The Windmill"),
     "Alpine Skyline - The Windmill: Dropdown": LocData(335815, "The Windmill"),
     "Alpine Skyline - The Windmill: House Window": LocData(335389, "The Windmill"),
@@ -239,12 +242,12 @@ act_completions = {
     "Act Completion (Time Rift - Dead Bird Studio)": LocData(312577, "Time Rift - Dead Bird Studio"),
 
     "Act Completion (Contractual Obligations)": LocData(312317, "Contractual Obligations"),
-    "Act Completion (The Subcon Well)": LocData(311160, "The Subcon Well"),
+    "Act Completion (The Subcon Well)": LocData(311160, "The Subcon Well", hookshot=True),
     "Act Completion (Toilet of Doom)": LocData(311984, "Toilet of Doom", hookshot=True),
     "Act Completion (Queen Vanessa's Manor)": LocData(312017, "Queen Vanessa's Manor"),
     "Act Completion (Mail Delivery Service)": LocData(312032, "Mail Delivery Service", required_hats=[HatType.SPRINT]),
     "Act Completion (Your Contract has Expired)": LocData(311390, "Your Contract has Expired"),
-    "Act Completion (Time Rift - Pipe)": LocData(313069, "Time Rift - Pipe"),
+    "Act Completion (Time Rift - Pipe)": LocData(313069, "Time Rift - Pipe", hookshot=True),
     "Act Completion (Time Rift - Village)": LocData(313056, "Time Rift - Village"),
     "Act Completion (Time Rift - Sleepy Subcon)": LocData(312086, "Time Rift - Sleepy Subcon"),
 
@@ -296,6 +299,13 @@ storybook_pages = {
     "Alpine Skyline (Rift) - Page: Below Aqueduct": LocData(345013, "Time Rift - Alpine Skyline"),
 }
 
+contract_locations = {
+    "Snatcher's Contract - The Subcon Well": LocData(300200, "Contractual Obligations"),
+    "Snatcher's Contract - Toilet of Doom": LocData(300201, "Subcon Forest Area"),
+    "Snatcher's Contract - Queen Vanessa's Manor": LocData(300202, "Subcon Forest Area"),
+    "Snatcher's Contract - Mail Delivery Service": LocData(300203, "Subcon Forest Area"),
+}
+
 shop_locations = {
     "Badge Seller - Item 1": LocData(301003, "Badge Seller"),
     "Badge Seller - Item 2": LocData(301004, "Badge Seller"),
@@ -335,10 +345,26 @@ humt_locations = [
     "Mafia Town - Camera Badge 2",
 ]
 
+# Locations in Alpine that are available in The Illness has Spread
+# Goat Village locations don't need to be put here
+tihs_locations = [
+    "Alpine Skyline - Bird Pass Fork",
+    "Alpine Skyline - Yellow Band Hills",
+    "Alpine Skyline - Ember Summit",
+    "Alpine Skyline - Goat Outpost Horn",
+    "Alpine Skyline - Windy Passage",
+]
+
+event_locs = {
+    "Windmill Cleared": LocData(0, "The Windmill"),
+    "Twilight Bell Cleared": LocData(0, "The Twilight Bell"),
+}
+
 location_table = {
     **ahit_locations,
     **act_completions,
     **storybook_pages,
+    **contract_locations,
     **shop_locations,
 }
 

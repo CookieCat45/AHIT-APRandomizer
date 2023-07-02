@@ -14,6 +14,7 @@ var int Port;
 
 var bool ActRando;
 var bool ShuffleStorybookPages;
+var bool ShuffleActContracts;
 var bool DeathLink;
 
 var int Chapter1Cost;
@@ -27,6 +28,11 @@ var int BrewingYarnCost;
 var int IceYarnCost;
 var int DwellerYarnCost;
 var int TimeStopYarnCost;
+
+var array<Hat_ChapterActInfo> LockedBlueRifts;
+var array< class<Hat_SnatcherContract_Act> > ObtainedContracts;
+var array< class<Hat_SnatcherContract_Act> > TakenContracts;
+var array< class<Hat_SnatcherContract_Act> > CheckedContracts;
 
 // hat stitch order
 var EHatType Hat1;

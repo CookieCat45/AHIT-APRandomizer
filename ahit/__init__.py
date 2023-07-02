@@ -1,8 +1,12 @@
 from BaseClasses import Item, ItemClassification, Region
-from .Items import HatInTimeItem, item_table, time_pieces, item_frequencies, item_dlc_enabled, junk_weights, relic_groups
+
+from .Items import HatInTimeItem, item_table, time_pieces, item_frequencies, item_dlc_enabled, junk_weights,\
+    create_item, create_multiple_items, create_junk_items, relic_groups, act_contracts
+
 from .Regions import create_region, create_regions, connect_regions, randomize_act_entrances, chapter_act_info, \
-    create_event_location
-from .Locations import HatInTimeLocation, location_table, get_total_locations
+    create_events
+
+from .Locations import HatInTimeLocation, location_table, get_total_locations, contract_locations
 from .Types import HatDLC, HatType, ChapterIndex
 from .Options import ahit_options
 from ..AutoWorld import World
@@ -30,7 +34,7 @@ class HatInTimeWorld(World):
     act_connections: typing.Dict[str, str] = {}
 
     def generate_early(self):
-        # If our starting chapter is 4, and act rando is off, force hookshot into inventory.
+        # If our starting chapter is 4, force hookshot into inventory.
         # Starting chapter 3/4 is banned in act rando, because they don't have enough starting acts
         start_chapter: int = self.multiworld.StartingChapter[self.player].value
         if start_chapter == 4 or start_chapter == 3:
@@ -39,6 +43,9 @@ class HatInTimeWorld(World):
                     self.multiworld.push_precollected(self.create_item("Hookshot Badge"))
             else:
                 self.multiworld.StartingChapter[self.player].value = self.multiworld.random.randint(1, 2)
+
+        if self.multiworld.StartWithCompassBadge[self.player].value > 0:
+            self.multiworld.push_precollected(self.create_item("Compass Badge"))
 
     def create_items(self):
         self.hat_yarn_costs = {HatType.SPRINT: -1, HatType.BREWING: -1, HatType.ICE: -1,
@@ -52,7 +59,7 @@ class HatInTimeWorld(World):
         self.calculate_yarn_costs()
 
         self.topology_present = self.multiworld.ActRandomizer[self.player].value
-        yarn_pool: typing.List[Item] = self.create_multiple_items("Yarn", self.multiworld.YarnAvailable[self.player].value)
+        yarn_pool: typing.List[Item] = create_multiple_items(self, "Yarn", self.multiworld.YarnAvailable[self.player].value)
         itempool += yarn_pool
 
         if self.multiworld.RandomizeHatOrder[self.player].value > 0:
@@ -73,16 +80,26 @@ class HatInTimeWorld(World):
             if item_type is ItemClassification.filler or item_type is ItemClassification.trap:
                 continue
 
+            if name in act_contracts.keys() and self.multiworld.ShuffleActContracts[self.player].value == 0:
+                continue
+
             if name in time_pieces.keys():
                 self.item_name_groups["Time Pieces"].add(name)
 
-            itempool += self.create_multiple_items(name, item_frequencies.get(name, 1))
+            itempool += create_multiple_items(self, name, item_frequencies.get(name, 1))
 
-        itempool += self.create_junk_items(get_total_locations(self)-len(itempool))
+        create_events(self)
+        total_locations: int = get_total_locations(self)
+        itempool += create_junk_items(self, total_locations-len(itempool))
         self.multiworld.itempool += itempool
 
     def create_regions(self):
         create_regions(self)
+
+        # place default contract locations if contract shuffle is off so logic can still utilize them
+        if self.multiworld.ShuffleActContracts[self.player].value == 0:
+            for name in contract_locations.keys():
+                self.multiworld.get_location(name, self.player).place_locked_item(create_item(self, name))
 
     def set_rules(self):
         self.act_connections = {}
@@ -98,9 +115,11 @@ class HatInTimeWorld(World):
             randomize_act_entrances(self)
 
         set_rules(self)
-        self.create_events()
 
-    def write_spoiler(self, spoiler_handle: typing.TextIO):
+    def create_item(self, name: str) -> Item:
+        return create_item(self, name)
+
+    def write_spoiler_header(self, spoiler_handle: typing.TextIO):
         for i in self.chapter_timepiece_costs.keys():
             spoiler_handle.write("Chapter %i Cost: %i\n" % (i, self.chapter_timepiece_costs[ChapterIndex(i)]))
 
@@ -134,87 +153,26 @@ class HatInTimeWorld(World):
 
         return slot_data
 
-    def create_item(self, name: str) -> Item:
-        data = item_table[name]
-        return HatInTimeItem(name, data.classification, data.code, self.player)
-
-    def create_multiple_items(self, name: str, count: int = 1) -> typing.List[Item]:
-        data = item_table[name]
-        itemlist: typing.List[Item] = []
-
-        for i in range(count):
-            itemlist += [HatInTimeItem(name, data.classification, data.code, self.player)]
-
-        return itemlist
-
-    def create_events(self):
-        w = self
+    def calculate_yarn_costs(self):
         mw = self.multiworld
         p = self.player
-        # birdhouse = mw.get_region("The Birdhouse", p)
-        # lava_cake = mw.get_region("The Lava Cake", p)
-        windmill = mw.get_region("The Windmill", p)
-        twilight_bell = mw.get_region("The Twilight Bell", p)
-
-        # birdhouse_event = create_event_location("Birdhouse Cleared", birdhouse, w)
-        # birdhouse_event.access_rule = mw.get_location("Act Completion (The Birdhouse)", w.player).access_rule
-
-        # lava_cake_event = create_event_location("Lava Cake Cleared", lava_cake, w)
-        # lava_cake_event.access_rule = mw.get_location("Act Completion (The Lava Cake)", w.player).access_rule
-
-        windmill_event = create_event_location("Windmill Cleared", windmill, w)
-        windmill_event.access_rule = mw.get_location("Act Completion (The Windmill)", w.player).access_rule
-
-        twilight_bell_event = create_event_location("Twilight Bell Cleared", twilight_bell, w)
-        twilight_bell_event.access_rule = mw.get_location("Act Completion (The Twilight Bell)", w.player).access_rule
-
-    def create_junk_items(self, count: int) -> typing.List[Item]:
-        trap_chance = self.multiworld.TrapChance[self.player].value
-        junk_pool: typing.List[Item] = []
-        junk_list: typing.Dict[str, int] = {}
-        trap_list: typing.Dict[str, int] = {}
-        ic: ItemClassification
-
-        for name in item_table.keys():
-            ic = item_table.get(name).classification
-            if ic == ItemClassification.filler:
-                junk_list[name] = junk_weights.get(name)
-            elif trap_chance > 0 and ic == ItemClassification.trap:
-                if name == "Baby Trap":
-                    trap_list[name] = self.multiworld.BabyTrapWeight[self.player].value
-                elif name == "Laser Trap":
-                    trap_list[name] = self.multiworld.LaserTrapWeight[self.player].value
-                elif name == "Parade Trap":
-                    trap_list[name] = self.multiworld.ParadeTrapWeight[self.player].value
-
-        for i in range(count):
-            if trap_chance > 0 and self.multiworld.random.randint(1, 100) <= trap_chance:
-                junk_pool += [self.create_item(
-                    self.multiworld.random.choices(list(trap_list.keys()), weights=list(trap_list.values()), k=1)[0])]
-            else:
-                junk_pool += [self.create_item(
-                    self.multiworld.random.choices(list(junk_list.keys()), weights=list(junk_list.values()), k=1)[0])]
-
-        return junk_pool
-
-    def calculate_yarn_costs(self):
-        min_yarn_cost = int(min(self.multiworld.YarnCostMin[self.player].value, self.multiworld.YarnCostMax[self.player].value))
-        max_yarn_cost = int(max(self.multiworld.YarnCostMin[self.player].value, self.multiworld.YarnCostMax[self.player].value))
+        min_yarn_cost = int(min(mw.YarnCostMin[p].value, mw.YarnCostMax[p].value))
+        max_yarn_cost = int(max(mw.YarnCostMin[p].value, mw.YarnCostMax[p].value))
 
         max_cost: int = 0
         for i in range(5):
-            cost = self.multiworld.random.randint(min(min_yarn_cost, max_yarn_cost), max(max_yarn_cost, min_yarn_cost))
+            cost = mw.random.randint(min(min_yarn_cost, max_yarn_cost), max(max_yarn_cost, min_yarn_cost))
             self.hat_yarn_costs[HatType(i)] = cost
             max_cost += cost
 
-        available_yarn = self.multiworld.YarnAvailable[self.player].value
+        available_yarn = mw.YarnAvailable[p].value
         if max_cost > available_yarn:
-            self.multiworld.YarnAvailable[self.player].value = max_cost
+            mw.YarnAvailable[p].value = max_cost
             available_yarn = max_cost
 
         # make sure we always have at least 8 extra
         if max_cost + 8 > available_yarn:
-            self.multiworld.YarnAvailable[self.player].value += (max_cost + 8) - available_yarn
+            mw.YarnAvailable[p].value += (max_cost + 8) - available_yarn
 
     def set_chapter_cost(self, chapter: ChapterIndex, cost: int):
         self.chapter_timepiece_costs[chapter] = cost

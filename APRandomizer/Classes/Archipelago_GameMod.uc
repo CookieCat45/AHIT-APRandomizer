@@ -20,6 +20,9 @@ var config int DebugMode;
 var config int DisableInjection;
 var const editconst Vector SpaceshipSpawnLocation;
 
+var transient array<Hat_SnatcherContract_Selectable> SelectContracts;
+var transient bool TrapsDestroyed;
+
 struct immutable ShuffledAct
 {
 	var Hat_ChapterActInfo OriginalAct;
@@ -74,6 +77,7 @@ var array<Texture2D> UnlockScreenNumbers;
 event OnModLoaded()
 {
 	HookActorSpawn(class'Hat_Player', 'Player');
+	HookActorSpawn(class'Actor', 'ContractEvent');
 }
 
 event OnModUnloaded()
@@ -83,10 +87,38 @@ event OnModUnloaded()
 	
 	if (Broadcaster != None)
 		Broadcaster.Destroy();
+	
+	if (IsArchipelagoEnabled())
+		SaveGame();
+}
+
+function SaveGame()
+{
+	local string path;
+	
+	if (SlotData != None && SlotData.Initialized)
+	{
+		path = "APRandomizer/slot_data"$`SaveManager.GetCurrentSaveData().CreationTimeStamp;	
+		if (class'Engine'.static.BasicSaveObject(SlotData, path, false, 1, true))
+		{
+			DebugMessage("Saved slot data to file successfully!");
+		}
+	}
+	
+	if (ItemResender != None)
+	{
+		class'Engine'.static.BasicSaveObject(ItemResender, 
+		"APRandomizer/item_resender"$`SaveManager.GetCurrentSaveData().CreationTimeStamp, false, 1, true);
+	}
+
+	`SaveManager.SaveToFile(true);
 }
 
 event OnHookedActorSpawn(Object newActor, Name identifier)
 {
+	local int i;
+	local Hat_SaveGame save;
+	
 	if (identifier == 'Player')
 	{
 		if (newActor.IsA('Hat_Player_MustacheGirl'))
@@ -94,6 +126,41 @@ event OnHookedActorSpawn(Object newActor, Name identifier)
 			
 		// Need to do this on a timer to prevent the game from overriding our actions
 		SetTimer(0.3, false, NameOf(EnableConsoleCommands));
+	}
+	
+	if (IsArchipelagoEnabled())
+	{
+		if (identifier == 'ContractEvent' && SlotData.ShuffleActContracts)
+		{
+			if (newActor.IsA('Hat_SnatcherContractEvent'))
+			{
+				if (newActor.IsA('Hat_SnatcherContractEvent_Initial') || newActor.IsA('Hat_SnatcherContractEvent_GenericTrap')
+					|| newActor.IsA('Hat_SnatcherContractEvent_IceBroken'))
+				{
+					DebugMessage("Hooking contract event: " $newActor.name);
+					save = `SaveManager.GetCurrentSaveData();
+					
+					for (i = 0; i < SlotData.ObtainedContracts.Length; i++)
+					{
+						if (SlotData.CheckedContracts.Find(SlotData.ObtainedContracts[i]) != -1)
+							continue;
+						
+						// temporarily remove any obtained contracts so player can still do contract checks
+						SlotData.TakenContracts.AddItem(SlotData.ObtainedContracts[i]);
+						save.SnatcherContracts.RemoveItem(SlotData.ObtainedContracts[i]);
+						save.CompletedSnatcherContracts.RemoveItem(SlotData.ObtainedContracts[i]);
+					}
+					
+					SetTimer(0.5, true, NameOf(WaitForContractEvent));
+				}
+			}
+			else if (newActor.IsA('Hat_SnatcherContract_Selectable'))
+			{
+				SelectContracts.AddItem(Hat_SnatcherContract_Selectable(newActor));
+				ClearTimer(NameOf(CheckContractsForDeletion));
+				SetTimer(0.5, false, NameOf(CheckContractsForDeletion));
+			}
+		}
 	}
 }
 
@@ -124,6 +191,9 @@ event PreBeginPlay()
 {
 	local Hat_ChapterActInfo act;
 	local Hat_SaveGame save;
+	local string path;
+	local int i;
+
 	Super.PreBeginPlay();
 	
 	if (bool(DisableInjection) || `GameManager.GetCurrentMapFilename() ~= `GameManager.TitleScreenMapName)
@@ -135,44 +205,89 @@ event PreBeginPlay()
 		SetAPBits("ArchipelagoEnabled", 1);
 	}
 	
-	if (IsArchipelagoEnabled() && !IsInSpaceship())
+	if (IsArchipelagoEnabled())
 	{
-		// We need to remove the player's time pieces that are from rifts in vanilla, then give them back
-		// because otherwise the associated rift portals will disappear. Curse you, Hat_TimeRiftPortal!
-		foreach `GameManager.GetChapterInfo().ChapterActInfo(act)
+		if (!IsInSpaceship())
 		{
-			if (act.IsBonus && `SaveManager.HasTimePiece(act.hourglass))
+			// We need to remove the player's time pieces that are from rifts in vanilla, then give them back
+			// because otherwise the associated rift portals will disappear. Curse you, Hat_TimeRiftPortal!
+			foreach `GameManager.GetChapterInfo().ChapterActInfo(act)
 			{
-				save.RemoveTimePiece(act.hourglass);
-				TakenTimePieces.AddItem(act.hourglass);
+				if (act.IsBonus && `SaveManager.HasTimePiece(act.hourglass))
+				{
+					save.RemoveTimePiece(act.hourglass);
+					TakenTimePieces.AddItem(act.hourglass);
+				}
+			}
+			
+			// Similar situation for Snatcher's contract traps. If the player is entering Subcon with no contracts,
+			// none of Snatcher's contract traps will spawn (Hat_SnatcherContractSummon) and the player will not be able 
+			// to get contracts until they either complete Vanessa's Manor (which softlocks them out of the act in act rando) 
+			// or Contractual Obligations.
+			if (`GameManager.GetCurrentMapFilename() ~= "subconforest")
+			{
+				if (save.SnatcherContracts.Length == 0 && save.CompletedSnatcherContracts.Length == 0
+					&& save.TurnedInSnatcherContracts.Length == 0)
+				{
+					// Give a dummy contract.
+					// The PlayerController hasn't spawned yet, so this will generate an Accessed None warning, but W/E.
+					save.GiveContract(class'Hat_SnatcherContract_Act', GetALocalPlayerController());
+				}
+				
+				// If we have the Subcon Well contract, remove it or else the player may permanently miss the bag trap contract check
+				if (SlotData.ObtainedContracts.Find(class'Hat_SnatcherContract_IceWall') != -1
+				&& SlotData.CheckedContracts.Find(class'Hat_SnatcherContract_IceWall') == -1)
+				{
+					save.SnatcherContracts.RemoveItem(class'Hat_SnatcherContract_IceWall');
+					save.CompletedSnatcherContracts.RemoveItem(class'Hat_SnatcherContract_IceWall');
+					SlotData.TakenContracts.AddItem(class'Hat_SnatcherContract_IceWall');
+				}
+			}
+			
+			if (`GameManager.GetChapterInfo().ChapterID == 4)
+			{
+				if (HasAPBit("AlpineFinale", 1))
+					EnableAlpineFinale();
+				else
+					DisableAlpineFinale();
+			}
+			
+			SetAPBits("AlpineFinale", 0);
+			
+			// If we're going to Alps, make sure we go to the intro if we should
+			if (`GameManager.GetChapterInfo().ChapterID == 4 && `GameManager.GetCurrentAct() == 1 
+				&& !class'Hat_SaveBitHelper'.static.HasActBit("ForceAlpineFinale", 1))
+			{
+				if (!class'Hat_SaveBitHelper'.static.HasLevelBit("Actless_FreeRoam_Intro_Complete", 1, "AlpsAndSails"))
+				{
+					`GameManager.SetCurrentAct(99);
+					`GameManager.SetCurrentCheckpoint(-1, false);
+				}
 			}
 		}
-		
-		// Similar situation for Snatcher's contract traps. If the player is entering Subcon with no contracts,
-		// none of Snatcher's contract traps will spawn (Hat_SnatcherContractSummon) and the player will not be able 
-		// to get contracts until they either complete Vanessa's Manor (which softlocks them out of the act in act rando) 
-		// or Contractual Obligations.
-		if (`GameManager.GetCurrentMapFilename() ~= "subconforest")
+		else
 		{
-			if (save.SnatcherContracts.Length == 0 && save.CompletedSnatcherContracts.Length == 0
-				&& save.TurnedInSnatcherContracts.Length == 0)
+			// Hat_DecorationStand is not alwaysloaded, and the alwaysloaded workaround doesn't seem to work with it (crash on boot).
+			// So what we do here is, when a relic stand is completed, tell our save file that it actually HASN'T been
+			// completed on map load so that it doesn't place the decorations on the stand and we can place more.
+			for (i = 0; i < save.HUBDecorations.Length; i++)
 			{
-				// Give a dummy contract.
-				// The PlayerController hasn't spawned yet, so this will generate an Accessed None warning, but W/E.
-				save.GiveContract(class'Hat_SnatcherContract_Act', GetALocalPlayerController());
+				if (save.HUBDecorations[i].Complete)
+				{
+					save.HUBDecorations.RemoveItem(save.HUBDecorations[i]);
+					i--;
+				}
 			}
 		}
-		
-		// If we're going to Alps, make sure we go to the intro if we should
-		if (`GameManager.GetChapterInfo().ChapterID == 4 && `GameManager.GetCurrentAct() == 1 
-			&& !class'Hat_SaveBitHelper'.static.HasActBit("ForcedAlpineFinale", 1))
-		{
-			if (!class'Hat_SaveBitHelper'.static.HasLevelBit("Actless_FreeRoam_Intro_Complete", 1, "AlpsAndSails"))
-			{
-				`GameManager.SetCurrentAct(99);
-				`GameManager.SetCurrentCheckpoint(-1, false);
-			}
-		}
+	}
+	
+	SlotData = new class'Archipelago_SlotData';
+	path = "APRandomizer/slot_data"$`SaveManager.GetCurrentSaveData().CreationTimeStamp;
+	
+	if (class'Engine'.static.BasicLoadObject(SlotData, path, false, 1))
+	{
+		SlotData.Initialized = true;
+		UpdateChapterInfo();
 	}
 }
 
@@ -199,10 +314,11 @@ event PostBeginPlay()
 
 function OnPostInitGame()
 {
-	local string path;
 	local int i, saveCount;
 	local Hat_BackpackItem item;
 	local Hat_TreasureChest_Base chest;
+	local Hat_TimeRiftPortal portal;
+	local TriggerVolume trigger;
 	local Hat_SaveGame save;
 	local Hat_Player ply;
 	local Hat_NPC mu;
@@ -244,7 +360,7 @@ function OnPostInitGame()
 		// The player can still get the yarn by smacking Rumbi after getting 4 time pieces.
 		foreach DynamicActors(class'Hat_NPC', mu)
 		{
-			if (mu.IsA('Hat_NPC_MustacheGirl') && string(mu.Name) ~= "Hat_NPC_MustacheGirl_0")
+			if (mu.IsA('Hat_NPC_MustacheGirl') && mu.Name == 'Hat_NPC_MustacheGirl_0')
 			{
 				// Set this level bit to 0 so that Rumbi will drop the yarn
 				class'Hat_SaveBitHelper'.static.SetLevelBits("mu_preawakening_intruder_tutorial", 0);
@@ -253,7 +369,7 @@ function OnPostInitGame()
 			}
 		}
 		
-		SetTimer(0.01, false, NameOf(ForceStandVisibility));
+		SetTimer(0.01, false, NameOf(SpawnDecorationStands));
 		
 		// When returning to hub from levels in act rando, the player may get softlocked behind chapter doors
 		// because the game will spawn them at the telescope for that act's chapter. So, always go to the bedroom.
@@ -264,6 +380,8 @@ function OnPostInitGame()
 			
 			ply.SetLocation(SpaceshipSpawnLocation);
 		}
+		
+		OpenBedroomDoor();
 	}
 	else
 	{
@@ -316,6 +434,27 @@ function OnPostInitGame()
 		}
 		
 		TakenTimePieces.Length = 0;
+		
+		// If act rando or contracts are shuffled, remove these act transitions for the well/manor if we don't enter from the proper act.
+		// This forces the player to find the act/contracts in order to enter them.
+		if (SlotData.ActRando || SlotData.ShuffleActContracts)
+		{
+			if (`GameManager.GetCurrentMapFilename() ~= "subconforest")
+			{
+				DebugMessage("Disabling trigger volumes...");
+				
+				foreach AllActors(class'TriggerVolume', trigger)
+				{
+					if (trigger.Name == 'TriggerVolume_26' && `GameManager.GetCurrentAct() != 2
+					|| trigger.Name == 'TriggerVolume_20' && `GameManager.GetCurrentAct() != 4)
+					{
+						DebugMessage("Disabling trigger volume: "$trigger.Name);
+						trigger.ShutDown();
+						break;
+					}
+				}
+			}
+		}
 	}
 	
 	// If we load a new save file with at least 1 time piece, the game will force the umbrella into our inventory.
@@ -339,22 +478,78 @@ function OnPostInitGame()
 		save.SnatcherContracts.RemoveItem(class'Hat_SnatcherContract_Act');
 	}
 	
-	SlotData = new class'Archipelago_SlotData';
-	path = "APRandomizer/slot_data"$`SaveManager.GetCurrentSaveData().CreationTimeStamp;
-	
-	if (class'Engine'.static.BasicLoadObject(SlotData, path, false, 1))
+	if (SlotData != None && SlotData.Initialized)
 	{
-		DebugMessage("Loaded slot data from file: "$path);
-		SlotData.Initialized = true;
-		UpdateChapterInfo();
+		// Restore any taken contracts if they're still in the list for some reason
+		if (SlotData.TakenContracts.Length > 0)
+			OnContractEventEnd();
+		
+		// Check for new contracts
+		if (SlotData.ShuffleActContracts)
+			SetTimer(1.0, true, NameOf(CheckForNewContracts));
 	}
-	else
+	
+	// not alwaysloaded, cook w/alwaysloaded workaround in OpenModManager
+	foreach DynamicActors(class'Hat_TimeRiftPortal', portal)
 	{
-		DebugMessage("Couldn't find slot data, will retrieve from server on connect"$path);
+		if (SlotData.LockedBlueRifts.Find(GetChapterActInfoFromHourglass(portal.Hourglass)) != -1)
+			portal.Destroy();
 	}
 	
 	if (Client == None)
 		CreateClient();
+}
+
+function bool DoesPlayerReallyHaveContract(class<Hat_SnatcherContract_Act> contract)
+{
+	return SlotData.ObtainedContracts.Find(contract) != -1;
+}
+
+function CheckForNewContracts()
+{
+	local int i, j, id;
+	local Hat_SaveGame save;
+	local Actor a;
+	save = `SaveManager.GetCurrentSaveData();
+	
+	for (i = 0; i < save.SnatcherContracts.Length; i++)
+	{
+		if (save.SnatcherContracts[i] == None 
+		|| DoesPlayerReallyHaveContract(save.SnatcherContracts[i]) 
+		|| SlotData.CheckedContracts.Find(save.SnatcherContracts[i]) != -1)
+			continue;
+		
+		// We don't have this contract. Remove it and send the check for it.
+		for (j = 0; j < save.SnatcherContracts[i].default.UnlockActIDs.Length; j++)
+		{
+			class'Hat_SaveBitHelper'.static.RemoveLevelBit("contract_unlock_actid", save.SnatcherContracts[i].default.UnlockActIDs[j], "subconforest");
+		}
+		
+		id = class'Archipelago_ItemInfo'.static.GetContractID(save.SnatcherContracts[i]);
+		DebugMessage("Sending contract as location: " $save.SnatcherContracts[i] $" ID: " $id);
+		SendLocationCheck(id);
+		
+		SlotData.CheckedContracts.AddItem(save.SnatcherContracts[i]);
+		save.SnatcherContracts.RemoveItem(save.SnatcherContracts[i]);
+	}
+	
+	if (!TrapsDestroyed)
+	{
+		if (SlotData.CheckedContracts.Find(class'Hat_SnatcherContract_Toilet') != -1
+		&& SlotData.CheckedContracts.Find(class'Hat_SnatcherContract_Vanessa') != -1
+		&& SlotData.CheckedContracts.Find(class'Hat_SnatcherContract_MailDelivery') != -1)
+		{
+			foreach DynamicActors(class'Actor', a)
+			{
+				if (a.IsA('Hat_SnatcherContractSummon'))
+				{
+					a.Destroy();
+				}
+			}
+
+			TrapsDestroyed = true;
+		}
+	}
 }
 
 function OpenSlotNameBubble(optional float delay=0.0)
@@ -469,6 +664,7 @@ function LoadSlotData(JsonObject json)
 	SlotData.ConnectedOnce = true;
 	SlotData.ActRando = json.GetBoolValue("ActRandomizer");
 	SlotData.ShuffleStorybookPages = json.GetBoolValue("ShuffleStorybookPages");
+	SlotData.ShuffleActContracts = json.GetBoolValue("ShuffleActContracts");
 	SlotData.DeathLink = json.GetBoolValue("death_link");
 	
 	SlotData.Chapter1Cost = json.GetIntValue("Chapter1Cost");
@@ -586,6 +782,10 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 						act = ceremony;
 					}
 				}
+				else if (SlotData.ActRando)
+				{
+					basementShuffle = true;
+				}
 			}
 			else
 			{
@@ -643,6 +843,7 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 	if (shuffled == None)
 	{
 		DebugMessage("[ERROR] Failed to find shuffled act for " $act);
+		ScriptTrace();
 		return;
 	}
 	
@@ -657,6 +858,27 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 		MapName = shuffled.MapName;
 		DebugMessage("Switching act " $PathName(act) $" with act: " $PathName(shuffled) $", map:" $MapName);
 	}
+	
+	// Alpine Skyline finale
+	if (Hat_ChapterInfo(ChapterInfo).ChapterID == 4)
+	{
+		// Need to do this on a timer so the act bit doesn't get wiped from the map transition
+		if (ActID == 1 && !shuffled.IsBonus)
+		{
+			DebugMessage("Forcing Alpine finale");
+			SetAPBits("AlpineFinale", 1);
+		}
+	}
+}
+
+function EnableAlpineFinale()
+{
+	class'Hat_SaveBitHelper'.static.SetActBits("ForceAlpineFinale", 1);
+}
+
+function DisableAlpineFinale()
+{
+	class'Hat_SaveBitHelper'.static.SetActBits("ForceAlpineFinale", 0);
 }
 
 function OnPreOpenHUD(HUD InHUD, out class<Object> InHUDElement)
@@ -724,7 +946,16 @@ function CheckActTitleCard(Hat_HUD hud)
 		
 		`GameManager.LoadNewAct(chapterId, actId);
 		card.MapName = map;
-		//card.SetTitleCardInfo(newAct.GetTitleCardBackground(), newAct.ChapterInfo.ChapterName, newAct.ActName);
+		
+		// Alpine Skyline finale
+		if (chapterId == 4)
+		{
+			if (actId == 1 && !newAct.IsBonus)
+			{
+				DebugMessage("Forcing Alpine finale");
+				SetAPBits("AlpineFinale", 1);
+			}
+		}
 	}
 }
 
@@ -733,8 +964,9 @@ function OnTimePieceCollected(string Identifier)
 	local int i, id;
 	local Hat_ChapterActInfo currentAct;
 	local string hourglass;
+	local bool actless;
 	
-	if (!IsArchipelagoEnabled())
+	if (!IsArchipelagoEnabled() || IsItemTimePiece)
 		return;
 	
 	// This level bit says this Time Piece was given to us as an item, so remove the Time Piece if it's not there
@@ -743,12 +975,8 @@ function OnTimePieceCollected(string Identifier)
 		`SaveManager.GetCurrentSaveData().RemoveTimePiece(Identifier);
 	}
 	
-	if (!IsItemTimePiece) // Not given by server
-	{
-		// This is the only goal for now
-		if (Identifier ~= "TheFinale_FinalBoss")
-			BeatGame();
-	}
+	if (Identifier ~= "TheFinale_FinalBoss")
+		BeatGame();
 	
 	for (i = 0; i < Len(Identifier); i++)
 		id += Asc(Mid(Identifier, i, 1));
@@ -756,27 +984,40 @@ function OnTimePieceCollected(string Identifier)
 	id += ActCompleteIDRange;
 	DebugMessage("Collected Time Piece: "$Identifier $", Location ID = " $id);
 	
+	actless = (Identifier ~= "Alps_Birdhouse"
+	|| Identifier ~= "AlpineSkyline_WeddingCake"
+	|| Identifier ~= "Alpine_Twilight"
+	|| Identifier ~= "AlpineSkyline_Windmill");
+	
 	// We actually completed this act, so set the Time Piece ID as a level bit
 	if (SlotData.ActRando)
 	{
-		// We entered this act from a different act, set the original act's Time Piece instead
-		currentAct = GetActualCurrentAct();
-		
-		for (i = 0; i < SlotData.ShuffledActList.Length; i++)
+		if (actless)
 		{
-			if (SlotData.ShuffledActList[i].NewAct == currentAct)
+			hourglass = Identifier;
+			DebugMessage("Completed act: " $GetChapterActInfoFromHourglass(Identifier));
+		}
+		else
+		{
+			// We entered this act from a different act, set the original act's Time Piece instead
+			currentAct = GetActualCurrentAct();
+			
+			for (i = 0; i < SlotData.ShuffledActList.Length; i++)
 			{
-				if (SlotData.ShuffledActList[i].IsDeadBirdBasementOriginalAct)
+				if (SlotData.ShuffledActList[i].NewAct == currentAct)
 				{
-					hourglass = "chapter3_secret_finale";
+					if (SlotData.ShuffledActList[i].IsDeadBirdBasementOriginalAct)
+					{
+						hourglass = "chapter3_secret_finale";
+					}
+					else
+					{
+						hourglass = SlotData.ShuffledActList[i].OriginalAct.hourglass;
+					}
+					
+					DebugMessage("Completed act: " $SlotData.ShuffledActList[i].OriginalAct);
+					break;
 				}
-				else
-				{
-					hourglass = SlotData.ShuffledActList[i].OriginalAct.hourglass;
-				}
-				
-				DebugMessage("Completed act: " $SlotData.ShuffledActList[i].OriginalAct);
-				break;
 			}
 		}
 		
@@ -784,7 +1025,14 @@ function OnTimePieceCollected(string Identifier)
 	}
 	else
 	{
+		DebugMessage("Completed act: " $GetChapterActInfoFromHourglass(Identifier));
 		SetAPBits("ActComplete_"$Identifier, 1);
+	}
+	
+	if (hourglass == "")
+	{
+		DebugMessage("FAILED to find ChapterActInfo: "$Identifier);
+		ScriptTrace();
 	}
 	
 	SendLocationCheck(id);
@@ -849,7 +1097,8 @@ function Hat_ChapterActInfo GetChapterActInfoFromHourglass(string hourglass)
 
 function UpdateChapterInfo()
 {
-	local Hat_SpaceshipPowerPanel panel;
+	if (!SlotData.Initialized)
+		return;
 	
 	SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo.maingame.MafiaTown', SlotData.Chapter1Cost);
 	SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo.maingame.trainwreck_of_science', SlotData.Chapter2Cost);
@@ -861,16 +1110,23 @@ function UpdateChapterInfo()
 	if (IsInSpaceship())
 	{
 		UpdatePowerPanels();
-		
-		foreach DynamicActors(class'Hat_SpaceshipPowerPanel', panel)
+		OpenBedroomDoor();
+	}
+	
+	SaveGame();
+}
+
+function OpenBedroomDoor()
+{
+	local Hat_SpaceshipPowerPanel panel;
+
+	foreach DynamicActors(class'Hat_SpaceshipPowerPanel', panel)
+	{
+		if (panel.ChapterInfo.ChapterID == 3)
 		{
-			// Always open this door
-			if (panel.ChapterInfo.ChapterID == 3)
-			{
-				panel.SpaceshipDoor.Enabled = true;
-				panel.SpaceshipDoor.bBlocksNavigation = false;
-				panel.SpaceshipDoor.SetLockedVisuals(false);
-			}
+			panel.SpaceshipDoor.Enabled = true;
+			panel.SpaceshipDoor.bBlocksNavigation = false;
+			panel.SpaceshipDoor.SetLockedVisuals(false);
 		}
 	}
 }
@@ -891,17 +1147,17 @@ function UpdateActUnlocks()
 			{
 				if (IsChapterActInfoUnlocked(act))
 				{
-					// Need to remove this from blue rifts, or else the portal won't appear
+					SlotData.LockedBlueRifts.RemoveItem(act);
 					act.RequiredActID.Length = 0;
 					act.RequiredActID.AddItem(0); // else game thinks it's a purple rift
 					act.InDevelopment = false;
 				}
 				else
 				{
-					act.InDevelopment = true; // Force hide portal
+					SlotData.LockedBlueRifts.AddItem(act);
+					act.InDevelopment = true;
 				}
 			}
-			
 		}
 	}
 }
@@ -913,7 +1169,8 @@ function UpdatePowerPanels()
 	
 	foreach DynamicActors(class'Hat_SpaceshipPowerPanel', panel)
 	{
-		if (panel.CanBeUnlocked() && panel.InteractPoint == None && (!panel.RuntimeMat.GetScalarParameterValue('Unlocked', val) || val == 0))
+		if (!IsPowerPanelActivated2(panel) && panel.CanBeUnlocked() 
+		&& panel.InteractPoint == None && (!panel.RuntimeMat.GetScalarParameterValue('Unlocked', val) || val == 0))
 		{
 			panel.InteractPoint = Spawn(class'Hat_InteractPoint',panel,,panel.Location + Vector(panel.Rotation)*10 + vect(0,0,1)*20,panel.Rotation,,true);
 			panel.InteractPoint.PushDelegate(panel.OnInteractDelegate);
@@ -928,12 +1185,22 @@ function UpdatePowerPanels()
 	}
 }
 
+function bool IsPowerPanelActivated2(Hat_SpaceshipPowerPanel panel)
+{
+	local Hat_ChapterInfo ci;
+	ci = panel.GetChapterInfo();
+	
+	if (ci == None) return false;
+	if (ci.ChapterID <= 0) return false;
+	if (!ci.HasDLCSupported(true)) return false;
+	if (!class'Hat_SaveBitHelper'.static.HasLevelBit(panel.ActivatedLevelBit, ci.ChapterID)) return false;
+	
+	return true;
+}
+
 function SetChapterTimePieceRequirement(Hat_ChapterInfo chapter, int amount)
 {
 	local Hat_SpaceshipPowerPanel panel;
-	if (!SlotData.Initialized)
-		return;
-
 	chapter.RequiredHourglassCount = amount;
 	
 	if (IsInSpaceship())
@@ -1047,7 +1314,7 @@ function ShuffleCollectibles()
 		}
 	}
 	
-	if (`GameManager.GetCurrentMapFilename() ~= "mafia_town")
+	if (InStr(`GameManager.GetCurrentMapFilename(), "mafia_town", false, true) != -1)
 	{
 		DebugMessage("[ShuffleCollectibles] Adding camera badge locations");
 		locationArray.AddItem(CameraBadgeCheck1);
@@ -1510,10 +1777,7 @@ function SendLocationCheck(int id, optional bool scout)
 	if (!IsFullyConnected() && !scout)
 	{
 		ItemResender.AddLocation(id);
-		
-		class'Engine'.static.BasicSaveObject(ItemResender, 
-		"APRandomizer/item_resender"$`SaveManager.GetCurrentSaveData().CreationTimeStamp, false, 1, true);
-		
+		SaveGame();
 		return;
 	}
 	
@@ -1537,10 +1801,7 @@ function SendMultipleLocationChecks(array<int> locationArray, optional bool scou
 	if (!IsFullyConnected() && !scout && !hint)
 	{
 		ItemResender.AddMultipleLocations(locationArray);
-		
-		class'Engine'.static.BasicSaveObject(ItemResender, 
-		"APRandomizer/item_resender"$`SaveManager.GetCurrentSaveData().CreationTimeStamp, false, 1, true);
-		
+		SaveGame();
 		return;
 	}
 
@@ -1575,6 +1836,65 @@ function SendMultipleLocationChecks(array<int> locationArray, optional bool scou
 	client.SendBinaryMessage(jsonMessage);
 }
 
+function WaitForContractEvent()
+{
+	local Actor event;
+
+	// Stupid, but sending in the event actor as a timer parameter and checking if it's None/has bDeleteMe doesn't work
+	foreach DynamicActors(class'Actor', event)
+	{
+		if (event.IsA('Hat_SnatcherContractEvent'))
+			return;
+	}
+	
+	ClearTimer(NameOf(WaitForContractEvent));
+	OnContractEventEnd();
+}
+
+function TakeAwayContract(class<Hat_SnatcherContract_Act> contract)
+{
+
+}
+
+function OnContractEventEnd()
+{
+	local int i;
+	local Hat_SaveGame save;
+	
+	if (SlotData.TakenContracts.Length == 0)
+		return;
+	
+	save = `SaveManager.GetCurrentSaveData();
+	for (i = 0; i < SlotData.TakenContracts.Length; i++)
+	{
+		if (save.SnatcherContracts.Find(SlotData.TakenContracts[i]) == -1)
+			save.SnatcherContracts.AddItem(SlotData.TakenContracts[i]);
+
+		if (SlotData.TakenContracts[i].static.IsContractComplete() && save.CompletedSnatcherContracts.Find(SlotData.TakenContracts[i]) == -1)
+		{
+			save.CompletedSnatcherContracts.AddItem(SlotData.TakenContracts[i]);
+		}
+		
+		DebugMessage("Restored player's contract: " $SlotData.TakenContracts[i]);
+	}
+	
+	SlotData.TakenContracts.Length = 0;
+	SaveGame();
+}
+
+function CheckContractsForDeletion()
+{
+	local int i;
+	for (i = 0; i < SelectContracts.Length; i++)
+	{
+		DebugMessage("Contract Class: " $SelectContracts[i].ContractClass);
+		if (SlotData.CheckedContracts.Find(SelectContracts[i].ContractClass) != -1)
+			SelectContracts[i].Destroy();
+	}
+	
+	SelectContracts.Length = 0;
+}
+
 function BabyTrapTimer()
 {
 	local Hat_Player player;
@@ -1607,6 +1927,32 @@ function BabyTrapTimer()
 	BabyCount--;
 	if (BabyCount <= 0)
 		ClearTimer(NameOf(BabyTrapTimer));
+}
+
+function OnPlayerEnterCannon(Pawn Player, Actor Cannon)
+{
+	DropAllBabies(Player, true);
+}
+
+function DropAllBabies(Pawn Player, optional bool destroy)
+{
+	local Archipelago_Stackable_Base stack;
+	foreach DynamicActors(class'Archipelago_Stackable_Base', stack)
+	{
+		if (stack.Carrier != Player)
+			continue;
+		
+		stack.ForceDrop();
+		
+		if (destroy)
+			stack.Destroy();
+	}
+	
+	if (!Hat_PawnCarryable(Player).IsCarryingItem(true))
+	{
+		Hat_PawnCarryable(Player).SetAnimCarryMode(ECarryMode_None);
+		Hat_HUD(PlayerController(Player.Controller).MyHUD).CloseHUD(class'Hat_HUDElementCarryHelp');
+	}
 }
 
 function LaserTrapTimer()
@@ -1694,15 +2040,15 @@ function ActivateParade()
 	}
 }
 
-function ForceStandVisibility()
+function SpawnDecorationStands()
 {
-	local Actor a;
+	local Actor stand;
 	
-	foreach DynamicActors(class'Actor', a)
+	foreach DynamicActors(class'Actor', stand)
 	{
-		if (a.bHidden && a.IsA('Hat_DecorationStand'))
+		if (stand.IsA('Hat_DecorationStand') && stand.bHidden)
 		{
-			a.SetHidden(false);
+			stand.SetHidden(false);
 		}
 	}
 }
@@ -1745,6 +2091,9 @@ function PrintItemsNearPlayer()
 	local Hat_Collectible_Important collectible;
 	local Hat_Collectible page;
 	
+	if (!bool(DebugMode))
+		return;
+
 	player = Hat_Player(GetALocalPlayerController().Pawn);
 	foreach DynamicActors(class'Hat_Collectible_Important', collectible)
 	{
@@ -1820,10 +2169,18 @@ function bool IsInSpaceship()
 // using the act's Time Piece.
 function bool IsActReallyCompleted(Hat_ChapterActInfo act)
 {
+	local bool result;
+	
 	if (act.hourglass == "")
 		return true;
 	
-	return HasAPBit("ActComplete_"$act.hourglass, 1);
+	result = HasAPBit("ActComplete_"$act.hourglass, 1);
+	if (result)
+	{
+		DebugMessage("Act Complete: " $act.hourglass);
+	}
+	
+	return result;
 }
 
 function bool IsActFreeRoam(Hat_ChapterActInfo act)

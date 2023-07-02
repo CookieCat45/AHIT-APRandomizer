@@ -156,10 +156,8 @@ event Tick(float d)
 					{
 						// Need to send the same data back as a pong
 						// This is a dumb way to do it, but whatever works.
-						`AP.DebugMessage("Received ping: " $NumberString(CurrentMessage));
 						pong = Mid(CurrentMessage, InStr(CurrentMessage, Chr(`CODE_PING), false, true));
 						pong = Mid(pong, 2);
-						`AP.DebugMessage("Sending pong: " $NumberString(pong));
 						SendBinaryMessage(pong, false, true);
 						break;
 					}
@@ -577,9 +575,10 @@ function OnReceivedItemsCommand(string json, optional bool connection)
 		}
 	}
 	
-	`AP.SetAPBits("LastItemIndex", index+total);
 	jsonObj = None;
 	jsonChild = None;
+	`AP.SetAPBits("LastItemIndex", index+total);
+	`AP.SaveGame();
 }
 
 function GrantTimePiece(string timePieceId, bool IsAct, string itemName)
@@ -613,12 +612,14 @@ function GrantItem(int itemId)
 {
 	local class worldClass;
 	local class invOverride;
+	local class<Hat_SnatcherContract_Act> contract;
 	local string itemName;
 	local Archipelago_RandomizedItem_Base item;
 	local Pawn player;
 	local ESpecialItemType special;
 	local ETrapType trap;
-	
+	local Hat_SaveGame save;
+
 	if (class'Archipelago_ItemInfo'.static.GetNativeItemData(itemId, itemName, worldClass, invOverride))
 	{
 		player = GetALocalPlayerController().Pawn;
@@ -655,8 +656,21 @@ function GrantItem(int itemId)
 			`AP.ScreenMessage("Got " $itemName);
 		}
 	}
+	else if (class'Archipelago_ItemInfo'.static.GetContractFromID(itemId) != None)
+	{
+		contract = class'Archipelago_ItemInfo'.static.GetContractFromID(itemId);
+		if (`AP.SlotData.ObtainedContracts.Find(contract) == -1)
+			`AP.SlotData.ObtainedContracts.AddItem(contract); // now we know we should actually have this contract
+		
+		save = `SaveManager.GetCurrentSaveData();
+		if (save.SnatcherContracts.Find(contract) == -1)
+			save.SnatcherContracts.AddItem(contract);
+		
+		contract.static.UnlockActs(save);
+	}
 	else
 	{
+		// screen message so players report problems
 		`AP.ScreenMessage("[GrantItem] Unknown item ID: " $itemId);
 	}
 }
@@ -664,7 +678,7 @@ function GrantItem(int itemId)
 function DoSpecialItemEffects(ESpecialItemType special)
 {
 	local Hat_Player player;
-
+	
 	switch (special)
 	{
 		case SpecialType_25Pons:
@@ -711,11 +725,11 @@ function DoTrapItemEffects(ETrapType trap)
 		case TrapType_Laser:
 			if (`AP.LaserCount > 0)
 			{
-				`AP.LaserCount += 5;
+				`AP.LaserCount += 15;
 			}
 			else
 			{
-				`AP.LaserCount = 5;
+				`AP.LaserCount = 15;
 				`AP.SetTimer(1.0, true, NameOf(`AP.LaserTrapTimer), `AP);
 			}
 			break;
@@ -864,6 +878,7 @@ event Closed()
 
 event Destroyed()
 {
+	`AP.Client = None;
 	`AP.CreateClient(5.0);
 	Super.Destroyed();
 }

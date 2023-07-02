@@ -2,9 +2,9 @@ class Archipelago_RandomizedItem_BadgeRelicFinder extends Archipelago_Randomized
 
 defaultproperties
 {
-	InventoryClass = class'Hat_Badge_FindRelics';
+	InventoryClass = class'Archipelago_Ability_ItemFinder';
 	
-    Begin Object Name=Model2
-		Materials(0)=MaterialInstanceConstant'HatInTime_Items.Materials.Badges.badge_relicfinder'
-    End Object
+  Begin Object Name=Model2
+  Materials(0)=MaterialInstanceConstant'HatInTime_Items.Materials.Badges.badge_relicfinder'
+  End Object
 }

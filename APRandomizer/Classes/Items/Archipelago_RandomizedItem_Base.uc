@@ -34,7 +34,6 @@ function Init()
 	else if (ItemFlags == ItemFlag_Garbage)
 	{
 		// No flashy effects for garbage items (still for traps though :v)
-		// Some yarn can be marked as junk
 		if (!IsA('Archipelago_RandomizedItem_Yarn'))
 		{
 			if (IdleAudioComponent != None)
@@ -96,8 +95,7 @@ simulated function bool OnCollected(Actor Collector)
 	{
 		SetOriginalLevelBit();
 	}
-		
-	`SaveManager.SaveToFile();
+	
 	return Super.OnCollected(Collector);
 }
 

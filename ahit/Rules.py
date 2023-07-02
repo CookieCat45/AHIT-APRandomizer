@@ -1,6 +1,6 @@
 from ..AutoWorld import World, CollectionState
 from ..generic.Rules import add_rule, set_rule
-from .Locations import location_table, humt_locations
+from .Locations import location_table, humt_locations, tihs_locations, storybook_pages
 from .Types import HatType, ChapterIndex
 from BaseClasses import Location, Entrance, Region
 import typing
@@ -95,13 +95,26 @@ def set_rules(world: World):
     lowest_cost: int = mw.LowestChapterCost[p].value
     highest_cost: int = mw.HighestChapterCost[p].value
     cost_increment: int = mw.ChapterCostIncrement[p].value
+    min_difference: int = mw.ChapterCostMinDifference[p].value
+    last_cost: int = 0
+    cost: int
     loop_count: int = 0
 
     for chapter in chapter_list:
-        value = mw.random.randint(lowest_cost + (cost_increment * loop_count),
-                                  min(highest_cost, lowest_cost + (cost_increment * (loop_count+1))))
+        min_range: int = lowest_cost + (cost_increment * loop_count)
+        if min_range >= highest_cost:
+            min_range = highest_cost-1
 
-        w.set_chapter_cost(chapter, mw.random.randint(value, min(value+cost_increment, highest_cost)))
+        value: int = mw.random.randint(min_range, min(highest_cost, max(lowest_cost, last_cost + cost_increment)))
+
+        cost = mw.random.randint(value, min(value + cost_increment, highest_cost))
+        if loop_count >= 1:
+            if last_cost + min_difference > cost:
+                cost = last_cost + min_difference
+
+        cost = min(cost, highest_cost)
+        w.set_chapter_cost(chapter, cost)
+        last_cost = cost
         loop_count += 1
 
     minimum: int = mw.Chapter5MinCost[p].value
@@ -136,9 +149,15 @@ def set_rules(world: World):
 
     location: Location
     for (key, data) in location_table.items():
+        if key in storybook_pages.keys() and mw.ShuffleStorybookPages[p].value == 0:
+            continue
+
         location = mw.get_location(key, p)
         if key in humt_locations:
-            add_rule(location, lambda state: state.can_reach("Heating Up Mafia Town", player=world.player), "or")
+            add_rule(location, lambda state: state.can_reach("Heating Up Mafia Town", "Region", p), "or")
+
+        if key in tihs_locations:
+            add_rule(location, lambda state: state.can_reach("The Illness has Spread", "Region", p), "or")
 
         for hat in data.required_hats:
             if hat is not HatType.NONE:
@@ -168,14 +187,22 @@ def set_rules(world: World):
              or state.count_group("UFO", world.player) >= 3
              or state.count_group("Crayon", world.player) >= 3)
 
+    # Only available outside She Came from Outer Space
+    add_rule(mw.get_location("Mafia Town - Mafia Geek Platform", p),
+             lambda state: state.can_reach("Welcome to Mafia Town", "Region", p)
+             or state.can_reach("Barrel Battle", "Region", p)
+             or state.can_reach("Down with the Mafia!", "Region", p)
+             or state.can_reach("Cheating the Race", "Region", p)
+             or state.can_reach("The Golden Vault", "Region", p))
+
     # For some reason, the brewing crate is removed in HUMT
     set_rule(mw.get_location("Mafia Town - Secret Cave", p),
-             lambda state: state.can_reach("Heating Up Mafia Town", player=p)
+             lambda state: state.can_reach("Heating Up Mafia Town", "Region", player=p)
              or can_use_hat(state, w, HatType.BREWING))
 
     # Can bounce across the lava to get this without Hookshot (need to die though :P)
     set_rule(mw.get_location("Mafia Town - Above Boats", p),
-             lambda state: state.can_reach("Heating Up Mafia Town", player=p)
+             lambda state: state.can_reach("Heating Up Mafia Town", "Region", player=p)
              or can_use_hookshot(state, w))
 
     set_rule(mw.get_location("Act Completion (Cheating the Race)", p),
@@ -183,14 +210,35 @@ def set_rules(world: World):
              or mw.CTRWithSprint[p].value > 0 and can_use_hat(state, w, HatType.SPRINT))
 
     set_rule(mw.get_location("Subcon Forest - Boss Arena Chest", p),
-             lambda state: state.can_reach("Toilet of Doom", player=world.player)
-             or state.can_reach("Your Contract has Expired", player=world.player))
+             lambda state: state.can_reach("Toilet of Doom", player=p)
+             or state.can_reach("Your Contract has Expired", player=p))
+
+    set_rule(mw.get_location("Act Completion (Time Rift - Village)", p),
+             lambda state: can_use_hat(state, w, HatType.BREWING) or state.has("Umbrella", p)
+             or can_use_hat(state, w, HatType.DWELLER))
+
+    add_rule(mw.get_entrance("Subcon Forest - Act 2", p),
+             lambda state: state.has("Snatcher's Contract - The Subcon Well", p)),
+
+    add_rule(mw.get_entrance("Subcon Forest - Act 3", p),
+             lambda state: state.has("Snatcher's Contract - Toilet of Doom", p)),
+
+    add_rule(mw.get_entrance("Subcon Forest - Act 4", p),
+             lambda state: state.has("Snatcher's Contract - Queen Vanessa's Manor", p)),
+
+    add_rule(mw.get_entrance("Subcon Forest - Act 5", p),
+             lambda state: state.has("Snatcher's Contract - Mail Delivery Service", p)),
+
+    add_rule(mw.get_location("Alpine Skyline - Mystifying Time Mesa: Zipline", p),
+             lambda state: can_use_hat(state, w, HatType.SPRINT) or can_use_hat(state, w, HatType.TIME_STOP))
 
     for entrance in mw.get_region("Alpine Free Roam", p).entrances:
         add_rule(entrance, lambda state: can_use_hookshot(state, w))
 
     if mw.SDJLogic[p].value > 0:
         set_sdj_rules(world)
+
+    # ****** !!!!!! SET ALL ENTRANCE RULES BEFORE THIS LINE !!!!!! ****** #
 
     for (key, acts) in act_connections.items():
         i: int = 1
@@ -204,7 +252,9 @@ def set_rules(world: World):
         entrances: typing.List[Entrance] = []
 
         for act in acts:
-            required_region = mw.get_entrance(act, p).connected_region
+            act_entrance: Entrance = mw.get_entrance(act, p)
+            access_rules.append(act_entrance.access_rule)
+            required_region = act_entrance.connected_region
             name: str = format("%s: Connection %i" % (key, i))
             new_entrance: Entrance = connect_regions(required_region, region, name, p)
             entrances.append(new_entrance)
@@ -214,18 +264,13 @@ def set_rules(world: World):
                 rule: typing.Callable[[CollectionState], bool]
                 name = format("Act Completion (%s)" % required_region.name)
                 rule = mw.get_location(name, p).access_rule
-                access_rules += [rule]
+                access_rules.append(rule)
 
             i += 1
 
         for e in entrances:
             for rules in access_rules:
                 add_rule(e, rules)
-
-    # add_rule(mw.get_entrance("Subcon Forest - Act 2", p), lambda state: can_reach_subcon(state, w))
-    # add_rule(mw.get_entrance("Subcon Forest - Act 3", p), lambda state: can_reach_subcon(state, w))
-    # add_rule(mw.get_entrance("Subcon Forest - Act 4", p), lambda state: can_reach_subcon(state, w))
-    # add_rule(mw.get_entrance("Subcon Forest - Act 5", p), lambda state: can_reach_subcon(state, w))
 
     mw.completion_condition[p] = lambda state: can_use_hat(state, w, HatType.BREWING) \
         and can_use_hat(state, w, HatType.DWELLER) \
@@ -234,11 +279,14 @@ def set_rules(world: World):
 
 
 def set_sdj_rules(world: World):
+    set_rule(world.multiworld.get_location("Subcon Forest - Long Tree Climb Chest", world.player),
+             lambda state: can_use_hat(state, world, HatType.DWELLER) or can_sdj(state, world))
+
     set_rule(world.multiworld.get_location("Alpine Skyline - The Birdhouse: Dweller Platforms Relic", world.player),
              lambda state: can_use_hat(state, world, HatType.DWELLER) or can_sdj(state, world))
 
-    set_rule(world.multiworld.get_location("Alpine Skyline - The Windmill: Time Trial", world.player),
-             lambda state: can_use_hat(state, world, HatType.DWELLER) or can_sdj(state, world))
+    # set_rule(world.multiworld.get_location("Alpine Skyline - The Windmill: Time Trial", world.player),
+    #         lambda state: can_use_hat(state, world, HatType.DWELLER) or can_sdj(state, world))
 
     set_rule(world.multiworld.get_location("Alpine Skyline - The Twilight Bell: Ice Platform", world.player),
              lambda state: can_use_hat(state, world, HatType.ICE) or can_sdj(state, world))
@@ -267,6 +315,12 @@ def reg_act_connection(world: World, region: typing.Union[str, Region], unlocked
 
 
 def set_indirect_connections(world: World):
+    for entrance in world.multiworld.get_region("Mafia Town Area", world.player).entrances:
+        reg_act_connection(world, "Heating Up Mafia Town", entrance)
+
+    for entrance in world.multiworld.get_region("Alpine Free Roam", world.player).entrances:
+        reg_act_connection(world, "The Illness has Spread", entrance)
+
     reg_act_connection(world, "The Birdhouse", "Alpine Skyline - Finale")
     reg_act_connection(world, "The Lava Cake", "Alpine Skyline - Finale")
     reg_act_connection(world, "The Windmill", "Alpine Skyline - Finale")
@@ -274,6 +328,7 @@ def set_indirect_connections(world: World):
 
 
 # See randomize_act_entrances in Regions.py
+# Called BEFORE set_rules!
 def set_rift_rules(world: World, regions: typing.Dict[str, Region]):
     w = world
     mw = world.multiworld

@@ -1,4 +1,5 @@
-from BaseClasses import Item, ItemClassification
+from BaseClasses import Item, ItemClassification, Location, Region
+from .Locations import HatInTimeLocation
 from ..AutoWorld import World
 from .Types import HatDLC
 import typing
@@ -14,8 +15,8 @@ class HatInTimeItem(Item):
     game: str = "A Hat in Time"
 
 
-def item_dlc_enabled(world: World, item: str) -> bool:
-    data = ahit_items.get(item) or time_pieces.get(item)
+def item_dlc_enabled(world: World, name: str) -> bool:
+    data = item_table[name]
 
     if data.dlc_flags == HatDLC.none:
         return True
@@ -27,6 +28,51 @@ def item_dlc_enabled(world: World, item: str) -> bool:
         return True
 
     return False
+
+
+def create_item(world: World, name: str) -> Item:
+    data = item_table[name]
+    return HatInTimeItem(name, data.classification, data.code, world.player)
+
+
+def create_multiple_items(world: World, name: str, count: int = 1) -> typing.List[Item]:
+    data = item_table[name]
+    itemlist: typing.List[Item] = []
+
+    for i in range(count):
+        itemlist += [HatInTimeItem(name, data.classification, data.code, world.player)]
+
+    return itemlist
+
+
+def create_junk_items(world: World, count: int) -> typing.List[Item]:
+    trap_chance = world.multiworld.TrapChance[world.player].value
+    junk_pool: typing.List[Item] = []
+    junk_list: typing.Dict[str, int] = {}
+    trap_list: typing.Dict[str, int] = {}
+    ic: ItemClassification
+
+    for name in item_table.keys():
+        ic = item_table[name].classification
+        if ic == ItemClassification.filler:
+            junk_list[name] = junk_weights.get(name)
+        elif trap_chance > 0 and ic == ItemClassification.trap:
+            if name == "Baby Trap":
+                trap_list[name] = world.multiworld.BabyTrapWeight[world.player].value
+            elif name == "Laser Trap":
+                trap_list[name] = world.multiworld.LaserTrapWeight[world.player].value
+            elif name == "Parade Trap":
+                trap_list[name] = world.multiworld.ParadeTrapWeight[world.player].value
+
+    for i in range(count):
+        if trap_chance > 0 and world.multiworld.random.randint(1, 100) <= trap_chance:
+            junk_pool += [world.create_item(
+                world.multiworld.random.choices(list(trap_list.keys()), weights=list(trap_list.values()), k=1)[0])]
+        else:
+            junk_pool += [world.create_item(
+                world.multiworld.random.choices(list(junk_list.keys()), weights=list(junk_list.values()), k=1)[0])]
+
+    return junk_pool
 
 
 ahit_items = {
@@ -53,7 +99,7 @@ ahit_items = {
     "Hookshot Badge": ItemData(300027, ItemClassification.progression),
     "Item Magnet Badge": ItemData(300028, ItemClassification.useful),
     "No Bonk Badge": ItemData(300029, ItemClassification.useful),
-    # "Compass Badge": ItemData(300030, ItemClassification.useful),
+    "Compass Badge": ItemData(300030, ItemClassification.useful),
     "Scooter Badge": ItemData(300031, ItemClassification.useful),
     "Badge Pin": ItemData(300043, ItemClassification.useful),
 
@@ -135,6 +181,13 @@ time_pieces = {
     "Time Piece (Time's End - The Finale)": ItemData(300087, ItemClassification.progression),
 }
 
+act_contracts = {
+    "Snatcher's Contract - The Subcon Well": ItemData(300200, ItemClassification.progression),
+    "Snatcher's Contract - Toilet of Doom": ItemData(300201, ItemClassification.progression),
+    "Snatcher's Contract - Queen Vanessa's Manor": ItemData(300202, ItemClassification.progression),
+    "Snatcher's Contract - Mail Delivery Service": ItemData(300203, ItemClassification.progression),
+}
+
 relic_groups = {
     "Burger": {"Relic (Burger Patty)", "Relic (Burger Cushion)"},
     "Train": {"Relic (Mountain Set)", "Relic (Train)"},
@@ -159,6 +212,7 @@ junk_weights = {
 item_table = {
     **ahit_items,
     **time_pieces,
+    **act_contracts,
 }
 
 lookup_id_to_name: typing.Dict[int, str] = {data.code: item_name for item_name, data in ahit_items.items() if data.code}

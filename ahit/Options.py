@@ -15,17 +15,23 @@ class RandomizeHatOrder(Toggle):
     default = 1
 
 
-class BetterCompassBadge(Toggle):
-    """NOT IMPLEMENTED If enabled, start with the Compass Badge. In Archipelago, the Compass Badge will track all items in the world
+class StartWithCompassBadge(Toggle):
+    """If enabled, start with the Compass Badge. In Archipelago, the Compass Badge will track all items in the world
     (instead of just Relics). Recommended if you're not familiar with where item locations are."""
     display_name = "Start with Compass Badge"
-    default = 0
+    default = 1
 
 
 class ShuffleStorybookPages(Toggle):
     """If enabled, each storybook page in the purple Time Rifts is an item check.
     The Compass Badge can track these down for you."""
     display_name = "Shuffle Storybook Pages"
+    default = 1
+
+
+class ShuffleActContracts(Toggle):
+    """If enabled, shuffle Snatcher's act contracts into the pool as items"""
+    display_name = "Shuffle Contracts"
     default = 1
 
 
@@ -69,8 +75,16 @@ class ChapterCostIncrement(Range):
     """Lower values mean chapter costs increase slower. Higher values make the cost differences more steep."""
     display_name = "Chapter Cost Increment"
     range_start = 1
-    range_end = 5
-    default = 3
+    range_end = 8
+    default = 5
+
+
+class ChapterCostMinDifference(Range):
+    """The minimum difference between chapter costs."""
+    display_name = "Minimum Chapter Cost Difference"
+    range_start = 1
+    range_end = 8
+    default = 5
 
 
 class LowestChapterCost(Range):
@@ -78,17 +92,17 @@ class LowestChapterCost(Range):
     Chapter costs will, progressively, be calculated based on this value (except for Chapter 5)."""
     display_name = "Lowest Possible Chapter Cost"
     range_start = 0
-    range_end = 6
-    default = 4
+    range_end = 10
+    default = 5
 
 
 class HighestChapterCost(Range):
     """Value determining the highest possible cost for a chapter.
     Chapter costs will, progressively, be calculated based on this value (except for Chapter 5)."""
     display_name = "Highest Possible Chapter Cost"
-    range_start = 16
-    range_end = 30
-    default = 20
+    range_start = 15
+    range_end = 35
+    default = 25
 
 
 class Chapter5MinCost(Range):
@@ -200,8 +214,9 @@ ahit_options: typing.Dict[str, type(Option)] = {
 
     "ActRandomizer":            ActRandomizer,
     "RandomizeHatOrder":        RandomizeHatOrder,
-    "BetterCompassBadge":       BetterCompassBadge,
+    "StartWithCompassBadge":    StartWithCompassBadge,
     "ShuffleStorybookPages":    ShuffleStorybookPages,
+    "ShuffleActContracts":      ShuffleActContracts,
     "StartingChapter":          StartingChapter,
     "SDJLogic":                 SDJLogic,
     "CTRWithSprint":            CTRWithSprint,
@@ -213,6 +228,7 @@ ahit_options: typing.Dict[str, type(Option)] = {
     "LowestChapterCost":        LowestChapterCost,
     "HighestChapterCost":       HighestChapterCost,
     "ChapterCostIncrement":     ChapterCostIncrement,
+    "ChapterCostMinDifference":  ChapterCostMinDifference,
 
     "Chapter5MinCost":          Chapter5MinCost,
     "Chapter5MaxCost":          Chapter5MaxCost,

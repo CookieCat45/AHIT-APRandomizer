@@ -1,6 +1,6 @@
 from ..AutoWorld import World
 from BaseClasses import Region, Entrance, ItemClassification, Location
-from .Locations import HatInTimeLocation, location_table, storybook_pages
+from .Locations import HatInTimeLocation, location_table, storybook_pages, event_locs
 from .Items import HatInTimeItem
 from .Types import ChapterIndex
 import typing
@@ -142,7 +142,7 @@ chapter_act_info = {
     "The Finale":                       "hatintime_chapterinfo.TheFinale.TheFinale_FinalBoss"
 }
 
-# The first four acts of a chapter in act rando can't be any of these
+# The first three acts of a chapter in act rando can't be any of these
 first_chapter_blacklist = [
     "Cheating the Race",
 
@@ -163,7 +163,7 @@ first_chapter_blacklist = [
     "Time Rift - Gallery",
 ]
 
-# One of the first 4 acts of a chapter in act rando must be one of these
+# One of the first three acts of a chapter in act rando must be one of these
 first_chapter_guaranteed_acts = [
     "Welcome to Mafia Town",
     "Barrel Battle",
@@ -258,12 +258,16 @@ def create_regions(world: World):
     alpine_skyline = create_region_and_connect(w, "Alpine Skyline",  "-> Alpine Skyline", spaceship)
     alpine_freeroam = create_region_and_connect(w, "Alpine Free Roam", "Alpine Skyline - Free Roam", alpine_skyline)
 
-    birdhouse = create_region_and_connect(w, "The Birdhouse", "-> The Birdhouse", alpine_freeroam)
-    lava_cake = create_region_and_connect(w, "The Lava Cake", "-> The Lava Cake", alpine_freeroam)
-    windmill = create_region_and_connect(w, "The Windmill", "-> The Windmill", alpine_freeroam)
-    twilight_bell = create_region_and_connect(w, "The Twilight Bell", "-> The Twilight Bell", alpine_freeroam)
+    # Needs to be a separate region because it can be accessed from both free roam and Illness, Illness w/o hookshot
+    goat_village = create_region_and_connect(w, "Goat Village", "Alpine Free Roam -> Goat Village", alpine_freeroam)
 
-    create_region_and_connect(w, "The Illness has Spread", "Alpine Skyline - Finale", alpine_freeroam)
+    create_region_and_connect(w, "The Birdhouse", "-> The Birdhouse", alpine_freeroam)
+    create_region_and_connect(w, "The Lava Cake", "-> The Lava Cake", alpine_freeroam)
+    create_region_and_connect(w, "The Windmill", "-> The Windmill", alpine_freeroam)
+    create_region_and_connect(w, "The Twilight Bell", "-> The Twilight Bell", alpine_freeroam)
+
+    illness = create_region_and_connect(w, "The Illness has Spread", "Alpine Skyline - Finale", alpine_skyline)
+    connect_regions(illness, goat_village, "The Illness has Spread -> Goat Village", w.player)
     create_rift_connections(w, create_region(w, "Time Rift - Alpine Skyline"))
     create_rift_connections(w, create_region(w, "Time Rift - The Twilight Bell"))
     create_rift_connections(w, create_region(w, "Time Rift - Curly Tail Trail"))
@@ -324,139 +328,189 @@ def create_rift_connections(world: World, region: Region):
         i += 1
 
 
-def create_event_location(name: str, region: Region, world: World) -> Location:
-    event = HatInTimeLocation(world.player, name, None, region)
-    region.locations.append(event)
-    event.place_locked_item(HatInTimeItem(name, ItemClassification.progression, None, world.player))
-    return event
-
-
 def randomize_act_entrances(world: World):
-    if world.multiworld.ActRandomizer[world.player].value > 0:
-        entrance_list: typing.List[Entrance] = get_act_entrances(world)
-        region_list: typing.List[Region] = get_act_regions(world)
-        world.multiworld.random.shuffle(entrance_list)
-        world.multiworld.random.shuffle(region_list)
+    entrance_list: typing.List[Entrance] = get_act_entrances(world)
+    region_list: typing.List[Region] = get_act_regions(world)
+    world.multiworld.random.shuffle(entrance_list)
+    world.multiworld.random.shuffle(region_list)
 
-        act_whitelist: typing.List[Region] = []
-        for region in region_list.copy():
-            if region.name not in first_chapter_blacklist:
-                act_whitelist.append(region)
+    # Guarantee that first three accessible acts are completable and that one of them is a location-dense area
+    act_whitelist: typing.List[Region] = []
+    for region in region_list.copy():
+        if region.name not in first_chapter_blacklist:
+            act_whitelist.append(region)
 
-        has_guaranteed_act: bool = False
-        count: int = 0
-        first_chapter_entrances: typing.List[Entrance] = get_first_chapter_region(world).exits.copy()
-        world.multiworld.random.shuffle(first_chapter_entrances)
-        world.multiworld.random.shuffle(act_whitelist)
+    has_guaranteed_act: bool = False
+    count: int = 0
+    first_chapter_entrances: typing.List[Entrance] = get_first_chapter_region(world).exits.copy()
+    world.multiworld.random.shuffle(first_chapter_entrances)
+    world.multiworld.random.shuffle(act_whitelist)
 
-        for entrance in first_chapter_entrances:
-            if "Act 1" not in entrance.name \
-             and "Act 2" not in entrance.name \
-             and "Act 3" not in entrance.name:
-                continue
-            
-            if entrance.name in blacklisted_acts.keys():
-                continue
+    for entrance in first_chapter_entrances:
+        if "Act 1" not in entrance.name \
+         and "Act 2" not in entrance.name \
+         and "Act 3" not in entrance.name:
+            continue
 
-            region: Region = act_whitelist[world.multiworld.random.randint(0, len(act_whitelist)-1)]
-            if not has_guaranteed_act:
-                if count >= 2 or world.multiworld.random.randint(0, 3) == 1:
-                    region = world.multiworld.get_region(
-                        first_chapter_guaranteed_acts
-                        [world.multiworld.random.randint(0, len(first_chapter_guaranteed_acts)-1)], world.player)
-                    has_guaranteed_act = True
-                elif region.name in first_chapter_guaranteed_acts:
-                    has_guaranteed_act = True
+        if entrance.name in blacklisted_acts.keys():
+            continue
 
-            world.update_chapter_act_info(entrance.connected_region, region)
-            reconnect_regions(entrance, entrance.parent_region, region)
-            entrance_list.remove(entrance)
-            region_list.remove(region)
-            act_whitelist.remove(region)
-            count += 1
-            if count >= 3:
-                break
+        region: Region = act_whitelist[world.multiworld.random.randint(0, len(act_whitelist)-1)]
+        if not has_guaranteed_act:
+            if count >= 2 or world.multiworld.random.randint(0, 3) == 1:
+                region = world.multiworld.get_region(
+                    first_chapter_guaranteed_acts
+                    [world.multiworld.random.randint(0, len(first_chapter_guaranteed_acts)-1)], world.player)
+                has_guaranteed_act = True
+            elif region.name in first_chapter_guaranteed_acts:
+                has_guaranteed_act = True
 
-        time_rifts: typing.List[Region] = []
-        for region in world.multiworld.get_regions(world.player):
-            if "Time Rift" in region.name and region.name in rift_access_regions.keys():
+        world.update_chapter_act_info(entrance.connected_region, region)
+        reconnect_regions(entrance, entrance.parent_region, region)
+        entrance_list.remove(entrance)
+        region_list.remove(region)
+        act_whitelist.remove(region)
+        count += 1
+        if count >= 3:
+            break
+
+    # Gather Time Rifts but separate the Alpine ones, so we don't accidentally make Alpine Free Roam inaccessible
+    time_rifts: typing.List[Region] = []
+    alpine_time_rifts: typing.List[Region] = []
+    for region in world.multiworld.get_regions(world.player):
+        if "Time Rift" in region.name and region.name in rift_access_regions.keys():
+            if region.name == "Time Rift - Curly Tail Trail" or region.name == "Time Rift - The Twilight Bell" \
+             or region.name == "Time Rift - Alpine Skyline":
+                alpine_time_rifts.append(region)
+            else:
                 time_rifts.append(region)
 
-        rift_dict: typing.Dict[str, Region] = {}
-        block_attempts: int = 0
-        chapter_rift_blocks: typing.Dict[ChapterIndex, typing.List[ChapterIndex]] = {ChapterIndex.MAFIA: [],
-                                                                                     ChapterIndex.BIRDS: [],
-                                                                                     ChapterIndex.SUBCON: [],
-                                                                                     ChapterIndex.ALPINE: []}
+    rift_dict: typing.Dict[str, Region] = {}
+    block_attempts: int = 0
+    chapter_rift_blocks: typing.Dict[ChapterIndex, typing.List[ChapterIndex]] = {ChapterIndex.MAFIA: [],
+                                                                                 ChapterIndex.BIRDS: [],
+                                                                                 ChapterIndex.SUBCON: [],
+                                                                                 ChapterIndex.ALPINE: []}
 
-        while len(entrance_list) > 0 or len(region_list) > 0 or len(time_rifts) > 0:
-            entrance = entrance_list[world.multiworld.random.randint(0, len(entrance_list) - 1)]
+    # First, map Alpine Free Roam to something other than its own Time Rift
+    alpine = world.multiworld.get_region("Alpine Free Roam", world.player)
+    e = entrance_list[world.multiworld.random.randint(0, len(entrance_list) - 1)]
 
-            # Rifts first
-            if len(time_rifts) > 0:
-                rift_region = time_rifts[world.multiworld.random.randint(0, len(time_rifts)-1)]
-                target_region = region_list[world.multiworld.random.randint(0, len(region_list)-1)]
+    # Obviously don't map it to the finale, that's impossible
+    while e.name == "Alpine Skyline - Finale":
+        e = entrance_list[world.multiworld.random.randint(0, len(entrance_list) - 1)]
 
-                # Make sure the target region and Time Rift do not share the same original chapter
-                if act_chapters[rift_region.name] == act_chapters[target_region.name]:
+    original_region: Region
+
+    # There are about 40% Time Rifts vs Acts in the game, so 40% chance to be mapped to a Time Rift
+    if world.multiworld.random.randint(1, 5) > 2:
+        original_region = e.connected_region
+        reconnect_regions(e, e.parent_region, alpine)
+        world.update_chapter_act_info(original_region, alpine)
+    else:
+        original_region = time_rifts[world.multiworld.random.randint(0, len(time_rifts) - 1)]
+        connect_time_rift(original_region, alpine, e, world)
+        world.update_chapter_act_info(original_region, alpine)
+        rift_dict.setdefault(original_region.name, alpine)
+        time_rifts.remove(original_region)
+
+    alpine_freeroam_chapter = [index for index, name in chapter_regions.items()
+                               if name == act_chapters[original_region.name]][0]
+
+    entrance_list.remove(e)
+    region_list.remove(alpine)
+
+    while len(entrance_list) > 0 or len(region_list) > 0 or len(time_rifts) > 0:
+        entrance = entrance_list[world.multiworld.random.randint(0, len(entrance_list) - 1)]
+
+        # Rifts first
+        if len(time_rifts) > 0:
+            target_region = region_list[world.multiworld.random.randint(0, len(region_list)-1)]
+
+            # Do Alpine time rifts first
+            if len(alpine_time_rifts) > 0:
+                rift_region = alpine_time_rifts[world.multiworld.random.randint(0, len(alpine_time_rifts)-1)]
+            else:
+                rift_region = time_rifts[world.multiworld.random.randint(0, len(time_rifts) - 1)]
+
+            # Make sure the target region and Time Rift do not share the same original chapter
+            # Unless the target region is a Time Rift
+            if act_chapters[rift_region.name] == act_chapters[target_region.name] \
+               and "Time Rift" not in target_region.name:
+                continue
+
+            rift_chapter_index = [index for index, name in chapter_regions.items()
+                                  if name == act_chapters[rift_region.name]][0]
+            target_chapter_index = [index for index, name in chapter_regions.items()
+                                    if name == act_chapters[target_region.name]][0]
+
+            # Don't place anything onto an Alpine time rift that originates
+            # from the chapter that has Alpine Free Roam.
+            if target_chapter_index is not ChapterIndex.SPACESHIP:
+                if rift_chapter_index is ChapterIndex.ALPINE and target_chapter_index is alpine_freeroam_chapter:
                     continue
 
-                if "Time Rift" not in target_region.name:
+            # If target act is from chapter 1 or 3,
+            # we can't have more than one non-rift act from the target act's chapter in a Time Rift
+            # in the same chapter.
+            if target_chapter_index in chapter_rift_blocks[rift_chapter_index] and block_attempts < 200:
+                block_attempts += 1
+                continue
 
-                    rift_chapter_index = [index for index, name in chapter_regions.items()
-                                          if name == act_chapters[rift_region.name]][0]
-                    target_chapter_index = [index for index, name in chapter_regions.items()
-                                            if name == act_chapters[target_region.name]][0]
+            block_attempts = 0
 
-                    # If target act is from chapter 1 or 3,
-                    # we can't have more than one non-rift act from the target act's chapter in a Time Rift
-                    # in the same chapter.
-                    if target_chapter_index in chapter_rift_blocks[rift_chapter_index] and block_attempts < 300:
-                        block_attempts += 1
-                        continue
+            if rift_chapter_index is not ChapterIndex.SPACESHIP \
+               and target_chapter_index is ChapterIndex.MAFIA or target_chapter_index is ChapterIndex.SUBCON:
+                chapter_rift_blocks[rift_chapter_index] += [target_chapter_index]
 
-                    if rift_chapter_index is not ChapterIndex.SPACESHIP \
-                       and target_chapter_index is ChapterIndex.MAFIA or target_chapter_index is ChapterIndex.SUBCON:
-                        chapter_rift_blocks[rift_chapter_index] += [target_chapter_index]
+            # Finally, connect the Time Rift
+            connect_time_rift(rift_region, target_region, entrance, world)
 
-                # Grab the Time Rift's current entrances
-                rift_entrances: typing.List[Entrance] = []
-                for e in rift_region.entrances:
-                    rift_entrances.append(e)
+            # Store in our dict (see set_rift_indirect_connections)
+            rift_dict.setdefault(rift_region.name, target_region)
 
-                rift_region.entrances.clear()
-
-                # Connect the entrance to our Time Rift
-                world.update_chapter_act_info(entrance.connected_region, rift_region)
-                reconnect_regions(entrance, entrance.parent_region, rift_region)
-
-                # Connect the Time Rift's old entrances to our target region
-                for e in rift_entrances:
-                    reconnect_regions(e, e.parent_region, target_region)
-
-                world.update_chapter_act_info(rift_region, target_region)
-
-                # Store in our dict (see set_rift_indirect_connections)
-                rift_dict.setdefault(rift_region.name, target_region)
-
+            if rift_region in time_rifts:
                 time_rifts.remove(rift_region)
-                entrance_list.remove(entrance)
-                region_list.remove(target_region)
-            else:
-                original_region = entrance.connected_region
-                region = region_list[world.multiworld.random.randint(0, len(region_list) - 1)]
-                reconnect_regions(entrance, entrance.parent_region, region)
-                world.update_chapter_act_info(original_region, region)
+            elif rift_region in alpine_time_rifts:
+                alpine_time_rifts.remove(rift_region)
 
-                region_list.remove(region)
-                entrance_list.remove(entrance)
+            entrance_list.remove(entrance)
+            region_list.remove(target_region)
+        else:
+            original_region = entrance.connected_region
+            region = region_list[world.multiworld.random.randint(0, len(region_list) - 1)]
+            reconnect_regions(entrance, entrance.parent_region, region)
+            world.update_chapter_act_info(original_region, region)
 
-        # Add in blacklisted acts with their defaults
-        for name in blacklisted_acts.keys():
-            blacklisted_region: Region = world.multiworld.get_region(blacklisted_acts[name], world.player)
-            world.update_chapter_act_info(blacklisted_region, blacklisted_region)
+            region_list.remove(region)
+            entrance_list.remove(entrance)
 
-        set_rift_rules(world, rift_dict)
+    # Add in blacklisted acts with their defaults
+    for name in blacklisted_acts.keys():
+        blacklisted_region: Region = world.multiworld.get_region(blacklisted_acts[name], world.player)
+        world.update_chapter_act_info(blacklisted_region, blacklisted_region)
+
+    set_rift_rules(world, rift_dict)
+
+
+def connect_time_rift(rift_region: Region, target_region: Region, entrance: Entrance, world: World):
+    # Grab the Time Rift's current entrances
+    rift_entrances: typing.List[Entrance] = []
+    for e in rift_region.entrances:
+        rift_entrances.append(e)
+
+    rift_region.entrances.clear()
+
+    # Connect the entrance to our Time Rift
+    world.update_chapter_act_info(entrance.connected_region, rift_region)
+    reconnect_regions(entrance, entrance.parent_region, rift_region)
+
+    # Connect the Time Rift's old entrances to our target region
+    for e in rift_entrances:
+        reconnect_regions(e, e.parent_region, target_region)
+
+    # Update ChapterActInfo data
+    world.update_chapter_act_info(rift_region, target_region)
 
 
 def get_act_entrances(world: World, exclude_blacklisted: bool = True) -> typing.List[Entrance]:
@@ -547,3 +601,24 @@ def get_first_chapter_region(world: World) -> Region:
 
 def get_act_original_chapter(world: World, act_name: str) -> Region:
     return world.multiworld.get_region(act_chapters[act_name], world.player)
+
+
+def create_events(world: World) -> int:
+    w = world
+    mw = w.multiworld
+    count: int = 0
+
+    for (name, data) in event_locs.items():
+        event: Location = create_event(name, mw.get_region(data.region, w.player), w)
+        act_completion: str = format("Act Completion (%s)" % data.region)
+        event.access_rule = mw.get_location(act_completion, w.player).access_rule
+        count += 1
+
+    return count
+
+
+def create_event(name: str, region: Region, world: World) -> Location:
+    event = HatInTimeLocation(world.player, name, None, region)
+    region.locations.append(event)
+    event.place_locked_item(HatInTimeItem(name, ItemClassification.progression, None, world.player))
+    return event
