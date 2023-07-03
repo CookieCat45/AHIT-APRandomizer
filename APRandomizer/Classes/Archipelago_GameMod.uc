@@ -244,12 +244,15 @@ event PreBeginPlay()
 				}
 				
 				// If we have the Subcon Well contract, remove it or else the player may permanently miss the bag trap contract check
-				if (SlotData.ObtainedContracts.Find(class'Hat_SnatcherContract_IceWall') != -1
-				&& SlotData.CheckedContracts.Find(class'Hat_SnatcherContract_IceWall') == -1)
+				if (SlotData.ShuffleActContracts)
 				{
-					save.SnatcherContracts.RemoveItem(class'Hat_SnatcherContract_IceWall');
-					save.CompletedSnatcherContracts.RemoveItem(class'Hat_SnatcherContract_IceWall');
-					SlotData.TakenContracts.AddItem(class'Hat_SnatcherContract_IceWall');
+					if (SlotData.ObtainedContracts.Find(class'Hat_SnatcherContract_IceWall') != -1
+					&& SlotData.CheckedContracts.Find(class'Hat_SnatcherContract_IceWall') == -1)
+					{
+						save.SnatcherContracts.RemoveItem(class'Hat_SnatcherContract_IceWall');
+						save.CompletedSnatcherContracts.RemoveItem(class'Hat_SnatcherContract_IceWall');
+						SlotData.TakenContracts.AddItem(class'Hat_SnatcherContract_IceWall');
+					}
 				}
 			}
 			

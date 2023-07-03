@@ -3,7 +3,6 @@ class Archipelago_RandomizedItem_Misc extends Archipelago_RandomizedItem_Base;
 
 defaultproperties
 {
-	// placeholder model until I create a 3D model of the Archipelago logo
 	Begin Object Class=StaticMeshComponent Name=Model2
 		StaticMesh = StaticMesh'HatInTime_Items.models.badge_standard';
 		LightEnvironment=m_hLightEnvironment;
