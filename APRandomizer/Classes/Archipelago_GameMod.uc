@@ -273,7 +273,7 @@ event PreBeginPlay()
 					`GameManager.SetCurrentCheckpoint(-1, false);
 				}
 				
-				// If we have all 4 peak time pieces, remove one so we don't go to Alpine finale
+				// If we possibly have all 4 peak time pieces, remove one so we don't go to Alpine finale
 				if (`SaveManager.HasTimePiece("AlpineSkyline_WeddingCake"))
 				{
 					`SaveManager.GetCurrentSaveData().RemoveTimePiece("AlpineSkyline_WeddingCake");
@@ -457,7 +457,6 @@ function OnPostInitGame()
 					{
 						DebugMessage("Disabling trigger volume: "$trigger.Name);
 						trigger.ShutDown();
-						break;
 					}
 				}
 			}
@@ -1314,6 +1313,10 @@ function ShuffleCollectibles()
 		|| collectible.IsA('Hat_Collectible_Sticker'))
 			continue;
 		
+		// hotfix
+		if (ObjectToLocationId(collectible) == 336395)
+			continue;
+
 		locationArray.AddItem(ObjectToLocationId(collectible));
 		if (bool(DebugMode))
 		{
