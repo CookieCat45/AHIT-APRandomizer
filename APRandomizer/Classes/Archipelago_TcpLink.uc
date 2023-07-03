@@ -619,7 +619,7 @@ function GrantItem(int itemId)
 	local ESpecialItemType special;
 	local ETrapType trap;
 	local Hat_SaveGame save;
-
+	
 	if (class'Archipelago_ItemInfo'.static.GetNativeItemData(itemId, itemName, worldClass, invOverride))
 	{
 		player = GetALocalPlayerController().Pawn;
@@ -656,7 +656,13 @@ function GrantItem(int itemId)
 			`AP.ScreenMessage("Got " $itemName);
 		}
 	}
-	else if (class'Archipelago_ItemInfo'.static.GetContractFromID(itemId) != None)
+	else
+	{
+		// screen message so players report problems
+		`AP.ScreenMessage("[GrantItem] Unknown item ID: " $itemId);
+	}
+
+	if (class'Archipelago_ItemInfo'.static.GetContractFromID(itemId) != None)
 	{
 		contract = class'Archipelago_ItemInfo'.static.GetContractFromID(itemId);
 		if (`AP.SlotData.ObtainedContracts.Find(contract) == -1)
@@ -667,11 +673,6 @@ function GrantItem(int itemId)
 			save.SnatcherContracts.AddItem(contract);
 		
 		contract.static.UnlockActs(save);
-	}
-	else
-	{
-		// screen message so players report problems
-		`AP.ScreenMessage("[GrantItem] Unknown item ID: " $itemId);
 	}
 }
 

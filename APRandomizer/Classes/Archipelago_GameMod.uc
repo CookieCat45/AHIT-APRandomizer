@@ -207,6 +207,15 @@ event PreBeginPlay()
 	
 	if (IsArchipelagoEnabled())
 	{
+		SlotData = new class'Archipelago_SlotData';
+		path = "APRandomizer/slot_data"$`SaveManager.GetCurrentSaveData().CreationTimeStamp;
+		
+		if (class'Engine'.static.BasicLoadObject(SlotData, path, false, 1))
+		{
+			SlotData.Initialized = true;
+			UpdateChapterInfo();
+		}
+
 		if (!IsInSpaceship())
 		{
 			// We need to remove the player's time pieces that are from rifts in vanilla, then give them back
@@ -263,6 +272,13 @@ event PreBeginPlay()
 					`GameManager.SetCurrentAct(99);
 					`GameManager.SetCurrentCheckpoint(-1, false);
 				}
+				
+				// If we have all 4 peak time pieces, remove one so we don't go to Alpine finale
+				if (`SaveManager.HasTimePiece("AlpineSkyline_WeddingCake"))
+				{
+					`SaveManager.GetCurrentSaveData().RemoveTimePiece("AlpineSkyline_WeddingCake");
+					TakenTimePieces.AddItem("AlpineSkyline_WeddingCake");
+				}
 			}
 		}
 		else
@@ -279,15 +295,6 @@ event PreBeginPlay()
 				}
 			}
 		}
-	}
-	
-	SlotData = new class'Archipelago_SlotData';
-	path = "APRandomizer/slot_data"$`SaveManager.GetCurrentSaveData().CreationTimeStamp;
-	
-	if (class'Engine'.static.BasicLoadObject(SlotData, path, false, 1))
-	{
-		SlotData.Initialized = true;
-		UpdateChapterInfo();
 	}
 }
 

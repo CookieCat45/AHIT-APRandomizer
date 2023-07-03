@@ -544,7 +544,7 @@ static function class<Hat_SnatcherContract_Act> GetContractFromID(int id)
 		
 		case 300201:
 			return class'Hat_SnatcherContract_Toilet';
-
+		
 		case 300202:
 			return class'Hat_SnatcherContract_Vanessa';
 		
