@@ -10,6 +10,7 @@ var Archipelago_ItemResender ItemResender;
 var bool ActMapChange;
 var bool IsItemTimePiece; // used to tell if a time piece being given to us is from AP or not
 var bool CollectiblesShuffled;
+var transient bool ContractEventActive;
 var array<string> PlayerNames;
 
 // see PreBeginPlay()
@@ -138,6 +139,7 @@ event OnHookedActorSpawn(Object newActor, Name identifier)
 					|| newActor.IsA('Hat_SnatcherContractEvent_IceBroken'))
 				{
 					DebugMessage("Hooking contract event: " $newActor.name);
+					ContractEventActive = true;
 					save = `SaveManager.GetCurrentSaveData();
 					
 					for (i = 0; i < SlotData.ObtainedContracts.Length; i++)
@@ -524,7 +526,7 @@ function CheckForNewContracts()
 	for (i = 0; i < save.SnatcherContracts.Length; i++)
 	{
 		if (save.SnatcherContracts[i] == None 
-		|| DoesPlayerReallyHaveContract(save.SnatcherContracts[i]) 
+		|| !ContractEventActive && DoesPlayerReallyHaveContract(save.SnatcherContracts[i])
 		|| SlotData.CheckedContracts.Find(save.SnatcherContracts[i]) != -1)
 			continue;
 		
@@ -849,7 +851,7 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 		shuffled = GetShuffledAct(act, basement);
 	}
 	
-	if (shuffled == None)
+	if (shuffled == None && basement == 0)
 	{
 		DebugMessage("[ERROR] Failed to find shuffled act for " $act);
 		ScriptTrace();
@@ -1873,6 +1875,8 @@ function OnContractEventEnd()
 {
 	local int i;
 	local Hat_SaveGame save;
+
+	ContractEventActive = false;
 	
 	if (SlotData.TakenContracts.Length == 0)
 		return;
