@@ -24,6 +24,8 @@ You will need the Steam release of A Hat in Time.
 When you create a new save file, you should be prompted to enter your slot name, password, and AP server address:port after loading into the Spaceship.
 
 # Console Commands
+Console Commands will not work on the titlescreen. You must be in game to use them.
+
 `ap_set_connection_info <IP> <port>`
 Change the IP and port that the client will connect to on this save file. The IP *MUST* be in double quotes!
 
