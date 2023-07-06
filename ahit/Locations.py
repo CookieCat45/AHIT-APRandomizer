@@ -116,6 +116,7 @@ ahit_locations = {
     "Murder on the Owl Express - Raven Suite Room": LocData(305701, "Murder on the Owl Express",
                                                             required_hats=[HatType.BREWING]),
     "Murder on the Owl Express - Raven Suite Top": LocData(305312, "Murder on the Owl Express"),
+    "Murder on the Owl Express - Lounge Chest": LocData(303963, "Murder on the Owl Express"),
 
     "Picture Perfect - Behind Badge Seller": LocData(304307, "Picture Perfect"),
     "Picture Perfect - Hats Buy Building": LocData(304530, "Picture Perfect"),
