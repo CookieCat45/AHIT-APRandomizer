@@ -195,7 +195,7 @@ rift_access_regions = {
 
     "Time Rift - The Owl Express":      ["Murder on the Owl Express"],
     "Time Rift - The Moon":             ["Picture Perfect", "The Big Parade"],
-    "Time Rift - Dead Bird Studio":     ["Dead Bird Studio"],
+    "Time Rift - Dead Bird Studio":     ["Dead Bird Studio", "Dead Bird Studio Basement"],
 
     "Time Rift - Pipe":          ["Contractual Obligations", "The Subcon Well",
                                   "Toilet of Doom", "Queen Vanessa's Manor",

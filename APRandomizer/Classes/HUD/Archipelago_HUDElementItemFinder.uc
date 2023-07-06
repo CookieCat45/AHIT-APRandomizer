@@ -9,43 +9,52 @@ var array<int> BrewingHatRequiredLocs;
 
 function UpdateClosestMarker(HUD H)
 {
-	local Archipelago_RandomizedItem_Base dec;
+	local Archipelago_RandomizedItem_Base item;
 	local Hat_Collectible_StoryBookPage page;
 	local Hat_TreasureChest_Base chest;
 	local Hat_Collectible_DeathWishLevelToken dwlt;
 	local float closest_distance;
-	local int bestindx, i;
-	local bool HasAnyDeathWishLevelTokens;
+	local int bestindx, i, mode;
+	local bool HasAnyDeathWishLevelTokens, onlyImportant;
 	local Hat_ImpactInteract_Breakable_ChemicalBadge b;
+	local Archipelago_GameMod m;
+	local Actor a;
 	
+	m = `AP;
 	bestindx = INDEX_NONE;
 	MarkerPositions.Length = 0;
 	MarkerClasses.Length = 0;
 	closest_distance = 0;
 	
+	// Depending on our mode, we either point to the closest item, point to only important items, or point to important items first.
+	mode = m.SlotData.CompassBadgeMode;
+	onlyImportant = (mode == 2 || mode == 3 && AreImportantItemsLeft(H));
+	
 	// Iterations
-	foreach H.PlayerOwner.DynamicActors(class'Archipelago_RandomizedItem_Base', dec)
+	foreach H.PlayerOwner.DynamicActors(class'Archipelago_RandomizedItem_Base', item)
 	{
-		if (dec.PickupActor != None) continue;
-		if (!CanReachLocation(dec.LocationId)) continue;
-		UpdateClosestMarker_Actor(H, dec, closest_distance, bestindx);
+		if (item.PickupActor != None) continue;
+		if (!CanReachLocation(item.LocationId)) continue;
+		if (onlyImportant && item.ItemFlags == ItemFlag_Garbage) continue;
+
+		UpdateClosestMarker_Actor(H, item, closest_distance, bestindx);
 	}
 	
 	foreach H.PlayerOwner.DynamicActors(class'Hat_TreasureChest_Base', chest)
 	{
 		if (chest.Content == None) continue;
 		if (chest.Opened) continue;
-		if (`AP.ChestArray.Find(chest) == -1) continue;
+		if (m.ChestArray.Find(chest) == -1) continue;
+		if (!CanReachLocation(m.ObjectToLocationId(chest))) continue;
+		if (onlyImportant && m.ImportantContainers.Find(chest) == -1) continue;
 		
-		if (!CanReachLocation(`AP.ObjectToLocationId(chest))) continue;
-		
-		//if (class<Hat_Collectible_Decoration>(chest.Content) == None && class<Hat_Collectible_RouletteToken>(chest.Content) == None) continue;
 		UpdateClosestMarker_Actor(H, chest, closest_distance, bestindx);
 	}
 	
+	// pages ignore onlyImportant, since they're the only items to collect in rifts
 	foreach H.PlayerOwner.DynamicActors(class'Hat_Collectible_StoryBookPage', page)
 	{
-		if (!CanReachLocation(`AP.ObjectToLocationId(page))) continue;
+		if (!CanReachLocation(m.ObjectToLocationId(page))) continue;
 		UpdateClosestMarker_Actor(H, page, closest_distance, bestindx);
 	}
 	
@@ -53,7 +62,8 @@ function UpdateClosestMarker(HUD H)
 	{
 		foreach H.PlayerOwner.DynamicActors(class'Hat_ImpactInteract_Breakable_ChemicalBadge', b)
 		{
-			if (!CanReachLocation(`AP.ObjectToLocationId(b))) continue;
+			if (!CanReachLocation(m.ObjectToLocationId(b))) continue;
+			if (onlyImportant && m.ImportantContainers.Find(b) == -1) continue;
 			
 			for (i = 0; i < b.Rewards.Length; i++)
 			{
@@ -63,6 +73,18 @@ function UpdateClosestMarker(HUD H)
 					break;
 				}
 			}
+		}
+	}
+	
+	foreach H.PlayerOwner.DynamicActors(class'Actor', a)
+	{
+		if (a.IsA('Hat_Goodie_Vault_Base') || a.IsA('Hat_NPC_Bullied'))
+		{
+			if (!CanReachLocation(m.ObjectToLocationId(a))) continue;
+			if (m.OpenedContainers.Find(a) != -1) continue;
+			if (onlyImportant && m.ImportantContainers.Find(a) == -1) continue;
+			
+			UpdateClosestMarker_Actor(H, a, closest_distance, bestindx);
 		}
 	}
 	
@@ -96,20 +118,39 @@ function UpdateClosestMarker(HUD H)
 	}
 }
 
-function bool UpdateClosestMarker_Actor(HUD H, Actor dec, out float closest_distance, out int bestindx)
+function bool Tick(HUD H, float d)
+{
+	IdleTime = 10.0;
+	return Super.Tick(H, d);
+}
+
+function bool AreImportantItemsLeft(HUD H, optional bool traps=true)
+{
+	local Archipelago_RandomizedItem_Base item;
+	
+	foreach H.PlayerOwner.DynamicActors(class'Archipelago_RandomizedItem_Base', item)
+	{
+		if (item.ItemFlags != ItemFlag_Garbage && (traps || item.ItemFlags != ItemFlag_Trap))
+			return false;
+	}
+	
+	return `AP.ImportantContainers.Length > 0;
+}
+
+function bool UpdateClosestMarker_Actor(HUD H, Actor item, out float closest_distance, out int bestindx)
 {
 	local float distance;
-	local Vector decloc;
+	local Vector itemloc;
 	
-	decloc = dec.Location;
-	distance = VSize((H.PlayerOwner.Pawn.Location - decloc)*vect(1,1,4));
+	itemloc = item.Location;
+	distance = VSize((H.PlayerOwner.Pawn.Location - itemloc)*vect(1,1,4));
 	
 	if (bestindx >= 0 && distance >= closest_distance) return false;
 	
 	closest_distance = distance;
 	
-	MarkerPositions.AddItem(decloc);
-	MarkerClasses.AddItem(dec.Class);
+	MarkerPositions.AddItem(itemloc);
+	MarkerClasses.AddItem(item.Class);
 	bestindx = MarkerPositions.Length - 1;
 	return true;
 }

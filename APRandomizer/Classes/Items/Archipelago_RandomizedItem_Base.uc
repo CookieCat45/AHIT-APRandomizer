@@ -13,7 +13,7 @@ var int LocationId;
 var int ItemId;
 var int ItemOwner;
 var int ItemFlags;
-var bool OwnItem;
+var int Player;
 var string ItemDisplayName;
 var string ItemDesc;
 var Surface HUDIcon;
@@ -53,6 +53,8 @@ simulated function bool OnCollected(Actor Collector)
 	local Hat_PlayerController pc;
 	local Hat_Loadout loadout;
 	local Hat_LoadoutBackpackItem item;
+	local bool autoEquip;
+	local int i, count;
 	
 	if (LightComponent != None)
 		LightComponent.SetEnabled(false);
@@ -69,12 +71,25 @@ simulated function bool OnCollected(Actor Collector)
 		{
 			pc = Hat_PlayerController(Pawn(Collector).controller);
 			item = class'Hat_Loadout'.static.MakeLoadoutItem(InventoryClass);
-			
+
 			if (item != None)
 			{
 				loadout = pc.GetLoadout();
-				
-				if (!loadout.AddBackpack(item, true, true, Hat_Player(Collector)))
+				autoEquip = true;
+				if (class'Hat_Loadout'.static.IsClassBadge(InventoryClass))
+				{
+					for (i = 0; i < loadout.MyLoadout.Badges.Length; i++)
+					{
+						if (loadout.MyLoadout.Badges[i] != None)
+						{
+							count += 1;
+						}
+					}
+					
+					autoEquip = (count < `SaveManager.GetNumberOfBadgeSlots());
+				}
+
+				if (!loadout.AddBackpack(item, autoEquip, true, Hat_Player(Collector)))
 				{
 					loadout.AddCollectible(InventoryClass);
 				}
@@ -127,7 +142,7 @@ function bool WasFromServer()
 
 function bool IsOwnItem()
 {
-	return OwnItem;
+	return ItemOwner == `AP.SlotData.PlayerSlot;
 }
 
 simulated function OnCollectedDisappear(Actor a)
@@ -153,7 +168,7 @@ simulated function OnCollectedDisappear(Actor a)
 
 function bool ShouldDoSpinEffect()
 {
-	return DoSpinEffect && (!IsOwnItem() || WasFromServer() || !`AP.IsFullyConnected());
+	return DoSpinEffect && (!IsOwnItem() || WasFromServer());
 }
 
 defaultproperties

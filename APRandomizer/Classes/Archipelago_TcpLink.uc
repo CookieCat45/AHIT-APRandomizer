@@ -18,7 +18,7 @@ event PostBeginPlay()
 	
 	if (`AP.SlotData.ConnectedOnce)
 	{
-		Connect();
+		Connect(true);
 	}
 	else
 	{
@@ -26,10 +26,18 @@ event PostBeginPlay()
 	}
 }
 
-function Connect()
+function Connect(optional bool retry)
 {
-	if (FullyConnected)
+	if (FullyConnected || ConnectingToAP)
 		return;
+	
+	if (LinkState == STATE_Connecting)
+	{
+		if (retry)
+			SetTimer(1.0, false, NameOf(Connect));
+		
+		return;
+	}
 	
 	`AP.ScreenMessage("Connecting to host: " $`AP.SlotData.Host$":"$`AP.SlotData.Port);
     Resolve(`AP.SlotData.Host);
@@ -46,7 +54,9 @@ event Resolved(IpAddr Addr)
     if (!Open(Addr))
     {
         `AP.ScreenMessage("Failed to open connection to "$`AP.SlotData.Host $":"$`AP.SlotData.Port);
-		`AP.OpenConnectBubble(1.0);
+		ClearTimer(NameOf(Connect));
+		ClearTimer(NameOf(TimedOut));
+		Destroy();
     }
 }
 
@@ -55,14 +65,17 @@ function TimedOut()
 	if (!FullyConnected && !ConnectingToAP)
 	{
 		`AP.ScreenMessage("Connection attempt to " $`AP.SlotData.Host$":" $`AP.SlotData.Port $" timed out");
-		`AP.OpenConnectBubble(1.0);
+		ClearTimer(NameOf(Connect));
+		Destroy();
 	}
 }
 
 event ResolveFailed()
 {
     `AP.ScreenMessage("Unable to resolve " $`AP.SlotData.Host $":"$`AP.SlotData.Port);
-	`AP.OpenConnectBubble(1.0);
+	ClearTimer(NameOf(Connect));
+	ClearTimer(NameOf(TimedOut));
+	Destroy();
 }
 
 event Opened()
@@ -70,6 +83,7 @@ event Opened()
 	local string crlf;
 	
 	ClearTimer(NameOf(TimedOut));
+	ClearTimer(NameOf(Connect));
 	
 	crlf = chr(13)$chr(10);
 	LinkMode = MODE_Line;
@@ -100,6 +114,7 @@ function ConnectToAP()
 {
 	local JsonObject json;
 	local JsonObject jsonVersion;
+	local string message;
 	
 	ConnectingToAP = true;
 	CurrentMessage = "";
@@ -110,7 +125,7 @@ function ConnectToAP()
 	json.SetStringValue("name", `AP.SlotData.SlotName);
 	json.SetStringValue("password", `AP.SlotData.Password);
 	json.SetStringValue("uuid", "");
-	json.SetStringValue("tags", "");
+	
 	json.SetIntValue("items_handling", 7);
 	json.SetBoolValue("slot_data", true);
 	
@@ -120,8 +135,22 @@ function ConnectToAP()
 	jsonVersion.SetStringValue("build", "1");
 	jsonVersion.SetStringValue("class", "Version");
 	json.SetObject("version", jsonVersion);
+
+	if (`AP.SlotData.DeathLink)
+	{
+		json.SetStringValue("tags", "[\"DeathLink\"]");
+	}
+	else
+	{
+		json.SetStringValue("tags", "");
+	}
 	
-	SendBinaryMessage(`AP.EncodeJson2(json));
+	// remove "" from tags array
+	message = `AP.EncodeJson2(json);
+	message = Repl(message, "\"[", "[");
+	message = Repl(message, "]\"", "]");
+	
+	SendBinaryMessage(message);
 	json = None;
 	jsonVersion = None;
 }
@@ -129,9 +158,14 @@ function ConnectToAP()
 event Tick(float d)
 {
 	local byte byteMessage[255];
-	local int count;
-	local int i;
+	local int count, i;
 	local string character, pong;
+	
+	if (LinkState == STATE_Connecting)
+	{
+		Super.Tick(d);
+		return;
+	}
 	
 	// Messages from the AP server are not null-terminated, so it must be done this way.
 	// We can only read 255 bytes from the socket at a time.
@@ -354,13 +388,14 @@ function bool IsValidMessageType(string msgType)
 // TODO: Cache locations and their items per map so we don't have to do this every time.
 function OnLocationInfoCommand(string json)
 {
-	local bool b;
+	local bool b, isItem;
 	local int i, locId, count;
 	local string s;
 	local JsonObject jsonObj, jsonChild;
 	local Archipelago_RandomizedItem_Base item;
 	local Hat_Collectible_Important collectible;
 	local class<Archipelago_ShopItem_Base> shopItemClass;
+	local Actor container;
 	
 	`AP.ReplOnce(json, "locations", "locations_0", json, true);
 	b = true;
@@ -398,6 +433,8 @@ function OnLocationInfoCommand(string json)
 		}
 		else
 		{
+			isItem = false;
+
 			foreach DynamicActors(class'Hat_Collectible_Important', collectible)
 			{
 				if (collectible.IsA('Hat_Collectible_VaultCode_Base') || collectible.IsA('Hat_Collectible_InstantCamera'))
@@ -414,11 +451,23 @@ function OnLocationInfoCommand(string json)
 						jsonChild.GetIntValue("player"),
 						collectible);
 					
+					isItem = true;
 					collectible.Destroy();
+					break;
 				}
 			}
 			
 			locId = jsonChild.GetIntValue("location");
+			if (!isItem && `AP.IsLocationIDContainer(locId, container))
+			{
+				if (jsonChild.GetIntValue("flags") != ItemFlag_Garbage)
+				{
+					`AP.ImportantContainers.AddItem(container);
+				}
+				
+				continue;
+			}
+			
 			if (locId == `AP.CameraBadgeCheck1 || locId == `AP.CameraBadgeCheck2)
 			{
 				if (locId == `AP.CameraBadgeCheck1 && `AP.HasAPBit("Camera1Check", 1)
@@ -469,7 +518,6 @@ function Archipelago_RandomizedItem_Base CreateItem(int locId, int itemId, int f
 	item.ItemId = itemId;
 	item.ItemFlags = flags;
 	item.ItemOwner = player;
-	item.OwnItem = (`AP.SlotData.PlayerSlot == player);
 	
 	if (collectible != None)
 	{

@@ -52,14 +52,30 @@ exec function ap_connect()
 exec function ap_deathlink()
 {
 	local bool val;
-
-	val = `AP.SlotData.DeathLink;
-	if (val)
-		`AP.ScreenMessage("Death Link disabled.");
-	else
-		`AP.ScreenMessage("Death Link enabled.");
+	local string message;
 	
-	`AP.SlotData.DeathLink = !val;
+	if (`AP.Client == None || !`AP.IsFullyConnected())
+	{
+		`AP.ScreenMessage("You are not connected.");
+		return;
+	}
+	
+	val = !`AP.SlotData.DeathLink;
+	
+	if (val)
+	{
+		message = "[{\"cmd\": \"ConnectUpdate\", \"tags\": [\"DeathLink\"]}]";
+		`AP.ScreenMessage("Death Link enabled.");
+	}
+	else
+	{
+		message = "[{\"cmd\": \"ConnectUpdate\", \"tags\": []}]";
+		`AP.ScreenMessage("Death Link disabled.");
+	}
+	
+	`AP.Client.SendBinaryMessage(message);
+	`AP.SlotData.DeathLink = val;
+	`AP.SaveGame();
 }
 
 // -------------------------------------------- DEBUG COMMANDS -------------------------------------------- \\

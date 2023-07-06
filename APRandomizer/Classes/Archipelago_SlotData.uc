@@ -17,6 +17,8 @@ var bool ShuffleStorybookPages;
 var bool ShuffleActContracts;
 var bool DeathLink;
 
+var int CompassBadgeMode;
+
 var int Chapter1Cost;
 var int Chapter2Cost;
 var int Chapter3Cost;

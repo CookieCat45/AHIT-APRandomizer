@@ -1,4 +1,4 @@
-from BaseClasses import Item, ItemClassification, Region
+from BaseClasses import Item, ItemClassification, Region, LocationProgressType
 
 from .Items import HatInTimeItem, item_table, time_pieces, item_frequencies, item_dlc_enabled, junk_weights,\
     create_item, create_multiple_items, create_junk_items, relic_groups, act_contracts
@@ -100,6 +100,11 @@ class HatInTimeWorld(World):
         if self.multiworld.ShuffleActContracts[self.player].value == 0:
             for name in contract_locations.keys():
                 self.multiworld.get_location(name, self.player).place_locked_item(create_item(self, name))
+        else:
+            # The bag trap contract check needs to be excluded, because if the player has the Subcon Well contract,
+            # the trap will not activate, locking the player out of the check permanently
+            self.multiworld.get_location("Snatcher's Contract - The Subcon Well",
+                                         self.player).progress_type = LocationProgressType.EXCLUDED
 
     def set_rules(self):
         self.act_connections = {}

@@ -7,10 +7,13 @@ var Archipelago_TcpLink Client;
 var Archipelago_BroadcastHandler Broadcaster;
 var Archipelago_SlotData SlotData;
 var Archipelago_ItemResender ItemResender;
-var bool ActMapChange;
-var bool IsItemTimePiece; // used to tell if a time piece being given to us is from AP or not
-var bool CollectiblesShuffled;
+var transient bool ActMapChange;
+var transient bool IsItemTimePiece; // used to tell if a time piece being given to us is from AP or not
+var transient bool CollectiblesShuffled;
+var transient bool ControllerCapsLock;
 var transient bool ContractEventActive;
+var array<Actor> ImportantContainers;
+var array<Actor> OpenedContainers; // Only necessary for vaults/old guys in Mafia Town
 var array<string> PlayerNames;
 
 // see PreBeginPlay()
@@ -166,12 +169,15 @@ event OnHookedActorSpawn(Object newActor, Name identifier)
 	}
 }
 
-// Override the player's input class so we can use our own console commands (without conflicting with Console Commands Plus)
+// Override the player's input class so we can use our own console commands (without conflicting with Console Commands Plus!)
 function EnableConsoleCommands()
 {
-	local Hat_PlayerController c;
+	local PlayerController c;
 	
-	c = Hat_PlayerController(GetALocalPlayerController());
+	if (!IsArchipelagoEnabled())
+		return;
+	
+	c = GetALocalPlayerController();
 	c.Interactions.RemoveItem(c.PlayerInput);
 	c.PlayerInput = None;
 	c.InputClass = class'Archipelago_CommandHelper';
@@ -185,6 +191,9 @@ function CreateClient(optional float delay=0.0)
 		SetTimer(delay, false, NameOf(CreateClient));
 		return;
 	}
+
+	if (client != None)
+		return;
 	
 	client = Spawn(class'Archipelago_TcpLink');
 }
@@ -195,7 +204,7 @@ event PreBeginPlay()
 	local Hat_SaveGame save;
 	local string path;
 	local int i;
-
+	
 	Super.PreBeginPlay();
 	
 	if (bool(DisableInjection) || `GameManager.GetCurrentMapFilename() ~= `GameManager.TitleScreenMapName)
@@ -243,18 +252,6 @@ event PreBeginPlay()
 					// Give a dummy contract.
 					// The PlayerController hasn't spawned yet, so this will generate an Accessed None warning, but W/E.
 					save.GiveContract(class'Hat_SnatcherContract_Act', GetALocalPlayerController());
-				}
-				
-				// If we have the Subcon Well contract, remove it or else the player may permanently miss the bag trap contract check
-				if (SlotData.ShuffleActContracts)
-				{
-					if (SlotData.ObtainedContracts.Find(class'Hat_SnatcherContract_IceWall') != -1
-					&& SlotData.CheckedContracts.Find(class'Hat_SnatcherContract_IceWall') == -1)
-					{
-						save.SnatcherContracts.RemoveItem(class'Hat_SnatcherContract_IceWall');
-						save.CompletedSnatcherContracts.RemoveItem(class'Hat_SnatcherContract_IceWall');
-						SlotData.TakenContracts.AddItem(class'Hat_SnatcherContract_IceWall');
-					}
 				}
 			}
 			
@@ -577,7 +574,8 @@ function OpenSlotNameBubble(optional float delay=0.0)
 	hud = Hat_HUD(Hat_PlayerController(GetALocalPlayerController()).MyHUD);
 	bubble = Archipelago_HUDElementBubble(hud.OpenHUD(class'Archipelago_HUDElementBubble'));
 	bubble.BubbleType = BubbleType_SlotName;
-	bubble.OpenInputText(hud, "Please enter your slot name.", class'Hat_ConversationType_Regular', 'a', 25);
+	bubble.OpenInputText(hud, "Please enter your slot name. If you are using a controller, hold the X button for capital letters.", 
+	class'Hat_ConversationType_Regular', 'a', 25);
 }
 
 function OpenPasswordBubble(optional float delay=0.0)
@@ -594,7 +592,7 @@ function OpenPasswordBubble(optional float delay=0.0)
 	hud = Hat_HUD(Hat_PlayerController(GetALocalPlayerController()).MyHUD);
 	bubble = Archipelago_HUDElementBubble(hud.OpenHUD(class'Archipelago_HUDElementBubble'));
 	bubble.BubbleType = BubbleType_Password;
-	bubble.OpenInputText(hud, "Please enter password (if there is none, just left-click).", class'Hat_ConversationType_Regular', 'a', 25);
+	bubble.OpenInputText(hud, "Please enter password (if there is none, just left-click or press Y if on controller).", class'Hat_ConversationType_Regular', 'a', 25);
 }
 
 function OpenConnectBubble(optional float delay=0.0)
@@ -611,7 +609,7 @@ function OpenConnectBubble(optional float delay=0.0)
 	hud = Hat_HUD(Hat_PlayerController(GetALocalPlayerController()).MyHUD);
 	bubble = Archipelago_HUDElementBubble(hud.OpenHUD(class'Archipelago_HUDElementBubble'));
 	bubble.BubbleType = BubbleType_Connect;
-	bubble.OpenInputText(hud, "Please enter IP:Port.", class'Hat_ConversationType_Regular', 'a', 25);
+	bubble.OpenInputText(hud, "Please enter IP:Port. If you are using a controller, - may be used in place of :", class'Hat_ConversationType_Regular', 'a', 25);
 }
 
 function KeepConnectionAlive()
@@ -666,7 +664,7 @@ function LoadSlotData(JsonObject json)
 	local array<Hat_ChapterInfo> chapters;
 	local array<string> actNames;
 	local ShuffledAct actShuffle;
-	local string n, path;
+	local string n;
 	local int i, j, v;
 	
 	if (SlotData.Initialized)
@@ -677,6 +675,8 @@ function LoadSlotData(JsonObject json)
 	SlotData.ShuffleStorybookPages = json.GetBoolValue("ShuffleStorybookPages");
 	SlotData.ShuffleActContracts = json.GetBoolValue("ShuffleActContracts");
 	SlotData.DeathLink = json.GetBoolValue("death_link");
+	
+	SlotData.CompassBadgeMode = json.GetIntValue("CompassBadgeMode");
 	
 	SlotData.Chapter1Cost = json.GetIntValue("Chapter1Cost");
 	SlotData.Chapter2Cost = json.GetIntValue("Chapter2Cost");
@@ -739,12 +739,7 @@ function LoadSlotData(JsonObject json)
 		DebugMessage("FOUND act pair:" $"DeadBirdBasement" $"REPLACED WITH: " $n);
 	}
 	
-	path = "APRandomizer/slot_data"$`SaveManager.GetCurrentSaveData().CreationTimeStamp;	
-	if (class'Engine'.static.BasicSaveObject(SlotData, path, false, 1, true))
-	{
-		DebugMessage("Saved slot data to file successfully!");
-	}
-	
+	SaveGame();
 	SlotData.Initialized = true;
 	UpdateChapterInfo();
 }
@@ -1304,11 +1299,12 @@ function ShuffleCollectibles()
 {
 	local Hat_Collectible_Important collectible;
 	local Hat_NPC npc;
-	//local class<Actor> actorClass;
+	local int locId, i;
+	local Actor vault;
 	local array<int> locationArray;
 	local array<class<Object>> shopItemClasses;
 	local class<Object> shopItem;
-
+	
 	if (CollectiblesShuffled)
 		return;
 	
@@ -1336,18 +1332,35 @@ function ShuffleCollectibles()
 		locationArray.AddItem(CameraBadgeCheck2);
 	}
 	
-	// We can spawn the items when we receive a LocationInfo packet from the server; we still need the XYZ locations of the collectibles on the map
-	if (locationArray.Length > 0)
-		SendMultipleLocationChecks(locationArray, true);
-		
+	for (i = 0; i < ChestArray.Length; i++)
+	{
+		locationArray.AddItem(ObjectToLocationId(ChestArray[i]));
+	}
+	
+	foreach DynamicActors(class'Actor', vault)
+	{
+		if (vault.IsA('Hat_Goodie_Vault_Base'))
+			locationArray.AddItem(ObjectToLocationId(vault));
+	}
+	
 	BulliedNPCArray.Length = 0;
 	foreach DynamicActors(class'Hat_NPC', npc)
 	{
 		if (npc.bHidden || !npc.IsA('Hat_NPC_Bullied'))
 			continue;
+		
+		locId = ObjectToLocationId(npc);
+		if (locId != 303832 && locId != 303833)
+			continue;
 			
 		BulliedNPCArray.AddItem(npc);
+		locationArray.AddItem(locId);
 	}
+	
+	// We can spawn the items when we receive a LocationInfo packet from the server
+	// We need containers like chests to determine if they are important or not
+	if (locationArray.Length > 0)
+		SendMultipleLocationChecks(locationArray, true);
 	
 	locationArray.Length = 0;
 	shopItemClasses = class'Hat_ClassHelper'.static.GetAllScriptClasses("Archipelago_ShopItem_Base");
@@ -1457,6 +1470,8 @@ function IterateChestArray()
 		
 		locationArray.AddItem(ObjectToLocationId(ChestArray[i]));
 		ChestArray.RemoveItem(ChestArray[i]);
+		ImportantContainers.RemoveItem(ChestArray[i]);
+		OpenedContainers.AddItem(ChestArray[i]);
 	}
 	
 	for (i = 0; i < BulliedNPCArray.Length; i++)
@@ -1475,6 +1490,8 @@ function IterateChestArray()
 		}
 		
 		locationArray.AddItem(ObjectToLocationId(BulliedNPCArray[i]));
+		ImportantContainers.RemoveItem(BulliedNPCArray[i]);
+		OpenedContainers.AddItem(BulliedNPCArray[i]);
 		BulliedNPCArray.RemoveItem(BulliedNPCArray[i]);
 	}
 	
@@ -1482,6 +1499,27 @@ function IterateChestArray()
 	{
 		SendMultipleLocationChecks(locationArray);
 	}
+}
+
+function bool IsLocationIDContainer(int id, optional out Actor container)
+{
+	local Actor a;
+	
+	foreach DynamicActors(class'Actor', a)
+	{
+		if (a.IsA('Hat_TreasureChest_Base') || a.IsA('Hat_Goodie_Vault_Base') || a.IsA('Hat_NPC_Bullied')
+		|| a.IsA('Hat_ImpactInteract_Breakable_ChemicalBadge'))
+		{
+			if (ObjectToLocationId(a) == id)
+			{
+				DebugMessage("Found container: "$a.Name $", ID: "$id);
+				container = a;
+				return true;
+			}
+		}
+	}
+	
+	return false;
 }
 
 // for breakable objects that contain important items
@@ -1512,6 +1550,7 @@ function OnPreBreakableBreak(Actor Breakable, Pawn Breaker)
 				continue;
 			
 			b.Rewards.RemoveItem(b.Rewards[i]);
+			b.RememberDestroyed = false;
 			hasImportantItem = true;
 		}
 		
@@ -1535,6 +1574,8 @@ function OnPreBreakableBreak(Actor Breakable, Pawn Breaker)
 			rot.Pitch = 16384 + RandRange(rangeMin,rangeMax);
 			vel = Vector(rot)*RandRange(150,300) + vect(0,0,1)*RandRange(200,500);
 			item.Bounce(vel);
+			
+			ImportantContainers.RemoveItem(b);
 		}
 	}
 }
@@ -1605,7 +1646,7 @@ function OnCollectibleSpawned(Object collectible)
 		if (Actor(collectible).Owner != None)
 		{
 			DebugMessage(collectible.Name $"Owner Name: " $Actor(collectible).Owner.Name);
-
+			
 			if (Actor(collectible).Owner.IsA('Hat_Goodie_Vault_Base'))
 			{
 				// We don't have the data of this item so just spawn a misc
@@ -1620,6 +1661,8 @@ function OnCollectibleSpawned(Object collectible)
 				vel = Vector(rot)*RandRange(150,300) + vect(0,0,1)*RandRange(200,500);
 				item.Bounce(vel);
 				
+				ImportantContainers.RemoveItem(Actor(collectible).Owner);
+				OpenedContainers.AddItem(Actor(collectible).Owner);
 				Actor(collectible).Destroy();
 			}
 		}
@@ -1687,7 +1730,7 @@ function OnYarnCollected(optional int amount=1)
 	cost = GetHatYarnCost(abilityClass);
 	index = GetAPBits("HatCraftIndex", 1);
 	
-	if (abilityClass != None)
+	if (abilityClass != None && index <= 5)
 	{
 		if (amount > 0)
 		{
@@ -1905,6 +1948,9 @@ function CheckContractsForDeletion()
 	for (i = 0; i < SelectContracts.Length; i++)
 	{
 		DebugMessage("Contract Class: " $SelectContracts[i].ContractClass);
+		if (SelectContracts[i].ContractClass == class'Hat_SnatcherContract_IceWall')
+			continue;
+		
 		if (SlotData.CheckedContracts.Find(SelectContracts[i].ContractClass) != -1)
 			SelectContracts[i].Destroy();
 	}

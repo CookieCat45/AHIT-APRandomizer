@@ -22,6 +22,17 @@ class StartWithCompassBadge(Toggle):
     default = 1
 
 
+class CompassBadgeMode(Choice):
+    """closest - Compass Badge points to the closest item regardless of classification
+    important_only - Compass Badge points to progression/useful items only
+    important_first - Compass Badge points to progression/useful items first, then it will point to junk items"""
+    display_name = "Compass Badge Mode"
+    default = 1
+    option_closest = 1
+    option_important_only = 2
+    option_important_first = 3
+
+
 class ShuffleStorybookPages(Toggle):
     """If enabled, each storybook page in the purple Time Rifts is an item check.
     The Compass Badge can track these down for you."""
@@ -215,6 +226,7 @@ ahit_options: typing.Dict[str, type(Option)] = {
     "ActRandomizer":            ActRandomizer,
     "RandomizeHatOrder":        RandomizeHatOrder,
     "StartWithCompassBadge":    StartWithCompassBadge,
+    "CompassBadgeMode":         CompassBadgeMode,
     "ShuffleStorybookPages":    ShuffleStorybookPages,
     "ShuffleActContracts":      ShuffleActContracts,
     "StartingChapter":          StartingChapter,

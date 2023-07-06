@@ -1,10 +1,11 @@
 class Archipelago_BubbleTalker_InputText extends Hat_BubbleTalker_InputText;
 
+`include(APRandomizer\Classes\Globals.uci);
+
 function bool InputKey( int ControllerId, name Key, EInputEvent EventType, float AmountDepressed = 1.f, bool bGamepad = FALSE )
 {
 	local string s;
-	local InputText_KilledCharacter kc;
-
+	
 	if (Key == 'LeftShift' || (!bGamepad && Key == 'Hat_Player_Ability'))
 	{
 		if (EventType == IE_Released) IsHoldingLeftShift = false;
@@ -18,24 +19,12 @@ function bool InputKey( int ControllerId, name Key, EInputEvent EventType, float
     
     if (EventType == IE_Pressed || EventType == IE_Repeat)
 	{
-		if (IsUsingGamepad && !bGamePad)
-			return false;
+		//if (IsUsingGamepad && !bGamePad)
+		//	return false;
 		
 		if (Key == 'BackSpace')
 		{
-			if (Len(Result) <= 0)
-				return true;
-			kc.DisplayText = Mid(Result, Len(Result)-1,1);
-			kc.CharacterIndex = Len(Result)-1;
-			kc.LifeTime = 8;
-			kc.Velocity.X = RandRange(-1.0f,1.0f);
-			kc.Velocity.Y = RandRange(2.5f,4.0f);
-			KilledCharacters.AddItem(kc);
-			Result = Left(Result, Len(Result)-1);
-			while (CharactersFadeIn.Length > Len(Result))
-				CharactersFadeIn.Remove(CharactersFadeIn.Length-1,1);
-			PlaySoundToPlayerControllers(KeyboardBackspaceSound);
-			return true;
+			return DeleteCharacter();
 		}
 
 		s = KeyNameToCharacter(Key);
@@ -54,7 +43,7 @@ function bool InputKey( int ControllerId, name Key, EInputEvent EventType, float
             
             // lowercase support
             s = Locs(string(Key));
-			if (IsHoldingLeftShift || IsHoldingRightShift)
+			if (IsHoldingLeftShift || IsHoldingRightShift || bGamePad && `AP.ControllerCapsLock)
             {
                 s = Caps(s);
             }
@@ -65,6 +54,27 @@ function bool InputKey( int ControllerId, name Key, EInputEvent EventType, float
 	}
 
 	return false;
+}
+
+function bool DeleteCharacter()
+{
+	local InputText_KilledCharacter kc;
+	
+	if (Len(Result) <= 0)
+		return true;
+	
+	kc.DisplayText = Mid(Result, Len(Result)-1,1);
+	kc.CharacterIndex = Len(Result)-1;
+	kc.LifeTime = 8;
+	kc.Velocity.X = RandRange(-1.0f,1.0f);
+	kc.Velocity.Y = RandRange(2.5f,4.0f);
+	KilledCharacters.AddItem(kc);
+	Result = Left(Result, Len(Result)-1);
+	
+	while (CharactersFadeIn.Length > Len(Result))
+		CharactersFadeIn.Remove(CharactersFadeIn.Length-1,1);
+	
+	PlaySoundToPlayerControllers(KeyboardBackspaceSound);
 }
 
 function DrawInputText(HUD H, Hat_BubbleTalkerQuestion element, float fTime, float fX, float fY)

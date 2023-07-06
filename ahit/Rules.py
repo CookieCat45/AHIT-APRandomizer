@@ -187,6 +187,19 @@ def set_rules(world: World):
              or state.count_group("UFO", world.player) >= 3
              or state.count_group("Crayon", world.player) >= 3)
 
+    # Old guys don't appear at night
+    add_rule(mw.get_location("Mafia Town - Old Man (Steel Beams)", p),
+             lambda state: state.can_reach("Welcome to Mafia Town", "Region", p)
+             or state.can_reach("Barrel Battle", "Region", p)
+             or state.can_reach("Cheating the Race", "Region", p)
+             or state.can_reach("The Golden Vault", "Region", p))
+
+    add_rule(mw.get_location("Mafia Town - Old Man (Seaside Spaghetti)", p),
+             lambda state: state.can_reach("Welcome to Mafia Town", "Region", p)
+             or state.can_reach("Barrel Battle", "Region", p)
+             or state.can_reach("Cheating the Race", "Region", p)
+             or state.can_reach("The Golden Vault", "Region", p))
+
     # Only available outside She Came from Outer Space
     add_rule(mw.get_location("Mafia Town - Mafia Geek Platform", p),
              lambda state: state.can_reach("Welcome to Mafia Town", "Region", p)
@@ -197,21 +210,37 @@ def set_rules(world: World):
 
     # For some reason, the brewing crate is removed in HUMT
     set_rule(mw.get_location("Mafia Town - Secret Cave", p),
-             lambda state: state.can_reach("Heating Up Mafia Town", "Region", player=p)
+             lambda state: state.can_reach("Heating Up Mafia Town", "Region", p)
              or can_use_hat(state, w, HatType.BREWING))
 
     # Can bounce across the lava to get this without Hookshot (need to die though :P)
     set_rule(mw.get_location("Mafia Town - Above Boats", p),
-             lambda state: state.can_reach("Heating Up Mafia Town", "Region", player=p)
+             lambda state: state.can_reach("Heating Up Mafia Town", "Region", p)
              or can_use_hookshot(state, w))
 
     set_rule(mw.get_location("Act Completion (Cheating the Race)", p),
              lambda state: can_use_hat(state, w, HatType.TIME_STOP)
              or mw.CTRWithSprint[p].value > 0 and can_use_hat(state, w, HatType.SPRINT))
 
+    add_rule(mw.get_location("Dead Bird Studio - Up the Ladder", p),
+             lambda state: state.can_reach("Dead Bird Studio", "Region", p)
+             or state.can_reach("Dead Bird Studio Basement", "Region", p))
+
+    add_rule(mw.get_location("Dead Bird Studio - Red Building Top", p),
+             lambda state: state.can_reach("Dead Bird Studio", "Region", p)
+             or state.can_reach("Dead Bird Studio Basement", "Region", p))
+
+    add_rule(mw.get_location("Dead Bird Studio - Behind Water Tower", p),
+             lambda state: state.can_reach("Dead Bird Studio", "Region", p)
+             or state.can_reach("Dead Bird Studio Basement", "Region", p))
+
+    add_rule(mw.get_location("Dead Bird Studio - Side of House", p),
+             lambda state: state.can_reach("Dead Bird Studio", "Region", p)
+             or state.can_reach("Dead Bird Studio Basement", "Region", p))
+
     set_rule(mw.get_location("Subcon Forest - Boss Arena Chest", p),
-             lambda state: state.can_reach("Toilet of Doom", player=p)
-             or state.can_reach("Your Contract has Expired", player=p))
+             lambda state: state.can_reach("Toilet of Doom", "Region", p)
+             or state.can_reach("Your Contract has Expired", "Region", p))
 
     set_rule(mw.get_location("Act Completion (Time Rift - Village)", p),
              lambda state: can_use_hat(state, w, HatType.BREWING) or state.has("Umbrella", p)
