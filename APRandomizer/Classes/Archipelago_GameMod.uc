@@ -414,7 +414,7 @@ function OnPostInitGame()
 					a.Destroy();
 					continue;
 				}
-
+				
 				// Hide all regular collectibles, just in case
 				a.ShutDown();
 			}
@@ -1340,7 +1340,12 @@ function ShuffleCollectibles()
 	foreach DynamicActors(class'Actor', vault)
 	{
 		if (vault.IsA('Hat_Goodie_Vault_Base'))
+		{
+			if (vault.Name == 'Hat_Goodie_Vault_1') // golden vault
+				continue;
+			
 			locationArray.AddItem(ObjectToLocationId(vault));
+		}
 	}
 	
 	BulliedNPCArray.Length = 0;
@@ -1356,7 +1361,7 @@ function ShuffleCollectibles()
 		BulliedNPCArray.AddItem(npc);
 		locationArray.AddItem(locId);
 	}
-	
+
 	// We can spawn the items when we receive a LocationInfo packet from the server
 	// We need containers like chests to determine if they are important or not
 	if (locationArray.Length > 0)
@@ -1469,9 +1474,9 @@ function IterateChestArray()
 		}
 		
 		locationArray.AddItem(ObjectToLocationId(ChestArray[i]));
-		ChestArray.RemoveItem(ChestArray[i]);
-		ImportantContainers.RemoveItem(ChestArray[i]);
 		OpenedContainers.AddItem(ChestArray[i]);
+		ImportantContainers.RemoveItem(ChestArray[i]);
+		ChestArray.RemoveItem(ChestArray[i]);
 	}
 	
 	for (i = 0; i < BulliedNPCArray.Length; i++)
