@@ -22,3 +22,21 @@ You will need the Steam release of A Hat in Time.
 8. Start up the game using your new shortcut. Go to the game's settings and make sure "Enable Developer Console" is checked.
 
 When you create a new save file, you should be prompted to enter your slot name, password, and AP server address:port after loading into the Spaceship.
+
+# Console Commands
+Console commands will not work on the titlescreen. You must be in game to use them.
+
+`ap_set_connection_info <IP> <port>`
+Change the IP and port that the client will connect to on this save file. The IP *MUST* be in double quotes!
+
+`ap_show_connection_info`
+Shows the current IP and port that the client will connect to on this save file.
+
+`ap_say <message>`
+Sends a chat message to the server. Using commands like `ap_say !release` should also work, though you should use !hint in a text client, because the game is unfortunately not able to print hint messages.
+
+`ap_deathlink`
+Toggle Death Link.
+
+`ap_connect`
+Forces the client to attempt a connection to the server. You shouldn't have to use this, but you can try it if the client won't connect for some reason.
