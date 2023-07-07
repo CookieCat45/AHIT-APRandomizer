@@ -967,7 +967,7 @@ function CheckActTitleCard(Hat_HUD hud)
 
 function OnTimePieceCollected(string Identifier)
 {
-	local int i, id;
+	local int i, id, basement;
 	local Hat_ChapterActInfo currentAct;
 	local string hourglass;
 	local bool actless;
@@ -1006,11 +1006,12 @@ function OnTimePieceCollected(string Identifier)
 		else
 		{
 			// We entered this act from a different act, set the original act's Time Piece instead
-			currentAct = GetActualCurrentAct();
+			currentAct = GetActualCurrentAct(basement);
 			
 			for (i = 0; i < SlotData.ShuffledActList.Length; i++)
 			{
-				if (SlotData.ShuffledActList[i].NewAct == currentAct)
+				if (basement == 0 && SlotData.ShuffledActList[i].NewAct == currentAct 
+				|| basement > 0 && SlotData.ShuffledActList[i].IsDeadBirdBasementShuffledAct)
 				{
 					if (SlotData.ShuffledActList[i].IsDeadBirdBasementOriginalAct)
 					{
@@ -1045,7 +1046,7 @@ function OnTimePieceCollected(string Identifier)
 }
 
 // This is mainly because of Alpine Skyline's finale having an ActID of 1 -.-
-function Hat_ChapterActInfo GetActualCurrentAct()
+function Hat_ChapterActInfo GetActualCurrentAct(optional out int basement)
 {
 	local Hat_ChapterInfo chapter;
 	local Hat_ChapterActInfo act;
@@ -1076,6 +1077,11 @@ function Hat_ChapterActInfo GetActualCurrentAct()
 		{
 			return Hat_ChapterActInfo(DynamicLoadObject("hatintime_chapterinfo.AlpineSkyline.AlpineSkyline_IntroMountain", class'Hat_ChapterActInfo'));
 		}
+	}
+	else if (InStr(map, "DJGrooves_Boss", false, true) != -1 ||
+	map ~= "DeadBirdBasement")
+	{
+		basement = 1;
 	}
 	
 	return `GameManager.GetChapterActInfo();

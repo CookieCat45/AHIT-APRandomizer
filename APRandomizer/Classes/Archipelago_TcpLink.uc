@@ -127,7 +127,7 @@ function ConnectToAP()
 	json.SetStringValue("uuid", "");
 	
 	json.SetIntValue("items_handling", 7);
-	json.SetBoolValue("slot_data", true);
+	json.SetBoolValue("slot_data", !`AP.SlotData.Initialized);
 	
 	jsonVersion = new class'JsonObject';
 	jsonVersion.SetStringValue("major", "0");
@@ -135,7 +135,7 @@ function ConnectToAP()
 	jsonVersion.SetStringValue("build", "1");
 	jsonVersion.SetStringValue("class", "Version");
 	json.SetObject("version", jsonVersion);
-
+	
 	if (`AP.SlotData.DeathLink)
 	{
 		json.SetStringValue("tags", "[\"DeathLink\"]");
