@@ -161,11 +161,10 @@ event Tick(float d)
 	local int count, i;
 	local string character, pong;
 	
-	if (LinkState == STATE_Connecting)
-	{
-		Super.Tick(d);
+	Super.Tick(d);
+	
+	if (LinkState != STATE_Connected)
 		return;
-	}
 	
 	// Messages from the AP server are not null-terminated, so it must be done this way.
 	// We can only read 255 bytes from the socket at a time.
@@ -238,8 +237,6 @@ event Tick(float d)
 			}
 		}
 	}
-	
-	Super.Tick(d);
 }
 
 function string NumberString(string src)
@@ -920,8 +917,10 @@ event Closed()
 	// Destroy ourselves and create a new client. 
 	// Reconnecting with the same client object after closing a connection does not work for some reason.
 	if (!Refused)
-   		`AP.ScreenMessage("Connection was closed. Reconnecting in 5 seconds...");
-
+	{
+		`AP.ScreenMessage("Connection was closed. Reconnecting in 5 seconds... Winsock Error Code: " $GetLastError());
+	}
+	
 	Destroy();
 }
 

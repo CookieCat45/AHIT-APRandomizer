@@ -480,6 +480,11 @@ function OnPostInitGame()
 		}
 	}
 	
+	for (i = 0; i < SlotData.ObtainedContracts.Length; i++)
+	{
+		SlotData.ObtainedContracts[i].static.UnlockActs(save);
+	}
+	
 	// Remove our dummy contract from earlier.
 	if (save.SnatcherContracts.Find(class'Hat_SnatcherContract_Act') != -1)
 	{
@@ -2005,10 +2010,10 @@ function BabyTrapTimer()
 
 function OnPlayerEnterCannon(Pawn Player, Actor Cannon)
 {
-	DropAllBabies(Player, true);
+	DropAllBabies(Player);
 }
 
-function DropAllBabies(Pawn Player, optional bool destroy)
+function DropAllBabies(Pawn Player)
 {
 	local Archipelago_Stackable_Base stack;
 	foreach DynamicActors(class'Archipelago_Stackable_Base', stack)
@@ -2016,23 +2021,24 @@ function DropAllBabies(Pawn Player, optional bool destroy)
 		if (stack.Carrier != Player)
 			continue;
 		
-		stack.ForceDrop();
+		if (stack.StackEffect.Stack.Length == 1)
+		{
+			Hat_PawnCarryable(Player).DropCarry();
+		}
+		else
+		{
+			stack.OnDrop(Player);
+		}
 		
-		if (destroy)
-			stack.Destroy();
-	}
-	
-	if (!Hat_PawnCarryable(Player).IsCarryingItem(true))
-	{
-		Hat_PawnCarryable(Player).SetAnimCarryMode(ECarryMode_None);
-		Hat_HUD(PlayerController(Player.Controller).MyHUD).CloseHUD(class'Hat_HUDElementCarryHelp');
+		stack.CanBeCarried = false;
+		stack.SetTimer(1.0, false, NameOf(Destroy));
 	}
 }
 
 function LaserTrapTimer()
 {
 	local Hat_Player player;
-
+	
 	foreach DynamicActors(class'Hat_Player', player)
 	{
 		if (player.IsA('Hat_Player_MustacheGirl'))
