@@ -1,6 +1,6 @@
 from BaseClasses import Item, ItemClassification, Location, Region
 from .Locations import HatInTimeLocation
-from ..AutoWorld import World
+from worlds.AutoWorld import World
 from .Types import HatDLC
 import typing
 

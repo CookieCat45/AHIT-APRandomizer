@@ -1,5 +1,5 @@
 from BaseClasses import Location
-from ..AutoWorld import World
+from worlds.AutoWorld import World
 from .Types import HatDLC, HatType
 from typing import Optional, NamedTuple, Dict, List
 
@@ -102,10 +102,10 @@ ahit_locations = {
     "Mafia HQ - Bathroom Stall Chest": LocData(303243, "Down with the Mafia!"),
 
     "Dead Bird Studio - Up the Ladder": LocData(304874, "Dead Bird Studio"),  # Can be reached from basement
-    "Dead Bird Studio - DJ Grooves Sign Chest": LocData(303901, "Dead Bird Studio"),
     "Dead Bird Studio - Red Building Top": LocData(305024, "Dead Bird Studio"),  # Can be reached from basement
     "Dead Bird Studio - Behind Water Tower": LocData(305248, "Dead Bird Studio"),  # Can be reached from basement
     "Dead Bird Studio - Side of House": LocData(305247, "Dead Bird Studio"),  # Can be reached from basement
+    "Dead Bird Studio - DJ Grooves Sign Chest": LocData(303901, "Dead Bird Studio"),
     "Dead Bird Studio - Tightrope Chest": LocData(303898, "Dead Bird Studio"),
     "Dead Bird Studio - Tepee Chest": LocData(303899, "Dead Bird Studio"),
     "Dead Bird Studio - Conductor Chest": LocData(303900, "Dead Bird Studio"),

@@ -1,4 +1,4 @@
-from ..AutoWorld import World
+from worlds.AutoWorld import World
 from BaseClasses import Region, Entrance, ItemClassification, Location
 from .Locations import HatInTimeLocation, location_table, storybook_pages, event_locs
 from .Items import HatInTimeItem
@@ -195,7 +195,7 @@ rift_access_regions = {
 
     "Time Rift - The Owl Express":      ["Murder on the Owl Express"],
     "Time Rift - The Moon":             ["Picture Perfect", "The Big Parade"],
-    "Time Rift - Dead Bird Studio":     ["Dead Bird Studio", "Dead Bird Studio Basement"],
+    "Time Rift - Dead Bird Studio":     ["Dead Bird Studio"],
 
     "Time Rift - Pipe":          ["Contractual Obligations", "The Subcon Well",
                                   "Toilet of Doom", "Queen Vanessa's Manor",
@@ -245,6 +245,9 @@ def create_regions(world: World):
     create_rift_connections(w, create_region(w, "Time Rift - Dead Bird Studio"))
     create_rift_connections(w, create_region(w, "Time Rift - The Owl Express"))
     create_rift_connections(w, create_region(w, "Time Rift - The Moon"))
+
+    connect_regions(mw.get_region("Dead Bird Studio Basement", w.player), mw.get_region("Dead Bird Studio", w.player),
+                    "Dead Bird Studio Basement -> Dead Bird Studio", w.player)
 
     subcon_forest = create_region_and_connect(w, "Subcon Forest", "-> Subcon Forest", spaceship)
     sf_act1 = create_region_and_connect(w, "Contractual Obligations", "Subcon Forest - Act 1", subcon_forest)

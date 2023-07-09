@@ -1,5 +1,5 @@
-from ..AutoWorld import World, CollectionState
-from ..generic.Rules import add_rule, set_rule
+from worlds.AutoWorld import World, CollectionState
+from worlds.generic.Rules import add_rule, set_rule
 from .Locations import location_table, humt_locations, tihs_locations, storybook_pages
 from .Types import HatType, ChapterIndex
 from BaseClasses import Location, Entrance, Region
@@ -187,18 +187,20 @@ def set_rules(world: World):
              or state.count_group("UFO", world.player) >= 3
              or state.count_group("Crayon", world.player) >= 3)
 
-    # Old guys don't appear at night
+    # Old guys don't appear in SCFOS
     add_rule(mw.get_location("Mafia Town - Old Man (Steel Beams)", p),
              lambda state: state.can_reach("Welcome to Mafia Town", "Region", p)
              or state.can_reach("Barrel Battle", "Region", p)
              or state.can_reach("Cheating the Race", "Region", p)
-             or state.can_reach("The Golden Vault", "Region", p))
+             or state.can_reach("The Golden Vault", "Region", p)
+             or state.can_reach("Down with the Mafia!", "Region", p))
 
     add_rule(mw.get_location("Mafia Town - Old Man (Seaside Spaghetti)", p),
              lambda state: state.can_reach("Welcome to Mafia Town", "Region", p)
              or state.can_reach("Barrel Battle", "Region", p)
              or state.can_reach("Cheating the Race", "Region", p)
-             or state.can_reach("The Golden Vault", "Region", p))
+             or state.can_reach("The Golden Vault", "Region", p)
+             or state.can_reach("Down with the Mafia!", "Region", p))
 
     # Only available outside She Came from Outer Space
     add_rule(mw.get_location("Mafia Town - Mafia Geek Platform", p),
@@ -222,21 +224,23 @@ def set_rules(world: World):
              lambda state: can_use_hat(state, w, HatType.TIME_STOP)
              or mw.CTRWithSprint[p].value > 0 and can_use_hat(state, w, HatType.SPRINT))
 
-    add_rule(mw.get_location("Dead Bird Studio - Up the Ladder", p),
-             lambda state: state.can_reach("Dead Bird Studio", "Region", p)
-             or state.can_reach("Dead Bird Studio Basement", "Region", p))
+    add_rule(mw.get_location("Dead Bird Studio - DJ Grooves Sign Chest", p),
+             lambda state: state.can_reach("Dead Bird Studio", "Region", p))
 
-    add_rule(mw.get_location("Dead Bird Studio - Red Building Top", p),
-             lambda state: state.can_reach("Dead Bird Studio", "Region", p)
-             or state.can_reach("Dead Bird Studio Basement", "Region", p))
+    add_rule(mw.get_location("Dead Bird Studio - Tightrope Chest", p),
+             lambda state: state.can_reach("Dead Bird Studio", "Region", p))
 
-    add_rule(mw.get_location("Dead Bird Studio - Behind Water Tower", p),
-             lambda state: state.can_reach("Dead Bird Studio", "Region", p)
-             or state.can_reach("Dead Bird Studio Basement", "Region", p))
+    add_rule(mw.get_location("Dead Bird Studio - Tepee Chest", p),
+             lambda state: state.can_reach("Dead Bird Studio", "Region", p))
 
-    add_rule(mw.get_location("Dead Bird Studio - Side of House", p),
-             lambda state: state.can_reach("Dead Bird Studio", "Region", p)
-             or state.can_reach("Dead Bird Studio Basement", "Region", p))
+    add_rule(mw.get_location("Dead Bird Studio - Conductor Chest", p),
+             lambda state: state.can_reach("Dead Bird Studio", "Region", p))
+
+    add_rule(mw.get_location("Act Completion (Dead Bird Studio)", p),
+             lambda state: state.can_reach("Dead Bird Studio", "Region", p))
+
+    add_rule(mw.get_entrance("Dead Bird Studio -> Badge Seller", p),
+             lambda state: state.can_reach("Dead Bird Studio", "Region", p))
 
     set_rule(mw.get_location("Subcon Forest - Boss Arena Chest", p),
              lambda state: state.can_reach("Toilet of Doom", "Region", p)

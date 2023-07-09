@@ -56,7 +56,7 @@ event Resolved(IpAddr Addr)
         `AP.ScreenMessage("Failed to open connection to "$`AP.SlotData.Host $":"$`AP.SlotData.Port);
 		ClearTimer(NameOf(Connect));
 		ClearTimer(NameOf(TimedOut));
-		Destroy();
+		Close();
     }
 }
 
@@ -66,7 +66,7 @@ function TimedOut()
 	{
 		`AP.ScreenMessage("Connection attempt to " $`AP.SlotData.Host$":" $`AP.SlotData.Port $" timed out");
 		ClearTimer(NameOf(Connect));
-		Destroy();
+		Close();
 	}
 }
 
@@ -75,7 +75,7 @@ event ResolveFailed()
     `AP.ScreenMessage("Unable to resolve " $`AP.SlotData.Host $":"$`AP.SlotData.Port);
 	ClearTimer(NameOf(Connect));
 	ClearTimer(NameOf(TimedOut));
-	Destroy();
+	Close();
 }
 
 event Opened()

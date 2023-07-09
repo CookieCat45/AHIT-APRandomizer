@@ -9,7 +9,7 @@ from .Regions import create_region, create_regions, connect_regions, randomize_a
 from .Locations import HatInTimeLocation, location_table, get_total_locations, contract_locations
 from .Types import HatDLC, HatType, ChapterIndex
 from .Options import ahit_options
-from ..AutoWorld import World
+from worlds.AutoWorld import World
 from .Rules import set_rules
 import typing
 

@@ -86,11 +86,8 @@ event OnModLoaded()
 
 event OnModUnloaded()
 {
-	if (Client != None)
-		Client.Destroy();
-	
-	if (Broadcaster != None)
-		Broadcaster.Destroy();
+	if (client != None && client.LinkState == STATE_Connected)
+		client.Close();
 	
 	if (IsArchipelagoEnabled())
 		SaveGame();
@@ -2245,7 +2242,7 @@ function string EncodeJson2(JsonObject json)
 
 function bool IsFullyConnected()
 {
-	return (client != None && client.FullyConnected);
+	return (client != None && client.FullyConnected && client.LinkState == STATE_Connected);
 }
 
 function bool IsDeathLinkEnabled()
