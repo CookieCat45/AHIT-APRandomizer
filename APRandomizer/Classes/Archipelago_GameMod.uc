@@ -98,12 +98,10 @@ event OnModUnloaded()
 
 function SaveGame()
 {
-	local string path;
-	
 	if (SlotData != None && SlotData.Initialized)
 	{
-		path = "APRandomizer/slot_data"$`SaveManager.GetCurrentSaveData().CreationTimeStamp;	
-		if (class'Engine'.static.BasicSaveObject(SlotData, path, false, 1, true))
+		if (class'Engine'.static.BasicSaveObject(SlotData, 
+		"APRandomizer/slot_data"$`SaveManager.GetCurrentSaveData().CreationTimeStamp, false, 1, true))
 		{
 			DebugMessage("Saved slot data to file successfully!");
 		}
@@ -111,10 +109,13 @@ function SaveGame()
 	
 	if (ItemResender != None)
 	{
-		class'Engine'.static.BasicSaveObject(ItemResender, 
-		"APRandomizer/item_resender"$`SaveManager.GetCurrentSaveData().CreationTimeStamp, false, 1, true);
+		if (class'Engine'.static.BasicSaveObject(ItemResender, 
+		"APRandomizer/item_resender"$`SaveManager.GetCurrentSaveData().CreationTimeStamp, false, 1, true))
+		{
+			DebugMessage("Saved item resender to file successfully!");
+		}
 	}
-
+	
 	`SaveManager.SaveToFile(true);
 }
 
@@ -315,10 +316,7 @@ event PostBeginPlay()
 		class'Hat_SaveBitHelper'.static.SetLevelBits("hub_cinematics", 1);
 	}
 	
-	if (ItemResender == None)
-	{
-		ItemResender = new class'Archipelago_ItemResender';
-	}
+	ItemResender = new class'Archipelago_ItemResender';
 }
 
 function OnPostInitGame()
@@ -482,6 +480,7 @@ function OnPostInitGame()
 	
 	for (i = 0; i < SlotData.ObtainedContracts.Length; i++)
 	{
+		// these occasionally get wiped for some reason
 		SlotData.ObtainedContracts[i].static.UnlockActs(save);
 	}
 	
@@ -1961,6 +1960,9 @@ function OnContractEventEnd()
 function CheckContractsForDeletion()
 {
 	local int i;
+	if (IsIceBrokenEvent())
+		return;
+
 	for (i = 0; i < SelectContracts.Length; i++)
 	{
 		DebugMessage("Contract Class: " $SelectContracts[i].ContractClass);
@@ -1972,6 +1974,18 @@ function CheckContractsForDeletion()
 	}
 	
 	SelectContracts.Length = 0;
+}
+
+function bool IsIceBrokenEvent()
+{
+	local Actor a;
+	foreach DynamicActors(class'Actor', a)
+	{
+		if (a.IsA('Hat_SnatcherContractEvent_IceBroken'))
+			return true;
+	}
+	
+	return false;
 }
 
 function BabyTrapTimer()
