@@ -128,7 +128,7 @@ function OnEnter(HUD H)
             if (`AP.Client == None)
                 `AP.CreateClient();
             
-            `AP.Client.Connect(true);
+            `AP.Client.Connect();
             CloseHUD(H);
             break;
     }

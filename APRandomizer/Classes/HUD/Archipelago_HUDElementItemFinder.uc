@@ -81,7 +81,7 @@ function UpdateClosestMarker(HUD H)
 		if (a.IsA('Hat_Goodie_Vault_Base') || a.IsA('Hat_NPC_Bullied'))
 		{
 			if (!CanReachLocation(m.ObjectToLocationId(a))) continue;
-			if (m.OpenedContainers.Find(a) != -1) continue;
+			if (m.SlotData.OpenedContainerIDs.Find(m.ObjectToLocationId(a)) != -1) continue;
 			if (onlyImportant && m.ImportantContainers.Find(a) == -1) continue;
 			
 			UpdateClosestMarker_Actor(H, a, closest_distance, bestindx);

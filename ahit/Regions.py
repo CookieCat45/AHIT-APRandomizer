@@ -315,8 +315,8 @@ def create_regions(world: World):
     connect_regions(mw.get_region("Train Rush", w.player), badge_seller,
                     "Train Rush -> Badge Seller", w.player)
 
-    connect_regions(mw.get_region("Alpine Free Roam", w.player), badge_seller,
-                    "Alpine Free Roam -> Badge Seller", w.player)
+    connect_regions(mw.get_region("Goat Village", w.player), badge_seller,
+                    "Goat Village -> Badge Seller", w.player)
 
     # force recache
     mw.get_region("Time Rift - Sewers", w.player)

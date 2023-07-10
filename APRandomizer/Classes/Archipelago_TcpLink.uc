@@ -18,7 +18,7 @@ event PostBeginPlay()
 	
 	if (`AP.SlotData.ConnectedOnce)
 	{
-		Connect(true);
+		Connect();
 	}
 	else
 	{
@@ -26,19 +26,13 @@ event PostBeginPlay()
 	}
 }
 
-function Connect(optional bool retry)
+function Connect()
 {
-	if (FullyConnected || ConnectingToAP)
+	if (FullyConnected || ConnectingToAP || LinkState == STATE_Connecting)
 		return;
 	
-	if (LinkState == STATE_Connecting)
-	{
-		if (retry)
-			SetTimer(1.0, false, NameOf(Connect));
-		
-		return;
-	}
-	
+	ReceiveMode = RMODE_Event;
+	LinkMode = MODE_Line;
 	`AP.ScreenMessage("Connecting to host: " $`AP.SlotData.Host$":"$`AP.SlotData.Port);
     Resolve(`AP.SlotData.Host);
 	
@@ -51,6 +45,7 @@ event Resolved(IpAddr Addr)
     Addr.Port = `AP.SlotData.Port;
     BindPort();
 	
+	`AP.DebugMessage("Opening connection...");
     if (!Open(Addr))
     {
         `AP.ScreenMessage("Failed to open connection to "$`AP.SlotData.Host $":"$`AP.SlotData.Port);
@@ -86,9 +81,8 @@ event Opened()
 	ClearTimer(NameOf(Connect));
 	
 	crlf = chr(13)$chr(10);
-	LinkMode = MODE_Line;
-	ReceiveMode = RMODE_Event;
 	
+	`AP.DebugMessage("Opened connection, sending HTTP request...");
 	// send HTTP request to server to upgrade to websocket connection
 	SendText("GET / HTTP/1.1" $crlf
 	$"Host: " $`AP.SlotData.Host $crlf
@@ -103,9 +97,11 @@ event Opened()
 event ReceivedLine(string message)
 {
 	ReceiveMode = RMODE_Manual; // event mode seems to cause problems
+	LinkMode = MODE_Binary;
 	
 	if (!FullyConnected && !ConnectingToAP)
 	{
+		`AP.DebugMessage("Received HTTP response, sending Connect packet...");
 		ConnectToAP();
 	}
 }
@@ -163,7 +159,7 @@ event Tick(float d)
 	
 	Super.Tick(d);
 	
-	if (LinkState != STATE_Connected)
+	if (LinkState != STATE_Connected || ReceiveMode == RMODE_Event || LinkMode != MODE_Binary)
 		return;
 	
 	// Messages from the AP server are not null-terminated, so it must be done this way.
@@ -173,66 +169,72 @@ event Tick(float d)
 	{
 		count = ReadBinary(255, byteMessage);
 		
-		if (count > 0)
+		if (count <= 0)
+			return;
+
+		// Check for a ping first
+		if (!ParsingMessage)
 		{
-			// Check for a ping first
-			if (!ParsingMessage)
+			for (i = 0; i < count; i++)
 			{
-				for (i = 0; i < count; i++)
+				CurrentMessage $= Chr(byteMessage[i]);
+			}
+			
+			for (i = 0; i < Len(CurrentMessage); i++)
+			{
+				if (Asc(Mid("a"$CurrentMessage, i, 1)) == `CODE_PING)
 				{
-					CurrentMessage $= Chr(byteMessage[i]);
-				}
-				
-				for (i = 0; i < Len(CurrentMessage); i++)
-				{
-					if (Asc(Mid("a"$CurrentMessage, i, 1)) == `CODE_PING)
-					{
-						// Need to send the same data back as a pong
-						// This is a dumb way to do it, but whatever works.
-						pong = Mid(CurrentMessage, InStr(CurrentMessage, Chr(`CODE_PING), false, true));
-						pong = Mid(pong, 2);
-						SendBinaryMessage(pong, false, true);
-						break;
-					}
-				}
-				
-				CurrentMessage = "";
-				if (pong != "")
-				{
-					Super.Tick(d);
-					return;
+					// Need to send the same data back as a pong
+					// This is a dumb way to do it, but whatever works.
+					pong = Mid(CurrentMessage, InStr(CurrentMessage, Chr(`CODE_PING), false, true));
+					pong = Mid(pong, 2);
+					SendBinaryMessage(pong, false, true);
+					break;
 				}
 			}
 			
-			for (i = 0; i < count; i++)
+			CurrentMessage = "";
+			if (pong != "")
 			{
-				character = Chr(byteMessage[i]);
-				CurrentMessage $= character;
-				
-				if (character == "[")
+				Super.Tick(d);
+				return;
+			}
+		}
+		
+		for (i = 0; i < count; i++)
+		{
+			character = Chr(byteMessage[i]);
+			CurrentMessage $= character;
+			
+			if (character == "[")
+			{
+				// fix odd problem where two square brackets are present at start for some reason
+				if (!ParsingMessage && Chr(byteMessage[i+1]) == "[")
 				{
-					if (ParsingMessage)
-					{
-						BracketCounter--;
-					}
-					else // This is the beginning of a JSON message
-					{
-						CurrentMessage = "[";
-						ParsingMessage = true;
-					}
+					continue;
 				}
-				else if (character == "]")
+				
+				if (ParsingMessage)
 				{
-					BracketCounter++;
-					if (BracketCounter > 0)
-					{
-						// We've got a JSON message, parse it
-						ParseJSON(CurrentMessage);
-						
-						CurrentMessage = "";
-						BracketCounter = 0;
-						ParsingMessage = false;
-					}
+					BracketCounter--;
+				}
+				else // This is the beginning of a JSON message
+				{
+					CurrentMessage = "[";
+					ParsingMessage = true;
+				}
+			}
+			else if (character == "]")
+			{
+				BracketCounter++;
+				if (BracketCounter > 0)
+				{
+					// We've got a JSON message, parse it
+					ParseJSON(CurrentMessage);
+					
+					CurrentMessage = "";
+					BracketCounter = 0;
+					ParsingMessage = false;
 				}
 			}
 		}
@@ -431,7 +433,7 @@ function OnLocationInfoCommand(string json)
 		else
 		{
 			isItem = false;
-
+			
 			foreach DynamicActors(class'Hat_Collectible_Important', collectible)
 			{
 				if (collectible.IsA('Hat_Collectible_VaultCode_Base') || collectible.IsA('Hat_Collectible_InstantCamera'))
@@ -914,20 +916,30 @@ function SendBinaryMessage(string message, optional bool continuation, optional 
 
 event Closed()
 {
-	// Destroy ourselves and create a new client. 
-	// Reconnecting with the same client object after closing a connection does not work for some reason.
 	if (!Refused)
 	{
 		`AP.ScreenMessage("Connection was closed. Reconnecting in 5 seconds... Winsock Error Code: " $GetLastError());
 	}
 	
-	Destroy();
+	CurrentMessage = "";
+	ParsingMessage = false;
+	BracketCounter = 0;
+	FullyConnected = false;
+	ConnectingToAP = false;
+	
+	if (`AP.SlotData.ConnectedOnce)
+	{
+		SetTimer(5.0, false, NameOf(Connect));
+	}
+	else
+	{
+		`AP.OpenSlotNameBubble(1.0);
+	}
 }
 
 event Destroyed()
 {
-	`AP.Client = None;
-	`AP.CreateClient(5.0);
+	Close();
 	Super.Destroyed();
 }
 

@@ -416,17 +416,12 @@ simulated function BuildSpecialHourglasses(HUD H)
 			if (!ChapterInfo.ChapterActInfo[i].IsBonus && ChapterInfo.ChapterActInfo[i].ActID == s.ActID)
 				s.ChapterActInfo = ChapterInfo.ChapterActInfo[i];
 		
-		/*
 		// Called in AlpsAndSails.umap's intro mountain
 		if (ChapterInfo.ActIDAfterIntro > 0)
 		{
-			if (class'Hat_SaveBitHelper'.static.HasLevelBit("Actless_FreeRoam_Intro_Complete", 1, s.MapName))
-				s.ActID = ChapterInfo.ActIDAfterIntro;
-			// If we have ANY Time Pieces, then we don't want to play the intro anymore either.
-			if (!class'Hat_SeqCond_HasUntouchedChapter'.static.IsUntouched(ChapterInfo, 1, false))
-				s.ActID = ChapterInfo.ActIDAfterIntro;
+			//if (class'Hat_SaveBitHelper'.static.HasLevelBit("Actless_FreeRoam_Intro_Complete", 1, s.MapName))
+				//s.ActID = ChapterInfo.ActIDAfterIntro;
 		}
-		*/
 		
 		s.PlanetRotation = ChapterInfo.GetActPlanetRotation(1);
 		s.InstancedIcon = None;

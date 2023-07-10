@@ -16,6 +16,14 @@ defaultproperties
 	
 	CollectParticle = ParticleSystem'HatInTime_Items.ParticleSystems.energybit_collected2'
 	CollectParticleColor = (R=255,G=204,B=76,A=255);
-    
-    InventoryClass = class'Hat_Collectible_BadgeSlot';
+}
+
+simulated function bool OnCollected(Actor a)
+{
+	if (WasFromServer())
+	{
+		`GameManager.AddBadgeSlots(1);
+	}
+
+	return Super.OnCollected(a);
 }

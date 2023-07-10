@@ -13,12 +13,7 @@ var transient bool CollectiblesShuffled;
 var transient bool ControllerCapsLock;
 var transient bool ContractEventActive;
 var array<Actor> ImportantContainers;
-var array<Actor> OpenedContainers; // Only necessary for vaults/old guys in Mafia Town
 var array<string> PlayerNames;
-
-// see PreBeginPlay()
-var array<string> TakenTimePieces;
-var array<Hat_SnatcherContract_Act> TakenContracts;
 
 var config int DebugMode;
 var config int DisableInjection;
@@ -86,9 +81,6 @@ event OnModLoaded()
 
 event OnModUnloaded()
 {
-	if (client != None && client.LinkState == STATE_Connected)
-		client.Close();
-	
 	if (IsArchipelagoEnabled())
 		SaveGame();
 }
@@ -201,7 +193,7 @@ event PreBeginPlay()
 	local Hat_ChapterActInfo act;
 	local Hat_SaveGame save;
 	local string path;
-	local int i;
+	local int i, pos;
 	
 	Super.PreBeginPlay();
 	
@@ -214,55 +206,90 @@ event PreBeginPlay()
 		SetAPBits("ArchipelagoEnabled", 1);
 	}
 	
-	if (IsArchipelagoEnabled())
-	{
-		SlotData = new class'Archipelago_SlotData';
-		path = "APRandomizer/slot_data"$`SaveManager.GetCurrentSaveData().CreationTimeStamp;
-		
-		if (class'Engine'.static.BasicLoadObject(SlotData, path, false, 1))
-		{
-			SlotData.Initialized = true;
-			UpdateChapterInfo();
-		}
+	if (!IsArchipelagoEnabled())
+		return;
 
-		if (!IsInSpaceship())
+	SlotData = new class'Archipelago_SlotData';
+	path = "APRandomizer/slot_data"$`SaveManager.GetCurrentSaveData().CreationTimeStamp;
+	
+	if (class'Engine'.static.BasicLoadObject(SlotData, path, false, 1))
+	{
+		SlotData.Initialized = true;
+		UpdateChapterInfo();
+	}
+
+	if (!IsInSpaceship())
+	{
+		// We need to remove the player's time pieces that are from rifts in vanilla, then give them back
+		// because otherwise the associated rift portals will disappear. Curse you, Hat_TimeRiftPortal!
+		foreach `GameManager.GetChapterInfo().ChapterActInfo(act)
 		{
-			// We need to remove the player's time pieces that are from rifts in vanilla, then give them back
-			// because otherwise the associated rift portals will disappear. Curse you, Hat_TimeRiftPortal!
-			foreach `GameManager.GetChapterInfo().ChapterActInfo(act)
+			if (act.IsBonus && `SaveManager.HasTimePiece(act.hourglass))
 			{
-				if (act.IsBonus && `SaveManager.HasTimePiece(act.hourglass))
+				save.RemoveTimePiece(act.hourglass);
+				SlotData.TakenTimePieces.AddItem(act.hourglass);
+				SaveGame();
+			}
+		}
+		
+		// Similar situation for Snatcher's contract traps. If the player is entering Subcon with no contracts,
+		// none of Snatcher's contract traps will spawn (Hat_SnatcherContractSummon) and the player will not be able 
+		// to get contracts until they either complete Vanessa's Manor (which softlocks them out of the act in act rando) 
+		// or Contractual Obligations.
+		if (`GameManager.GetCurrentMapFilename() ~= "subconforest")
+		{
+			// If player has all contracts (other than Subcon Well), remove one so that traps still spawn
+			if (save.SnatcherContracts.Length >= 3 || save.CompletedSnatcherContracts.Length >= 3)
+			{
+				for (i = 0; i < 4; i++)
 				{
-					save.RemoveTimePiece(act.hourglass);
-					TakenTimePieces.AddItem(act.hourglass);
+					if (i < save.SnatcherContracts.Length || i < save.CompletedSnatcherContracts.Length)
+					{
+						if (i < save.SnatcherContracts.Length && save.SnatcherContracts[i] != class'Hat_SnatcherContract_IceWall'
+						|| i < save.CompletedSnatcherContracts.Length && save.CompletedSnatcherContracts[i] != class'Hat_SnatcherContract_IceWall')
+						{
+							pos = save.SnatcherContracts.Find(save.SnatcherContracts[i]);
+							if (pos != -1)
+							{
+								SlotData.TakenContracts.AddItem(save.SnatcherContracts[pos]);
+								save.SnatcherContracts.RemoveItem(save.SnatcherContracts[pos]);
+							}
+							
+							pos = save.CompletedSnatcherContracts.Find(save.SnatcherContracts[i]);
+							if (pos != -1)
+							{
+								if (SlotData.TakenContracts.Find(save.SnatcherContracts[pos]) == -1)
+									SlotData.TakenContracts.AddItem(save.SnatcherContracts[pos]);
+							
+								save.CompletedSnatcherContracts.RemoveItem(save.SnatcherContracts[pos]);
+							}
+							
+							break;
+						}
+					}
 				}
 			}
-			
-			// Similar situation for Snatcher's contract traps. If the player is entering Subcon with no contracts,
-			// none of Snatcher's contract traps will spawn (Hat_SnatcherContractSummon) and the player will not be able 
-			// to get contracts until they either complete Vanessa's Manor (which softlocks them out of the act in act rando) 
-			// or Contractual Obligations.
-			if (`GameManager.GetCurrentMapFilename() ~= "subconforest")
+			else if (save.SnatcherContracts.Length == 0 && save.CompletedSnatcherContracts.Length == 0
+				&& save.TurnedInSnatcherContracts.Length == 0)
 			{
-				if (save.SnatcherContracts.Length == 0 && save.CompletedSnatcherContracts.Length == 0
-					&& save.TurnedInSnatcherContracts.Length == 0)
-				{
-					// Give a dummy contract.
-					// The PlayerController hasn't spawned yet, so this will generate an Accessed None warning, but W/E.
-					save.GiveContract(class'Hat_SnatcherContract_Act', GetALocalPlayerController());
-				}
+				// Give a dummy contract.
+				// The PlayerController hasn't spawned yet, so this will generate an Accessed None warning, but W/E.
+				save.GiveContract(class'Hat_SnatcherContract_Act', GetALocalPlayerController());
 			}
-			
-			if (`GameManager.GetChapterInfo().ChapterID == 4)
-			{
-				if (HasAPBit("AlpineFinale", 1))
-					EnableAlpineFinale();
-				else
-					DisableAlpineFinale();
-			}
-			
-			SetAPBits("AlpineFinale", 0);
-			
+		}
+		
+		if (`GameManager.GetChapterInfo().ChapterID == 4)
+		{
+			if (HasAPBit("AlpineFinale", 1))
+				EnableAlpineFinale();
+			else
+				DisableAlpineFinale();
+		}
+		
+		SetAPBits("AlpineFinale", 0);
+		
+		if (SlotData.ActRando)
+		{
 			// If we're going to Alps, make sure we go to the intro if we should
 			if (`GameManager.GetChapterInfo().ChapterID == 4 && `GameManager.GetCurrentAct() == 1 
 				&& !class'Hat_SaveBitHelper'.static.HasActBit("ForceAlpineFinale", 1))
@@ -272,27 +299,20 @@ event PreBeginPlay()
 					`GameManager.SetCurrentAct(99);
 					`GameManager.SetCurrentCheckpoint(-1, false);
 				}
-				
-				// If we possibly have all 4 peak time pieces, remove one so we don't go to Alpine finale
-				if (`SaveManager.HasTimePiece("AlpineSkyline_WeddingCake"))
-				{
-					`SaveManager.GetCurrentSaveData().RemoveTimePiece("AlpineSkyline_WeddingCake");
-					TakenTimePieces.AddItem("AlpineSkyline_WeddingCake");
-				}
 			}
 		}
-		else
+	}
+	else
+	{
+		// Hat_DecorationStand is not alwaysloaded, and the alwaysloaded workaround doesn't seem to work with it (crash on boot).
+		// So what we do here is, when a relic stand is completed, tell our save file that it actually HASN'T been
+		// completed on map load so that it doesn't place the decorations on the stand and we can place more.
+		for (i = 0; i < save.HUBDecorations.Length; i++)
 		{
-			// Hat_DecorationStand is not alwaysloaded, and the alwaysloaded workaround doesn't seem to work with it (crash on boot).
-			// So what we do here is, when a relic stand is completed, tell our save file that it actually HASN'T been
-			// completed on map load so that it doesn't place the decorations on the stand and we can place more.
-			for (i = 0; i < save.HUBDecorations.Length; i++)
+			if (save.HUBDecorations[i].Complete)
 			{
-				if (save.HUBDecorations[i].Complete)
-				{
-					save.HUBDecorations.RemoveItem(save.HUBDecorations[i]);
-					i--;
-				}
+				save.HUBDecorations.RemoveItem(save.HUBDecorations[i]);
+				i--;
 			}
 		}
 	}
@@ -347,7 +367,7 @@ function OnPostInitGame()
 			}
 		}
 	}
-
+	
 	if (!IsArchipelagoEnabled())
 		return;
 	
@@ -377,12 +397,15 @@ function OnPostInitGame()
 		
 		// When returning to hub from levels in act rando, the player may get softlocked behind chapter doors
 		// because the game will spawn them at the telescope for that act's chapter. So, always go to the bedroom.
-		foreach DynamicActors(class'Hat_Player', ply)
+		if (SlotData.ActRando)
 		{
-			if (ply.IsA('Hat_Player_MustacheGirl'))
-				continue;
-			
-			ply.SetLocation(SpaceshipSpawnLocation);
+			foreach DynamicActors(class'Hat_Player', ply)
+			{
+				if (ply.IsA('Hat_Player_MustacheGirl'))
+					continue;
+				
+				ply.SetLocation(SpaceshipSpawnLocation);
+			}
 		}
 		
 		OpenBedroomDoor();
@@ -431,14 +454,6 @@ function OnPostInitGame()
 			chest.Content = class'Hat_Collectible_EnergyBit';
 		}
 		
-		// see PreBeginPlay()
-		for (i = 0; i < TakenTimePieces.Length; i++)
-		{
-			`SaveManager.GiveTimePiece(TakenTimePieces[i], false);
-		}
-		
-		TakenTimePieces.Length = 0;
-		
 		// If act rando or contracts are shuffled, remove these act transitions for the well/manor if we don't enter from the proper act.
 		// This forces the player to find the act/contracts in order to enter them.
 		if (SlotData.ActRando || SlotData.ShuffleActContracts)
@@ -474,6 +489,15 @@ function OnPostInitGame()
 			}
 		}
 	}
+	
+	for (i = 0; i < SlotData.TakenTimePieces.Length; i++)
+	{
+		`SaveManager.GiveTimePiece(SlotData.TakenTimePieces[i], false);
+	}
+	
+	SlotData.TakenTimePieces.Length = 0;
+	if (SlotData.Initialized)
+		UpdateChapterInfo();
 	
 	for (i = 0; i < SlotData.ObtainedContracts.Length; i++)
 	{
@@ -642,6 +666,8 @@ function OnFullyConnected()
 		ShuffleCollectibles();
 	}
 	
+	UpdateChapterInfo();
+	
 	// Have we beaten our seed? Send again in case we somehow weren't connected before.
 	if (HasAPBit("HasBeatenGame", 1))
 	{
@@ -655,7 +681,7 @@ function OnFullyConnected()
 		DebugMessage("Loaded item resender successfully!");
 		ItemResender.ResendLocations();
 	}
-
+	
 	// Call this just to see if we can craft a hat
 	OnYarnCollected(0);
 }
@@ -758,7 +784,7 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 	local Hat_ChapterActInfo act, shuffled, ceremony;
 	local bool basementShuffle;
 	local int basement;
-	
+
 	if (!IsArchipelagoEnabled())
 		return;
 	
@@ -766,6 +792,23 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 		return;
 	
 	ActMapChange = true;
+	
+	if (!SlotData.ActRando && Hat_ChapterInfo(ChapterInfo).ChapterID == 4)
+	{
+		if (ActID == 99 && class'Hat_SaveBitHelper'.static.HasLevelBit("Actless_FreeRoam_Intro_Complete", 1, "AlpsAndSails"))
+		{
+			ActID = 1;
+			
+			if (class'Hat_SeqCond_IsAlpineFinale'.static.IsAlpineFinale())
+				DisableAlpineFinale();
+		}
+		else if (ActID == 1)
+		{
+			EnableAlpineFinale();
+		}
+		
+		return;
+	}
 	
 	if (Hat_ChapterInfo(ChapterInfo).ChapterID == 2)
 	{
@@ -863,29 +906,54 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 	{
 		ActID = shuffled.ActID;
 		MapName = shuffled.MapName;
-		DebugMessage("Switching act " $PathName(act) $" with act: " $PathName(shuffled) $", map:" $MapName);
 	}
 	
-	// Alpine Skyline finale
 	if (Hat_ChapterInfo(ChapterInfo).ChapterID == 4)
 	{
-		// Need to do this on a timer so the act bit doesn't get wiped from the map transition
-		if (ActID == 1 && !shuffled.IsBonus)
+		// Free Roam
+		if (ActID == 99)
 		{
-			DebugMessage("Forcing Alpine finale");
-			SetAPBits("AlpineFinale", 1);
+			if (class'Hat_SaveBitHelper'.static.HasLevelBit("Actless_FreeRoam_Intro_Complete", 1, "AlpsAndSails"))
+				ActID = 1;
+			
+			if (class'Hat_SeqCond_IsAlpineFinale'.static.IsAlpineFinale())
+				DisableAlpineFinale();
+		}
+		else if (ActID == 1 && !shuffled.IsBonus)
+		{
+			EnableAlpineFinale();
 		}
 	}
+	
+	DebugMessage("Switching act " $PathName(act) $" with act: " $PathName(shuffled) $", map:" $MapName $" Act ID: "$ActID);
+}
+
+function bool AreAllPeaksComplete()
+{
+	return IsActReallyCompleted(GetChapterActInfoFromHourglass("AlpineSkyline_WeddingCake"))
+		&& IsActReallyCompleted(GetChapterActInfoFromHourglass("Alps_Birdhouse"))
+		&& IsActReallyCompleted(GetChapterActInfoFromHourglass("AlpineSkyline_Windmill"))
+		&& IsActReallyCompleted(GetChapterActInfoFromHourglass("Alpine_Twilight"));
 }
 
 function EnableAlpineFinale()
 {
+	SetAPBits("AlpineFinale", 1);
 	class'Hat_SaveBitHelper'.static.SetActBits("ForceAlpineFinale", 1);
 }
 
 function DisableAlpineFinale()
 {
+	SetAPBits("AlpineFinale", 0);
 	class'Hat_SaveBitHelper'.static.SetActBits("ForceAlpineFinale", 0);
+	
+	// If we possibly have all 4 peak time pieces, remove one so we don't go to Alpine finale
+	if (`SaveManager.HasTimePiece("AlpineSkyline_WeddingCake"))
+	{
+		`SaveManager.GetCurrentSaveData().RemoveTimePiece("AlpineSkyline_WeddingCake");
+		SlotData.TakenTimePieces.AddItem("AlpineSkyline_WeddingCake");
+		SaveGame();
+	}
 }
 
 function OnPreOpenHUD(HUD InHUD, out class<Object> InHUDElement)
@@ -951,18 +1019,24 @@ function CheckActTitleCard(Hat_HUD hud)
 			actId = newAct.ActID;
 		}
 		
-		`GameManager.LoadNewAct(chapterId, actId);
-		card.MapName = map;
-		
-		// Alpine Skyline finale
 		if (chapterId == 4)
 		{
-			if (actId == 1 && !newAct.IsBonus)
+			if (actId == 99)
 			{
-				DebugMessage("Forcing Alpine finale");
-				SetAPBits("AlpineFinale", 1);
+				if (class'Hat_SaveBitHelper'.static.HasLevelBit("Actless_FreeRoam_Intro_Complete", 1, "AlpsAndSails"))
+					actId = 1;
+				
+				if (class'Hat_SeqCond_IsAlpineFinale'.static.IsAlpineFinale())
+					DisableAlpineFinale();
+			}
+			else if (actId == 1 && !newAct.IsBonus)
+			{
+				EnableAlpineFinale();
 			}
 		}
+
+		`GameManager.LoadNewAct(chapterId, actId);
+		card.MapName = map;
 	}
 }
 
@@ -1046,7 +1120,7 @@ function OnTimePieceCollected(string Identifier)
 	SendLocationCheck(id);
 }
 
-// This is mainly because of Alpine Skyline's finale having an ActID of 1 -.-
+// This is mainly because of Alpine Skyline's finale having an ActID of 1, which causes problems with time rifts -.-
 function Hat_ChapterActInfo GetActualCurrentAct(optional out int basement)
 {
 	local Hat_ChapterInfo chapter;
@@ -1056,7 +1130,7 @@ function Hat_ChapterActInfo GetActualCurrentAct(optional out int basement)
 	chapter = `GameManager.GetChapterInfo();
 	map = `GameManager.GetCurrentMapFilename();
 	chapter.ConditionalUpdateActList();
-
+	
 	if (InStr(map, "timerift_", false, true) == 0)
 	{
 		foreach chapter.ChapterActInfo(act)
@@ -1066,20 +1140,8 @@ function Hat_ChapterActInfo GetActualCurrentAct(optional out int basement)
 				return act;
 		}
 	}
-	else if (chapter.ChapterID == 4)
-	{
-		// After the Alpine intro, the free roam and finale share the same act ID of 1 (which is obviously stupid).
-		// Fortunately, there's an act bit that forces the Alpine finale to be enabled, so we can simply check for that.
-		if (class'Hat_SaveBitHelper'.static.HasActBit("ForcedAlpineFinale", 1))
-		{
-			return Hat_ChapterActInfo(DynamicLoadObject("hatintime_chapterinfo.AlpineSkyline.AlpineSkyline_Finale", class'Hat_ChapterActInfo'));
-		}
-		else
-		{
-			return Hat_ChapterActInfo(DynamicLoadObject("hatintime_chapterinfo.AlpineSkyline.AlpineSkyline_IntroMountain", class'Hat_ChapterActInfo'));
-		}
-	}
-	else if (InStr(map, "DJGrooves_Boss", false, true) != -1 ||
+	
+	if (InStr(map, "DJGrooves_Boss", false, true) != -1 ||
 	map ~= "DeadBirdBasement")
 	{
 		basement = 1;
@@ -1256,7 +1318,8 @@ function bool IsChapterActInfoUnlocked(Hat_ChapterActInfo ChapterActInfo, option
 	}
 	
 	// If actless and we don't have this Time Piece (and its not the finale nor free roam nor rift), skip!
-	if (!ChapterActInfo.IsBonus && ChapterInfo.IsActless && (ChapterInfo.FinaleActID <= 0 || actid != ChapterInfo.FinaleActID) && !IsFreeRoam) 
+	if (!ChapterActInfo.IsBonus && ChapterInfo.IsActless && (ChapterInfo.FinaleActID <= 0 || actid != ChapterInfo.FinaleActID) && !IsFreeRoam
+	&& !IsActReallyCompleted(ChapterActInfo)) 
 		return false;
 	
 	// Subcon Forest
@@ -1321,9 +1384,8 @@ function ShuffleCollectibles()
 		|| collectible.IsA('Hat_Collectible_Sticker'))
 			continue;
 		
-		// hotfix
-		if (ObjectToLocationId(collectible) == 336395)
-			continue;
+		//if (ObjectToLocationId(collectible) == 336395)
+		//	continue;
 
 		locationArray.AddItem(ObjectToLocationId(collectible));
 		if (bool(DebugMode))
@@ -1481,7 +1543,7 @@ function IterateChestArray()
 		}
 		
 		locationArray.AddItem(ObjectToLocationId(ChestArray[i]));
-		OpenedContainers.AddItem(ChestArray[i]);
+		SlotData.OpenedContainerIDs.AddItem(ObjectToLocationId(ChestArray[i]));
 		ImportantContainers.RemoveItem(ChestArray[i]);
 		ChestArray.RemoveItem(ChestArray[i]);
 	}
@@ -1503,7 +1565,7 @@ function IterateChestArray()
 		
 		locationArray.AddItem(ObjectToLocationId(BulliedNPCArray[i]));
 		ImportantContainers.RemoveItem(BulliedNPCArray[i]);
-		OpenedContainers.AddItem(BulliedNPCArray[i]);
+		SlotData.OpenedContainerIDs.AddItem(ObjectToLocationId(BulliedNPCArray[i]));
 		BulliedNPCArray.RemoveItem(BulliedNPCArray[i]);
 	}
 	
@@ -1674,7 +1736,7 @@ function OnCollectibleSpawned(Object collectible)
 				item.Bounce(vel);
 				
 				ImportantContainers.RemoveItem(Actor(collectible).Owner);
-				OpenedContainers.AddItem(Actor(collectible).Owner);
+				SlotData.OpenedContainerIDs.AddItem(ObjectToLocationId(Actor(collectible).Owner));
 				Actor(collectible).Destroy();
 			}
 		}
@@ -1762,7 +1824,7 @@ function OnYarnCollected(optional int amount=1)
 			SetAPBits("HatCraftIndex", index+1);
 		}
 	}
-	else
+	else if (amount > 0)
 	{
 		pons = 20 * amount;
 		`GameManager.AddEnergyBits(pons);
@@ -2242,7 +2304,7 @@ function string EncodeJson2(JsonObject json)
 
 function bool IsFullyConnected()
 {
-	return (client != None && client.FullyConnected && client.LinkState == STATE_Connected);
+	return (client != None && client.FullyConnected && !client.ConnectingToAP && client.LinkState == STATE_Connected);
 }
 
 function bool IsDeathLinkEnabled()
@@ -2261,9 +2323,17 @@ function bool IsInSpaceship()
 function bool IsActReallyCompleted(Hat_ChapterActInfo act)
 {
 	local bool result;
+	local Hat_ChapterActInfo shuffled;
 	
 	if (act.hourglass == "")
 		return true;
+	
+	if (SlotData != None && SlotData.Initialized && SlotData.ActRando)
+	{
+		shuffled = GetShuffledAct(act);
+		if (shuffled != None && shuffled.hourglass == "")
+			return true;
+	}
 	
 	result = HasAPBit("ActComplete_"$act.hourglass, 1);
 	if (result)

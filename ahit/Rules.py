@@ -318,9 +318,6 @@ def set_sdj_rules(world: World):
     set_rule(world.multiworld.get_location("Alpine Skyline - The Birdhouse: Dweller Platforms Relic", world.player),
              lambda state: can_use_hat(state, world, HatType.DWELLER) or can_sdj(state, world))
 
-    # set_rule(world.multiworld.get_location("Alpine Skyline - The Windmill: Time Trial", world.player),
-    #         lambda state: can_use_hat(state, world, HatType.DWELLER) or can_sdj(state, world))
-
     set_rule(world.multiworld.get_location("Alpine Skyline - The Twilight Bell: Ice Platform", world.player),
              lambda state: can_use_hat(state, world, HatType.ICE) or can_sdj(state, world))
 

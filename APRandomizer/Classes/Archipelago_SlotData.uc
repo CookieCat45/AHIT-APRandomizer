@@ -35,6 +35,8 @@ var array<Hat_ChapterActInfo> LockedBlueRifts;
 var array< class<Hat_SnatcherContract_Act> > ObtainedContracts;
 var array< class<Hat_SnatcherContract_Act> > TakenContracts;
 var array< class<Hat_SnatcherContract_Act> > CheckedContracts;
+var array<string> TakenTimePieces;
+var array<int> OpenedContainerIDs; // for Compass Badge
 
 // hat stitch order
 var EHatType Hat1;

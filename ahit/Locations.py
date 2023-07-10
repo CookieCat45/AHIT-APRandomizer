@@ -208,7 +208,7 @@ ahit_locations = {
                                                                 required_hats=[HatType.ICE]),
     "Alpine Skyline - Goat Outpost Horn": LocData(334760, "Alpine Free Roam"),
     "Alpine Skyline - Windy Passage": LocData(334776, "Alpine Free Roam"),
-    # "Alpine Skyline - The Windmill: Time Trial": LocData(336395, "The Windmill", required_hats=[HatType.DWELLER]),
+    "Alpine Skyline - The Windmill: Inside Pon Cluster": LocData(336395, "The Windmill"),
     "Alpine Skyline - The Windmill: Entrance": LocData(335783, "The Windmill"),
     "Alpine Skyline - The Windmill: Dropdown": LocData(335815, "The Windmill"),
     "Alpine Skyline - The Windmill: House Window": LocData(335389, "The Windmill"),

@@ -71,7 +71,7 @@ simulated function bool OnCollected(Actor Collector)
 		{
 			pc = Hat_PlayerController(Pawn(Collector).controller);
 			item = class'Hat_Loadout'.static.MakeLoadoutItem(InventoryClass);
-
+			
 			if (item != None)
 			{
 				loadout = pc.GetLoadout();
@@ -88,7 +88,7 @@ simulated function bool OnCollected(Actor Collector)
 					
 					autoEquip = (count < `SaveManager.GetNumberOfBadgeSlots());
 				}
-
+				
 				if (!loadout.AddBackpack(item, autoEquip, true, Hat_Player(Collector)))
 				{
 					loadout.AddCollectible(InventoryClass);
