@@ -928,34 +928,6 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 	DebugMessage("Switching act " $PathName(act) $" with act: " $PathName(shuffled) $", map:" $MapName $" Act ID: "$ActID);
 }
 
-function bool AreAllPeaksComplete()
-{
-	return IsActReallyCompleted(GetChapterActInfoFromHourglass("AlpineSkyline_WeddingCake"))
-		&& IsActReallyCompleted(GetChapterActInfoFromHourglass("Alps_Birdhouse"))
-		&& IsActReallyCompleted(GetChapterActInfoFromHourglass("AlpineSkyline_Windmill"))
-		&& IsActReallyCompleted(GetChapterActInfoFromHourglass("Alpine_Twilight"));
-}
-
-function EnableAlpineFinale()
-{
-	SetAPBits("AlpineFinale", 1);
-	class'Hat_SaveBitHelper'.static.SetActBits("ForceAlpineFinale", 1);
-}
-
-function DisableAlpineFinale()
-{
-	SetAPBits("AlpineFinale", 0);
-	class'Hat_SaveBitHelper'.static.SetActBits("ForceAlpineFinale", 0);
-	
-	// If we possibly have all 4 peak time pieces, remove one so we don't go to Alpine finale
-	if (`SaveManager.HasTimePiece("AlpineSkyline_WeddingCake"))
-	{
-		`SaveManager.GetCurrentSaveData().RemoveTimePiece("AlpineSkyline_WeddingCake");
-		SlotData.TakenTimePieces.AddItem("AlpineSkyline_WeddingCake");
-		SaveGame();
-	}
-}
-
 function OnPreOpenHUD(HUD InHUD, out class<Object> InHUDElement)
 {
 	if (!IsArchipelagoEnabled())
@@ -1034,9 +1006,37 @@ function CheckActTitleCard(Hat_HUD hud)
 				EnableAlpineFinale();
 			}
 		}
-
+		
 		`GameManager.LoadNewAct(chapterId, actId);
 		card.MapName = map;
+	}
+}
+
+function bool AreAllPeaksComplete()
+{
+	return IsActReallyCompleted(GetChapterActInfoFromHourglass("AlpineSkyline_WeddingCake"))
+		&& IsActReallyCompleted(GetChapterActInfoFromHourglass("Alps_Birdhouse"))
+		&& IsActReallyCompleted(GetChapterActInfoFromHourglass("AlpineSkyline_Windmill"))
+		&& IsActReallyCompleted(GetChapterActInfoFromHourglass("Alpine_Twilight"));
+}
+
+function EnableAlpineFinale()
+{
+	SetAPBits("AlpineFinale", 1);
+	class'Hat_SaveBitHelper'.static.SetActBits("ForceAlpineFinale", 1);
+}
+
+function DisableAlpineFinale()
+{
+	SetAPBits("AlpineFinale", 0);
+	class'Hat_SaveBitHelper'.static.SetActBits("ForceAlpineFinale", 0);
+	
+	// If we possibly have all 4 peak time pieces, remove one so we don't go to Alpine finale
+	if (`SaveManager.HasTimePiece("AlpineSkyline_WeddingCake"))
+	{
+		`SaveManager.GetCurrentSaveData().RemoveTimePiece("AlpineSkyline_WeddingCake");
+		SlotData.TakenTimePieces.AddItem("AlpineSkyline_WeddingCake");
+		SaveGame();
 	}
 }
 
@@ -1384,9 +1384,6 @@ function ShuffleCollectibles()
 		|| collectible.IsA('Hat_Collectible_Sticker'))
 			continue;
 		
-		//if (ObjectToLocationId(collectible) == 336395)
-		//	continue;
-
 		locationArray.AddItem(ObjectToLocationId(collectible));
 		if (bool(DebugMode))
 		{
