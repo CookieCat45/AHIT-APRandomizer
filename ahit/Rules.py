@@ -271,8 +271,6 @@ def set_rules(world: World):
     if mw.SDJLogic[p].value > 0:
         set_sdj_rules(world)
 
-    # ****** !!!!!! SET ALL ENTRANCE RULES BEFORE THIS LINE !!!!!! ****** #
-
     for (key, acts) in act_connections.items():
         i: int = 1
         entrance: Entrance = mw.get_entrance(key, p)
