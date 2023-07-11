@@ -1012,12 +1012,18 @@ function CheckActTitleCard(Hat_HUD hud)
 	}
 }
 
-function bool AreAllPeaksComplete()
+function bool AreAllPeaksCompleted()
 {
 	return IsActReallyCompleted(GetChapterActInfoFromHourglass("AlpineSkyline_WeddingCake"))
 		&& IsActReallyCompleted(GetChapterActInfoFromHourglass("Alps_Birdhouse"))
 		&& IsActReallyCompleted(GetChapterActInfoFromHourglass("AlpineSkyline_Windmill"))
 		&& IsActReallyCompleted(GetChapterActInfoFromHourglass("Alpine_Twilight"));
+}
+
+function bool IsAwardCeremonyCompleted()
+{
+	return IsActReallyCompleted(Hat_ChapterActInfo(DynamicLoadObject(
+			"hatintime_chapterinfo.BattleOfTheBirds.BattleOfTheBirds_AwardCeremony", class'Hat_ChapterActInfo')));
 }
 
 function EnableAlpineFinale()
@@ -2319,26 +2325,26 @@ function bool IsInSpaceship()
 // using the act's Time Piece.
 function bool IsActReallyCompleted(Hat_ChapterActInfo act)
 {
-	local bool result;
 	local Hat_ChapterActInfo shuffled;
 	
-	if (act.hourglass == "")
-		return true;
-	
-	if (SlotData != None && SlotData.Initialized && SlotData.ActRando)
+	if (SlotData != None && SlotData.Initialized)
 	{
-		shuffled = GetShuffledAct(act);
-		if (shuffled != None && shuffled.hourglass == "")
+		if (SlotData.ActRando)
+		{
+			if (IsChapterActInfoUnlocked(act))
+			{
+				shuffled = GetShuffledAct(act);
+				if (shuffled != None && shuffled.hourglass == "") // Free Roam
+					return true;
+			}
+		}
+		else if (act.hourglass == "")
+		{
 			return true;
+		}
 	}
 	
-	result = HasAPBit("ActComplete_"$act.hourglass, 1);
-	if (result)
-	{
-		DebugMessage("Act Complete: " $act.hourglass);
-	}
-	
-	return result;
+	return HasAPBit("ActComplete_"$act.hourglass, 1);
 }
 
 function bool IsActFreeRoam(Hat_ChapterActInfo act)

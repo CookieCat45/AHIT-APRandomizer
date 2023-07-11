@@ -4,11 +4,12 @@ class Archipelago_HUDMenuActSelect extends Hat_HUDMenuActSelect;
 
 simulated function BuildActs(HUD H)
 {
-	local int i,j, InventoryIndex, actid, total_num;
+	local int i,j, InventoryIndex, actid, total_num, basement, context;
 	local float angle, angle_radians;
 	local Array<Hat_ChapterActInfo> UnlockedActIDs;
 	local Array< class<Inventory> > InventoryClasses;
 	local MenuSelectHourglass s;
+	local Hat_ChapterActInfo shuffledAct;
 	
 	UnlockedActIDs = GetUnlockedActIDs(ChapterInfo,, ModChapterPackageName);
 	// Remove act 99 since its already going to be present as free roam if actless
@@ -89,8 +90,28 @@ simulated function BuildActs(HUD H)
 		s.ChapterActInfo = UnlockedActIDs[j];
         s.IsComplete = `AP.IsActReallyCompleted(s.ChapterActInfo);
 		
+		if (`AP.SlotData.ActRando)
+		{
+			if (ChapterInfo.ChapterID == 2 && s.ActID == 6 && `AP.IsAwardCeremonyCompleted())
+			{
+				shuffledAct = `AP.GetDeadBirdBasementShuffledAct();
+			}
+			else
+			{
+				shuffledAct = `AP.GetShuffledAct(s.ChapterActInfo, basement);
+			}
+		}
+		else
+		{
+			shuffledAct = s.ChapterActInfo;
+		}
 		
-		s.ActInfoboxName = GetLocalizedActName(s.ChapterActInfo, 0);
+		context = shuffledAct.IsBonus ? 1 : `AP.IsActFreeRoam(shuffledAct) ? 2 : 0;
+		
+		s.ActInfoboxName = basement == 0 ? GetLocalizedActName(shuffledAct, context) : 
+			GetLocalizedActName(Hat_ChapterActInfo(DynamicLoadObject(
+				"hatintime_chapterinfo.BattleOfTheBirds.BattleOfTheBirds_AwardCeremony", class'Hat_ChapterActInfo')), 0);
+		
 		if (ChapterInfo.IsActless)
 		{
 			s.ActInfoboxTitle = (ChapterInfo.ActlessPrefix != "") ? class'Hat_Localizer'.static.GetSystem("levels", ChapterInfo.ActlessPrefix) : "";
@@ -107,7 +128,8 @@ simulated function BuildActs(HUD H)
 		actid = ChapterInfo.GetActIDFromHourglass(s.Hourglass);
 		s.MapName = ChapterInfo.GetActMap(actid, s.IsComplete);
 		s.ActID = actid;
-		InventoryClasses = ChapterInfo.GetRequiredItems(s.Hourglass);
+		
+		InventoryClasses = shuffledAct.RequiredItems;
 		s.IsMissingItem = false;
 		s.SupportsCoop = ChapterInfo.GetSupportsCoop(s.Hourglass);
 		if (InventoryClasses.Length > 0 && !s.IsComplete)
@@ -265,11 +287,10 @@ simulated function BuildSpecialHourglasses(HUD H)
 	local MenuSelectHourglass s;
 	local MaterialInterface minf;
 	local MaterialInstanceConstant matinst;
-	local int TotalRequired;
-	local int FinaleFillBit, i;
+	local int FinaleFillBit, TotalRequired, CompletedRequiredActsLength, i, basement, context;
 	local float finalefill;
 	local bool HasFinale, HasFreeRoam;
-	local int CompletedRequiredActsLength;
+	local Hat_ChapterActInfo shuffledAct;
 	
 	HasFreeRoam = false;
 	if (!class'Hat_SeqCond_HasUntouchedChapter'.static.IsUntouched(ChapterInfo, 4, false) && ChapterInfo.HasFreeRoam)
@@ -369,11 +390,33 @@ simulated function BuildSpecialHourglasses(HUD H)
 		s.IsValid = true;
 		s.IsUnlocked = CompletedRequiredActsLength >= TotalRequired;
 		
+		if (`AP.SlotData.ActRando)
+		{
+			if (ChapterInfo.ChapterID == 2 && s.ActID == 6 && `AP.IsAwardCeremonyCompleted())
+			{
+				shuffledAct = `AP.GetDeadBirdBasementShuffledAct();
+			}
+			else
+			{
+				shuffledAct = `AP.GetShuffledAct(s.ChapterActInfo, basement);
+			}
+		}
+		else
+		{
+			shuffledAct = s.ChapterActInfo;
+		}
+		
+		context = shuffledAct.IsBonus ? 1 : `AP.IsActFreeRoam(shuffledAct) ? 2 : 0;
+		
+		s.ActInfoboxName = basement == 0 ? GetLocalizedActName(shuffledAct, context) : 
+			GetLocalizedActName(Hat_ChapterActInfo(DynamicLoadObject(
+				"hatintime_chapterinfo.BattleOfTheBirds.BattleOfTheBirds_AwardCeremony", class'Hat_ChapterActInfo')), 0);
+		
 		if (s.IsUnlocked || s.IsComplete)
 		{
 			if (!ChapterInfo.IsActless)
 				s.ActInfoboxTitle = class'Hat_Localizer'.static.GetSystem("levels", "Act") $ " " $ s.ActID;
-			s.ActInfoboxName = GetLocalizedActName(s.ChapterActInfo, 0);
+			s.ActInfoboxName = GetLocalizedActName(shuffledAct, context);
 		}
 		
 		s.InstancedIcon = None;
@@ -521,9 +564,10 @@ simulated function BuildBonusHourglasses(HUD H)
 simulated function BuildBonusHourglassesSide(HUD H, Array<Hat_ChapterActInfo> HourglassList, float max_angle, bool invertX)
 {
 	local float angle, angle_radians, posx, posy;
-	local int i;
+	local int i, basement, context;
 	local MenuSelectHourglass s;
 	local bool IsCompleted;
+	local Hat_ChapterActInfo shuffledAct;
 	
 	if (HourglassList.Length <= 0) return;
 	
@@ -551,11 +595,33 @@ simulated function BuildBonusHourglassesSide(HUD H, Array<Hat_ChapterActInfo> Ho
 		// The cave rift was shown even if we don't have it unlocked - this happens if everything is cleared except the cave rift. In that case, we only want to remind them that it exists.
 		if (s.ID == ActSelectType_TimeRift_Cave && !IsCompleted && !`AP.IsChapterActInfoUnlocked(s.ChapterActInfo, ModChapterPackageName))
 			s.ID = ActSelectType_TimeRift_Cave_Reminder;
+		
+		if (`AP.SlotData.ActRando)
+		{
+			if (ChapterInfo.ChapterID == 2 && s.ActID == 6 && `AP.IsAwardCeremonyCompleted())
+			{
+				shuffledAct = `AP.GetDeadBirdBasementShuffledAct();
+			}
+			else
+			{
+				shuffledAct = `AP.GetShuffledAct(s.ChapterActInfo, basement);
+			}
+		}
+		else
+		{
+			shuffledAct = s.ChapterActInfo;
+		}
+		
+		context = shuffledAct.IsBonus ? 1 : `AP.IsActFreeRoam(shuffledAct) ? 2 : 0;
+		
+		s.ActInfoboxName = basement == 0 ? GetLocalizedActName(shuffledAct, context) : 
+			GetLocalizedActName(Hat_ChapterActInfo(DynamicLoadObject(
+				"hatintime_chapterinfo.BattleOfTheBirds.BattleOfTheBirds_AwardCeremony", class'Hat_ChapterActInfo')), 0);
 
 		s.PosX = posx;
 		s.PosY = posy;
 		s.ActInfoboxTitle = class'Hat_Localizer'.static.GetGame("levels", s.ID == ActSelectType_TimeRift_Water ? "Location_DreamWorld_Water" : "Location_DreamWorld_Cave");
-		s.ActInfoboxName = IsCompleted ? GetLocalizedActName(s.ChapterActInfo, 0) : "???";
+		s.ActInfoboxName = IsCompleted ? GetLocalizedActName(shuffledAct, context) : "???";
 		s.ActDisplayLabel = s.ActInfoboxName;
 		s.IsDefault = false;
 		s.Photo = s.ID != ActSelectType_TimeRift_Cave_Reminder ? HourglassList[i].Photo : None;
