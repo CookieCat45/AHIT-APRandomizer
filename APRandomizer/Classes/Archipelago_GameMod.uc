@@ -81,8 +81,9 @@ event OnModLoaded()
 
 event OnModUnloaded()
 {
-	if (IsArchipelagoEnabled())
-		SaveGame();
+	// might be causing crashes?
+	//if (IsArchipelagoEnabled())
+	//	SaveGame();
 }
 
 function SaveGame()
@@ -1984,11 +1985,6 @@ function WaitForContractEvent()
 	
 	ClearTimer(NameOf(WaitForContractEvent));
 	OnContractEventEnd();
-}
-
-function TakeAwayContract(class<Hat_SnatcherContract_Act> contract)
-{
-
 }
 
 function OnContractEventEnd()
