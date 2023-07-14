@@ -81,9 +81,8 @@ event OnModLoaded()
 
 event OnModUnloaded()
 {
-	// might be causing crashes?
-	//if (IsArchipelagoEnabled())
-	//	SaveGame();
+	if (IsArchipelagoEnabled())
+		SaveGame();
 }
 
 function SaveGame()
@@ -724,7 +723,7 @@ function LoadSlotData(JsonObject json)
 	SlotData.Hat3 = EHatType(json.GetIntValue("Hat3"));
 	SlotData.Hat4 = EHatType(json.GetIntValue("Hat4"));
 	SlotData.Hat5 = EHatType(json.GetIntValue("Hat5"));
-
+	
 	if (SlotData.ActRando)
 	{
 		chapters = class'Hat_ChapterInfo'.static.GetAllChapterInfo();
@@ -767,7 +766,6 @@ function LoadSlotData(JsonObject json)
 		DebugMessage("FOUND act pair:" $"DeadBirdBasement" $"REPLACED WITH: " $n);
 	}
 	
-	SaveGame();
 	SlotData.Initialized = true;
 	UpdateChapterInfo();
 }
@@ -1201,7 +1199,7 @@ function UpdateChapterInfo()
 function OpenBedroomDoor()
 {
 	local Hat_SpaceshipPowerPanel panel;
-
+	
 	foreach DynamicActors(class'Hat_SpaceshipPowerPanel', panel)
 	{
 		if (panel.ChapterInfo.ChapterID == 3)
@@ -1229,14 +1227,18 @@ function UpdateActUnlocks()
 			{
 				if (IsChapterActInfoUnlocked(act))
 				{
-					SlotData.LockedBlueRifts.RemoveItem(act);
+					if (SlotData.LockedBlueRifts.Find(act) != -1)
+						SlotData.LockedBlueRifts.RemoveItem(act);
+
 					act.RequiredActID.Length = 0;
 					act.RequiredActID.AddItem(0); // else game thinks it's a purple rift
 					act.InDevelopment = false;
 				}
 				else
 				{
-					SlotData.LockedBlueRifts.AddItem(act);
+					if (SlotData.LockedBlueRifts.Find(act) == -1)
+						SlotData.LockedBlueRifts.AddItem(act);
+					
 					act.InDevelopment = true;
 				}
 			}
@@ -1326,7 +1328,7 @@ function bool IsChapterActInfoUnlocked(Hat_ChapterActInfo ChapterActInfo, option
 	
 	// If actless and we don't have this Time Piece (and its not the finale nor free roam nor rift), skip!
 	if (!ChapterActInfo.IsBonus && ChapterInfo.IsActless && (ChapterInfo.FinaleActID <= 0 || actid != ChapterInfo.FinaleActID) && !IsFreeRoam
-	&& !IsActReallyCompleted(ChapterActInfo)) 
+	&& !HasAPBit("ActComplete_"$ChapterActInfo.hourglass, 1)) 
 		return false;
 	
 	// Subcon Forest
@@ -1357,8 +1359,8 @@ function bool IsChapterActInfoUnlocked(Hat_ChapterActInfo ChapterActInfo, option
 				hourglass = class'Hat_TimeObject_Base'.static.GetModTimePieceIdentifier(ModPackageName, hourglass);
 			}
 			
-			if (IsActReallyCompleted(RequiredChapterActInfo)) continue;
-			
+			if (HasAPBit("ActComplete_"$hourglass, 1)) continue;
+
 			j = INDEX_NONE;
 			break;
 		}
