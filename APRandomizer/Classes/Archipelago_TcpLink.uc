@@ -168,7 +168,6 @@ event Tick(float d)
 	if (IsDataPending())
 	{
 		count = ReadBinary(255, byteMessage);
-		
 		if (count <= 0)
 			return;
 
@@ -258,9 +257,12 @@ function string NumberString(string src)
 function ParseJSON(string json)
 {
 	local bool b;
-	local int i, count;
+	local int i, count, split;
 	local string s, text;
 	local JsonObject jsonObj, jsonChild;
+	
+	if (Len(json) <= 10) // this is probably garbage that we thought was a json
+		return;
 	
 	`AP.DebugMessage("[ParseJSON] Received command: " $json);
 		
@@ -287,13 +289,17 @@ function ParseJSON(string json)
 			FullyConnected = true;
 			ConnectingToAP = false;
 			
-			jsonChild = jsonObj.GetObject("slot_data");
-			`AP.LoadSlotData(jsonChild);
+			if (!`AP.SlotData.Initialized)
+			{
+				jsonChild = jsonObj.GetObject("slot_data");
+				`AP.LoadSlotData(jsonChild);
+			}
 			
 			// sometimes this command will be paired with ReceivedItems
-			if (InStr(json, "{\"cmd\":\"ReceivedItems\"") != -1)
+			split = InStr(json, "{\"cmd\":\"ReceivedItems\"");
+			if (split != -1)
 			{
-				OnReceivedItemsCommand(Split(json, "{\"cmd\":\"ReceivedItems\""), true);
+				OnReceivedItemsCommand(Mid(json, split), true);
 			}
 			
 			// Initialize our player's names
@@ -561,6 +567,8 @@ function OnReceivedItemsCommand(string json, optional bool connection)
 	local JsonObject jsonObj, jsonChild;
 	local bool b;
 	
+	`AP.DebugMessage("Receiving items...");
+
 	`AP.ReplOnce(json, "items", "items_0", json, true);
 	b = true;
 	count = 0;
@@ -922,8 +930,8 @@ event Closed()
 	}
 	
 	CurrentMessage = "";
-	ParsingMessage = false;
 	BracketCounter = 0;
+	ParsingMessage = false;
 	FullyConnected = false;
 	ConnectingToAP = false;
 	

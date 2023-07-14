@@ -100,6 +100,9 @@ simulated function BuildActs(HUD H)
 			{
 				shuffledAct = `AP.GetShuffledAct(s.ChapterActInfo, basement);
 			}
+			
+			if (shuffledAct == None)
+				shuffledAct = s.ChapterActInfo;
 		}
 		else
 		{
@@ -400,6 +403,9 @@ simulated function BuildSpecialHourglasses(HUD H)
 			{
 				shuffledAct = `AP.GetShuffledAct(s.ChapterActInfo, basement);
 			}
+
+			if (shuffledAct == None)
+				shuffledAct = s.ChapterActInfo;
 		}
 		else
 		{
@@ -606,6 +612,9 @@ simulated function BuildBonusHourglassesSide(HUD H, Array<Hat_ChapterActInfo> Ho
 			{
 				shuffledAct = `AP.GetShuffledAct(s.ChapterActInfo, basement);
 			}
+
+			if (shuffledAct == None)
+				shuffledAct = s.ChapterActInfo;
 		}
 		else
 		{

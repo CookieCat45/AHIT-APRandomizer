@@ -4,7 +4,6 @@ class Archipelago_GameMod extends GameMod
 	config(Mods);
 
 var Archipelago_TcpLink Client;
-var Archipelago_BroadcastHandler Broadcaster;
 var Archipelago_SlotData SlotData;
 var Archipelago_ItemResender ItemResender;
 var transient bool ActMapChange;
@@ -197,7 +196,7 @@ event PreBeginPlay()
 	
 	Super.PreBeginPlay();
 	
-	if (bool(DisableInjection) || `GameManager.GetCurrentMapFilename() ~= `GameManager.TitleScreenMapName)
+	if (bool(DisableInjection) && !IsArchipelagoEnabled() || `GameManager.GetCurrentMapFilename() ~= `GameManager.TitleScreenMapName)
 		return;
 	
 	save = `SaveManager.GetCurrentSaveData();
@@ -1021,8 +1020,7 @@ function bool AreAllPeaksCompleted()
 
 function bool IsAwardCeremonyCompleted()
 {
-	return IsActReallyCompleted(Hat_ChapterActInfo(DynamicLoadObject(
-			"hatintime_chapterinfo.BattleOfTheBirds.BattleOfTheBirds_AwardCeremony", class'Hat_ChapterActInfo')));
+	return IsActReallyCompleted(GetChapterActInfoFromHourglass("award_ceremony"));
 }
 
 function EnableAlpineFinale()
@@ -1216,7 +1214,7 @@ function UpdateActUnlocks()
 	local array<Hat_ChapterInfo> chapterInfoArray;
 	local Hat_ChapterInfo chapter;
 	local Hat_ChapterActInfo act;
-	
+
 	chapterInfoArray = class'Hat_ChapterInfo'.static.GetAllChapterInfo();
 	foreach chapterInfoArray(chapter)
 	{
@@ -1229,7 +1227,7 @@ function UpdateActUnlocks()
 				{
 					if (SlotData.LockedBlueRifts.Find(act) != -1)
 						SlotData.LockedBlueRifts.RemoveItem(act);
-
+					
 					act.RequiredActID.Length = 0;
 					act.RequiredActID.AddItem(0); // else game thinks it's a purple rift
 					act.InDevelopment = false;
@@ -2022,11 +2020,12 @@ function CheckContractsForDeletion()
 	local int i;
 	if (IsIceBrokenEvent())
 		return;
-
+	
 	for (i = 0; i < SelectContracts.Length; i++)
 	{
 		DebugMessage("Contract Class: " $SelectContracts[i].ContractClass);
-		if (SelectContracts[i].ContractClass == class'Hat_SnatcherContract_IceWall')
+		if (SelectContracts[i].ContractClass == None ||
+			SelectContracts[i].ContractClass == class'Hat_SnatcherContract_IceWall')
 			continue;
 		
 		if (SlotData.CheckedContracts.Find(SelectContracts[i].ContractClass) != -1)
@@ -2405,34 +2404,29 @@ function Hat_ChapterActInfo GetRiftActFromMapName(string MapName)
 	return None;
 }
 
-function ScreenMessage(String message)
+function ScreenMessage(String message, optional Name type)
 {
-	if (Broadcaster == None)
-	{
-		Broadcaster = Spawn(class'Archipelago_BroadcastHandler');
-	}
-	
-    Broadcaster.Broadcast(GetALocalPlayerController(), message);
+	local PlayerController pc;
+	pc = GetALocalPlayerController();
+    pc.ClientMessage(message, type, 8);
+	pc.MyHUD.DisplayConsoleMessages();
 }
 
-function DebugMessage(String message)
+function DebugMessage(String message, optional Name type)
 {
+	local PlayerController pc;
+
 	if (!bool(DebugMode))
 		return;
 	
-	if (Broadcaster == None)
-	{
-		Broadcaster = Spawn(class'Archipelago_BroadcastHandler');
-	}
-	
-    Broadcaster.Broadcast(GetALocalPlayerController(), message);
-	`Broadcast(message);
+	pc = GetALocalPlayerController();
+    pc.ClientMessage(message, type, 8);
+	pc.MyHUD.DisplayConsoleMessages();
 }
 
 function int ObjectToLocationId(Object obj)
 {
-	local int i;
-	local int id;
+	local int i, id;
 	local string fullName;
 	
 	fullName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename(string(Actor(obj).GetLevelName()))$"."$obj.Name;

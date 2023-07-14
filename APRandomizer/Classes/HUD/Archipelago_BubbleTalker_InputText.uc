@@ -75,6 +75,7 @@ function bool DeleteCharacter()
 		CharactersFadeIn.Remove(CharactersFadeIn.Length-1,1);
 	
 	PlaySoundToPlayerControllers(KeyboardBackspaceSound);
+	return true;
 }
 
 function DrawInputText(HUD H, Hat_BubbleTalkerQuestion element, float fTime, float fX, float fY)
