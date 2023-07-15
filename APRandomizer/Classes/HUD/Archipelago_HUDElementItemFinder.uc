@@ -14,10 +14,11 @@ function UpdateClosestMarker(HUD H)
 	local Hat_TreasureChest_Base chest;
 	local Hat_Collectible_DeathWishLevelToken dwlt;
 	local float closest_distance;
-	local int bestindx, i, mode;
+	local int bestindx, i, mode, locId;
 	local bool HasAnyDeathWishLevelTokens, onlyImportant;
 	local Hat_ImpactInteract_Breakable_ChemicalBadge b;
 	local Archipelago_GameMod m;
+	local LocationInfo locInfo;
 	local Actor a;
 	
 	m = `AP;
@@ -36,7 +37,7 @@ function UpdateClosestMarker(HUD H)
 		if (item.PickupActor != None) continue;
 		if (!CanReachLocation(item.LocationId)) continue;
 		if (onlyImportant && item.ItemFlags == ItemFlag_Garbage) continue;
-
+		
 		UpdateClosestMarker_Actor(H, item, closest_distance, bestindx);
 	}
 	
@@ -45,8 +46,12 @@ function UpdateClosestMarker(HUD H)
 		if (chest.Content == None) continue;
 		if (chest.Opened) continue;
 		if (m.ChestArray.Find(chest) == -1) continue;
-		if (!CanReachLocation(m.ObjectToLocationId(chest))) continue;
-		if (onlyImportant && m.ImportantContainers.Find(chest) == -1) continue;
+		
+		locId = m.ObjectToLocationId(chest);
+		if (!CanReachLocation(locId) || `AP.IsLocationChecked(locId)) continue;
+		
+		locInfo = `AP.GetLocationInfoFromID(locId);
+		if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
 		
 		UpdateClosestMarker_Actor(H, chest, closest_distance, bestindx);
 	}
@@ -54,7 +59,8 @@ function UpdateClosestMarker(HUD H)
 	// pages ignore onlyImportant, since they're the only items to collect in rifts
 	foreach H.PlayerOwner.DynamicActors(class'Hat_Collectible_StoryBookPage', page)
 	{
-		if (!CanReachLocation(m.ObjectToLocationId(page))) continue;
+		locId = m.ObjectToLocationId(page);
+		if (!CanReachLocation(locId) || `AP.IsLocationChecked(locId)) continue;
 		UpdateClosestMarker_Actor(H, page, closest_distance, bestindx);
 	}
 	
@@ -62,8 +68,11 @@ function UpdateClosestMarker(HUD H)
 	{
 		foreach H.PlayerOwner.DynamicActors(class'Hat_ImpactInteract_Breakable_ChemicalBadge', b)
 		{
-			if (!CanReachLocation(m.ObjectToLocationId(b))) continue;
-			if (onlyImportant && m.ImportantContainers.Find(b) == -1) continue;
+			locId = m.ObjectToLocationId(b);
+			if (!CanReachLocation(locId) || `AP.IsLocationChecked(locId)) continue;
+			
+			locInfo = `AP.GetLocationInfoFromID(locId);
+			if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
 			
 			for (i = 0; i < b.Rewards.Length; i++)
 			{
@@ -80,9 +89,11 @@ function UpdateClosestMarker(HUD H)
 	{
 		if (a.IsA('Hat_Goodie_Vault_Base') || a.IsA('Hat_NPC_Bullied'))
 		{
-			if (!CanReachLocation(m.ObjectToLocationId(a))) continue;
-			if (m.SlotData.OpenedContainerIDs.Find(m.ObjectToLocationId(a)) != -1) continue;
-			if (onlyImportant && m.ImportantContainers.Find(a) == -1) continue;
+			locId = m.ObjectToLocationId(b);
+			if (!CanReachLocation(locId) || `AP.IsLocationChecked(locId)) continue;
+			
+			locInfo = `AP.GetLocationInfoFromID(locId);
+			if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
 			
 			UpdateClosestMarker_Actor(H, a, closest_distance, bestindx);
 		}
@@ -126,15 +137,22 @@ function bool Tick(HUD H, float d)
 
 function bool AreImportantItemsLeft(HUD H, optional bool traps=true)
 {
-	local Archipelago_RandomizedItem_Base item;
+	local int i;
+	local string mapName;
+	local array<LocationInfo> locInfoArray;
+	mapName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename();
+	locInfoArray = `AP.SlotData.LocationInfoArray;
 	
-	foreach H.PlayerOwner.DynamicActors(class'Archipelago_RandomizedItem_Base', item)
+	for (i = 0; i < locInfoArray.Length; i++)
 	{
-		if (item.ItemFlags != ItemFlag_Garbage && (traps || item.ItemFlags != ItemFlag_Trap))
-			return false;
+		if (locInfoArray[i].MapName ~= mapName && locInfoArray[i].Flags != ItemFlag_Garbage)
+		{
+			if (!locInfoArray[i].Checked)
+				return true;
+		}
 	}
 	
-	return `AP.ImportantContainers.Length > 0;
+	return false;
 }
 
 function bool UpdateClosestMarker_Actor(HUD H, Actor item, out float closest_distance, out int bestindx)
@@ -165,6 +183,38 @@ function bool CanReachLocation(int id)
 	if (id == 303486)
 	{
 		return (`GameManager.GetCurrentAct() == 4 || `GameManager.GetCurrentAct() == 6);
+	}
+	
+	// Subcon boss arena chest
+	if (id == 323735)
+	{
+		return `GameManager.GetCurrentAct() == 3 && class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Hookshot')
+		|| `GameManager.GetCurrentAct() == 6;
+	}
+
+	// HUMT
+	if (`GameManager.IsCurrentChapter(1) && `GameManager.IsCurrentAct(6))
+	{
+		return id == 334758 ||
+		id == 304214 ||
+		id == 303529 ||
+		id == 304610 ||
+		id == 303535 ||
+		id == 304459 ||
+		id == 304213 && class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Hookshot') ||
+		id == 304608 ||
+		id == 304462 ||
+		id == 303489 ||
+		id == 303530 ||
+		id == 304456 ||
+		id == 304457 ||
+		id == 304606 ||
+		id == 303481 && class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Hookshot') ||
+		id == 304607 && !class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_StatueFall') ||
+		id == 304212 ||
+		id == 302003 ||
+		id == 302004 ||
+		id == 305218; 
 	}
 	
 	if (HookshotRequiredLocs.Find(id) != -1 && !class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Hookshot'))

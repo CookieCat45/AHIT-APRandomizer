@@ -11,6 +11,11 @@ simulated static function string GetLocalizedItemName()
 	return default.DisplayName;
 }
 
+static function SetDisplayName(string newName)
+{
+    `GameManager.ConsoleCommand("set "$default.class $" "$newName);
+}
+
 simulated function bool OnCollected(Actor Collector)
 {
     `AP.SendLocationCheck(LocationID);

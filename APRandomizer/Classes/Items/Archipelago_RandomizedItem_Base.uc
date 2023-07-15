@@ -25,11 +25,12 @@ var AudioComponent IdleAudioComponent;
 var ParticleSystemComponent ImportantItemParticle;
 var PointLightComponent LightComponent;
 
-function Init()
+function bool Init()
 {
 	if (HasOriginalLevelBit()) // Already collected
 	{
 		Destroy();
+		return false;
 	}
 	else if (ItemFlags == ItemFlag_Garbage)
 	{
@@ -46,6 +47,8 @@ function Init()
 			}
 		}
 	}
+
+	return true;
 }
 
 simulated function bool OnCollected(Actor Collector)

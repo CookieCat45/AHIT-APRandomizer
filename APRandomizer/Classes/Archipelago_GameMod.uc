@@ -11,8 +11,6 @@ var transient bool IsItemTimePiece; // used to tell if a time piece being given 
 var transient bool CollectiblesShuffled;
 var transient bool ControllerCapsLock;
 var transient bool ContractEventActive;
-var array<Actor> ImportantContainers;
-var array<string> PlayerNames;
 
 var config int DebugMode;
 var config int DisableInjection;
@@ -36,7 +34,20 @@ struct immutable ShopItemInfo
 	var int ItemFlags;
 };
 
-var array<ShopItemInfo> ShopItemList;
+struct immutable LocationInfo
+{
+	var int ID;
+	var int ItemID;
+	var int Player;
+	var int Flags;
+	var bool Checked;
+	var string MapName;
+	var string OriginalName;
+	var string ItemName;
+	var Vector Position;
+	var class<Actor> ItemClass;
+	var class<Actor> ContainerClass;
+};
 
 // Level bit prefix
 const ArchipelagoPrefix = "AP_";
@@ -279,10 +290,13 @@ event PreBeginPlay()
 		
 		if (`GameManager.GetChapterInfo().ChapterID == 4)
 		{
-			if (HasAPBit("AlpineFinale", 1))
-				EnableAlpineFinale();
-			else
-				DisableAlpineFinale();
+			if (!class'Hat_SaveBitHelper'.static.HasActBit("ForceAlpineFinale", 1))
+			{
+				if (HasAPBit("AlpineFinale", 1))
+					EnableAlpineFinale();
+				else
+					DisableAlpineFinale();
+			}
 		}
 		
 		SetAPBits("AlpineFinale", 0);
@@ -452,6 +466,10 @@ function OnPostInitGame()
 			ChestArray.AddItem(chest);
 			chest.Content = class'Hat_Collectible_EnergyBit';
 		}
+		
+		// Shuffle items from cache?
+		if (IsMapScouted(class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename()))
+			ShuffleCollectibles();
 		
 		// If act rando or contracts are shuffled, remove these act transitions for the well/manor if we don't enter from the proper act.
 		// This forces the player to find the act/contracts in order to enter them.
@@ -1378,12 +1396,15 @@ function ShuffleCollectibles()
 	local Hat_NPC npc;
 	local int locId, i;
 	local Actor vault;
-	local array<int> locationArray;
+	local array<int> locationArray, shopLocationArray;
 	local array<class<Object>> shopItemClasses;
 	local class<Object> shopItem;
+	local string mapName;
 	
 	if (CollectiblesShuffled)
 		return;
+	
+	mapName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename();
 	
 	foreach DynamicActors(class'Hat_Collectible_Important', collectible)
 	{
@@ -1434,31 +1455,222 @@ function ShuffleCollectibles()
 		BulliedNPCArray.AddItem(npc);
 		locationArray.AddItem(locId);
 	}
-
-	// We can spawn the items when we receive a LocationInfo packet from the server
-	// We need containers like chests to determine if they are important or not
-	if (locationArray.Length > 0)
-		SendMultipleLocationChecks(locationArray, true);
 	
-	locationArray.Length = 0;
 	shopItemClasses = class'Hat_ClassHelper'.static.GetAllScriptClasses("Archipelago_ShopItem_Base");
 	
 	foreach shopItemClasses(shopItem)
 	{
 		if (shopItem == class'Archipelago_ShopItem_Base')
 			continue;
-	
-		locationArray.AddItem(class<Archipelago_ShopItem_Base>(shopItem).default.LocationID);
+		
+		if (IsShopItemCached(class<Archipelago_ShopItem_Base>(shopItem)))
+		{
+			InitShopItemDisplayName(class<Archipelago_ShopItem_Base>(shopItem));
+			continue;
+		}
+		
+		shopLocationArray.AddItem(class<Archipelago_ShopItem_Base>(shopItem).default.LocationID);
 	}
 	
-	// scout shop items
-	if (locationArray.Length > 0)
-		SendMultipleLocationChecks(locationArray, true);
+	if (locationArray.Length > 0 || shopLocationArray.Length > 0)
+	{
+		if (!IsMapScouted(mapName))
+		{
+			for (i = 0; i < shopLocationArray.Length; i++)
+				locationArray.AddItem(shopLocationArray[i]);
+			
+			SendMultipleLocationChecks(locationArray, true);
+		}
+		else
+		{
+			// Load from cache
+			for (i = 0; i < locationArray.Length; i++)
+				CreateItemFromInfo(GetLocationInfoFromID(locationArray[i]));
+			
+			if (shopLocationArray.Length > 0)
+				SendMultipleLocationChecks(shopLocationArray, true);
+		}
+	}
 	
 	if (ChestArray.Length > 0 || BulliedNPCArray.Length > 0)
 		SetTimer(0.5, true, NameOf(IterateChestArray));
 	
 	CollectiblesShuffled = true;
+}
+
+function LocationInfo GetLocationInfoFromID(int id)
+{
+	local int i;
+	local LocationInfo locInfo;
+	for (i = 0; i < SlotData.LocationInfoArray.Length; i++)
+	{
+		if (SlotData.LocationInfoArray[i].ID == id)
+			return SlotData.LocationInfoArray[i];
+	}
+	
+	return locInfo;
+}
+
+function bool IsShopItemCached(class<Archipelago_ShopItem_Base> shopClass)
+{
+	local int i;
+	
+	if (SlotData == None || !SlotData.Initialized)
+		return false;
+	
+	for (i = 0; i < SlotData.ShopItemList.Length; i++)
+	{
+		if (SlotData.ShopItemList[i].ItemClass == class)
+			return true;
+	}
+	
+	return false;
+}
+
+function bool IsLocationCached(int id)
+{
+	local int i;
+	
+	if (SlotData == None || !SlotData.Initialized)
+		return false;
+	
+	for (i = 0; i < SlotData.LocationInfoArray.Length; i++)
+	{
+		if (SlotData.LocationInfoArray[i].ID == id)
+			return true;
+	}
+	
+	return false;
+}
+
+function bool IsMapScouted(string map)
+{
+	return HasAPBit("MapScouted_"$Locs(map), 1);
+}
+
+function Archipelago_RandomizedItem_Base CreateItem(int locId, int itemId, int flags, int player, 
+	optional Hat_Collectible_Important collectible, optional Vector pos)
+{
+	local string timePieceId, itemName, mapName;
+	local class worldClass;
+	local Archipelago_RandomizedItem_Base item;
+	local int i;
+	local bool found;
+	local LocationInfo locInfo;
+	
+	if (!class'Archipelago_ItemInfo'.static.GetNativeItemData(itemId, itemName, worldClass)) // not a regular item
+	{
+		timePieceId = class'Archipelago_ItemInfo'.static.GetTimePieceFromItemID(itemId, , itemName);
+		
+		if (timePieceId != "")
+		{
+			worldClass = class'Archipelago_RandomizedItem_TimeObject';
+		}
+		else
+		{
+			// belongs to another game that isn't A Hat in Time
+			worldClass = class'Archipelago_RandomizedItem_Misc';
+		}
+	}
+	
+	item = Archipelago_RandomizedItem_Base(Spawn(class<Actor>(worldClass), , , collectible != None ? collectible.Location : pos, , , true));
+	item.LocationId = locId;
+	item.ItemId = itemId;
+	item.ItemFlags = flags;
+	item.ItemOwner = player;
+	
+	if (collectible != None)
+	{
+		item.OriginalCollectibleName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename(string(collectible.GetLevelName()))$"."$collectible.Name;
+	}
+	
+	if (!item.Init())
+		return None;
+					
+	if (worldClass != class'Archipelago_RandomizedItem_Misc')
+	{
+		item.ItemDisplayName = itemName;
+	}
+	else
+	{
+		switch (flags)
+		{
+			case ItemFlag_Important:
+				item.ItemDisplayName = "AP Item - Important"; 
+				break;
+				
+			case ItemFlag_ImportantSkipBalancing:
+				item.ItemDisplayName = "AP Item - Important"; 
+				break;
+			
+			case ItemFlag_Useful: 
+				item.ItemDisplayName = "AP Item - Useful"; 
+				break;
+			
+			default: 
+				item.ItemDisplayName = "AP Item"; 
+				break;
+		}
+	}
+	
+	mapName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename();
+
+	// can we cache this item?
+	for (i = 0; i < SlotData.LocationInfoArray.Length; i++)
+	{
+		if (locId == SlotData.LocationInfoArray[i].ID && mapName ~= SlotData.LocationInfoArray[i].MapName)
+		{
+			found = true;
+			break;
+		}
+	}
+	
+	if (!found)
+	{
+		DebugMessage("Caching location: "$locId);
+		locInfo.ID = locId;
+		locInfo.ItemID = itemId;
+		locInfo.Player = player;
+		locInfo.Flags = flags;
+		locInfo.MapName = mapName;
+		locInfo.ItemClass = item.class;
+		locInfo.ItemName = item.ItemDisplayName;
+		locInfo.OriginalName = item.OriginalCollectibleName;
+		locInfo.Position = item.Location;
+		SlotData.LocationInfoArray.AddItem(locInfo);
+	}
+	
+	return item;
+}
+
+function Archipelago_RandomizedItem_Base CreateItemFromInfo(LocationInfo locInfo)
+{
+	local Archipelago_RandomizedItem_Base item;
+	
+	item = Archipelago_RandomizedItem_Base(Spawn(locInfo.ItemClass, , , locInfo.Position, , , true));
+	item.LocationId = locInfo.ID;
+	item.ItemId = locInfo.ItemID;
+	item.ItemFlags = locInfo.Flags;
+	item.ItemOwner = locInfo.Player;
+	item.ItemDisplayName = locInfo.ItemName;
+	item.OriginalCollectibleName = locInfo.OriginalName;
+	
+	if (!item.Init())
+		return None;
+	
+	return item;
+}
+
+function bool IsLocationChecked(int id)
+{
+	local int i;
+	for (i = 0; i < SlotData.LocationInfoArray.Length; i++)
+	{
+		if (SlotData.LocationInfoArray[i].ID == id)
+			return SlotData.LocationInfoArray[i].Checked;
+	}
+	
+	return false;
 }
 
 function bool GetShopItemClassFromLocation(int locationId, out class<Archipelago_ShopItem_Base> outClass)
@@ -1486,20 +1698,62 @@ function bool GetShopItemClassFromLocation(int locationId, out class<Archipelago
 function ShopItemInfo CreateShopItemInfo(class<Archipelago_ShopItem_Base> itemClass, int ItemID, int flags)
 {
 	local ShopItemInfo shopInfo;
+	
 	shopInfo.ItemClass = itemClass;
 	shopInfo.ItemID = itemId;
 	shopInfo.ItemFlags = flags;
-	ShopItemList.AddItem(shopInfo);
+	SlotData.ShopItemList.AddItem(shopInfo);
+	InitShopItemDisplayName(itemClass);
+	
 	return shopInfo;
+}
+
+function InitShopItemDisplayName(class<Archipelago_ShopItem_Base> itemClass)
+{
+	local ShopItemInfo shopInfo;
+	local string displayName;
+	
+	if (!GetShopItemInfo(itemClass, shopInfo))
+		return;
+	
+	if (class'Archipelago_ItemInfo'.static.GetNativeItemData(shopInfo.ItemID, displayName))
+	{
+		itemClass.static.SetDisplayName(displayName);
+	}
+	else
+	{
+		switch (shopInfo.ItemFlags)
+		{
+			case ItemFlag_Important:
+				itemClass.static.SetDisplayName("AP Item (Progression)");
+				break;
+			
+			case ItemFlag_ImportantSkipBalancing:
+				itemClass.static.SetDisplayName("AP Item (Progression)");
+				break;
+			
+			case ItemFlag_Trap:
+				itemClass.static.SetDisplayName("AP Item (Progression)");
+				break;
+			
+			case ItemFlag_Useful:
+				itemClass.static.SetDisplayName("AP Item (Useful)");
+				break;
+			
+			default:
+				itemClass.static.SetDisplayName("AP Item");
+				break;
+		}
+	}
 }
 
 function int GetShopItemID(class<Archipelago_ShopItem_Base> itemClass)
 {
 	local int i;
-	for (i = 0; i < ShopItemList.Length; i++)
+	for (i = 0; i < SlotData.ShopItemList.Length; i++)
 	{
-		if (ShopItemList[i].ItemClass == itemClass)
-			return ShopItemList[i].ItemID;
+		if (SlotData.ShopItemList[i].ItemClass == itemClass)
+			return SlotData.ShopItemList[i].ItemID;
 	}
 	
 	return 0;
@@ -1508,11 +1762,11 @@ function int GetShopItemID(class<Archipelago_ShopItem_Base> itemClass)
 function bool GetShopItemInfo(class<Archipelago_ShopItem_Base> itemClass, optional out ShopItemInfo shopInfo)
 {
 	local int i;
-	for (i = 0; i < ShopItemList.Length; i++)
+	for (i = 0; i < SlotData.ShopItemList.Length; i++)
 	{
-		if (ShopItemList[i].ItemClass == itemClass)
+		if (SlotData.ShopItemList[i].ItemClass == itemClass)
 		{
-			shopInfo = ShopItemList[i];
+			shopInfo = SlotData.ShopItemList[i];
 			return true;
 		}
 	}
@@ -1547,8 +1801,6 @@ function IterateChestArray()
 		}
 		
 		locationArray.AddItem(ObjectToLocationId(ChestArray[i]));
-		SlotData.OpenedContainerIDs.AddItem(ObjectToLocationId(ChestArray[i]));
-		ImportantContainers.RemoveItem(ChestArray[i]);
 		ChestArray.RemoveItem(ChestArray[i]);
 	}
 	
@@ -1568,8 +1820,6 @@ function IterateChestArray()
 		}
 		
 		locationArray.AddItem(ObjectToLocationId(BulliedNPCArray[i]));
-		ImportantContainers.RemoveItem(BulliedNPCArray[i]);
-		SlotData.OpenedContainerIDs.AddItem(ObjectToLocationId(BulliedNPCArray[i]));
 		BulliedNPCArray.RemoveItem(BulliedNPCArray[i]);
 	}
 	
@@ -1634,6 +1884,9 @@ function OnPreBreakableBreak(Actor Breakable, Pawn Breaker)
 		
 		if (hasImportantItem)
 		{
+			if (IsLocationChecked(ObjectToLocationId(b)))
+				return;
+			
 			if (bool(DebugMode))
 			{
 				message = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename(string(b.GetLevelName()));
@@ -1652,8 +1905,6 @@ function OnPreBreakableBreak(Actor Breakable, Pawn Breaker)
 			rot.Pitch = 16384 + RandRange(rangeMin,rangeMax);
 			vel = Vector(rot)*RandRange(150,300) + vect(0,0,1)*RandRange(200,500);
 			item.Bounce(vel);
-			
-			ImportantContainers.RemoveItem(b);
 		}
 	}
 }
@@ -1738,9 +1989,6 @@ function OnCollectibleSpawned(Object collectible)
 				rot.Pitch += RandRange(range*-1,range);
 				vel = Vector(rot)*RandRange(150,300) + vect(0,0,1)*RandRange(200,500);
 				item.Bounce(vel);
-				
-				ImportantContainers.RemoveItem(Actor(collectible).Owner);
-				SlotData.OpenedContainerIDs.AddItem(ObjectToLocationId(Actor(collectible).Owner));
 				Actor(collectible).Destroy();
 			}
 		}
@@ -1909,6 +2157,7 @@ function int GetHatYarnCost(class<Hat_Ability> hatClass)
 function SendLocationCheck(int id, optional bool scout)
 {
 	local string jsonMessage;
+	local int i;
 	
 	if (!IsFullyConnected() && !scout)
 	{
@@ -1920,6 +2169,23 @@ function SendLocationCheck(int id, optional bool scout)
 	if (!scout)
 	{
 		jsonMessage = "[{\"cmd\":\"LocationChecks\",\"locations\":[" $id $"]}]";
+		for (i = 0; i < SlotData.LocationInfoArray.Length; i++)
+		{
+			if (SlotData.LocationInfoArray[i].ID == id)
+			{
+				SlotData.LocationInfoArray[i].Checked = true;
+				
+				if (SlotData.PlayerSlot != SlotData.LocationInfoArray[i].Player)
+				{
+					ScreenMessage("Sent " $SlotData.LocationInfoArray[i].ItemName 
+						$" to " $PlayerIdToName(SlotData.LocationInfoArray[i].Player));
+				}
+				
+				break;
+			}
+		}
+		
+		SaveGame();
 	}
 	else
 	{
@@ -1932,7 +2198,7 @@ function SendLocationCheck(int id, optional bool scout)
 function SendMultipleLocationChecks(array<int> locationArray, optional bool scout, optional bool hint)
 {
 	local string jsonMessage;
-	local int i;
+	local int i, j;
 	
 	if (!IsFullyConnected() && !scout && !hint)
 	{
@@ -1940,22 +2206,46 @@ function SendMultipleLocationChecks(array<int> locationArray, optional bool scou
 		SaveGame();
 		return;
 	}
-
+	
 	if (!scout)
 	{
 		jsonMessage = "[{\"cmd\":\"LocationChecks\",\"locations\":[";
+		for (i = 0; i < locationArray.Length; i++)
+		{
+			jsonMessage $= locationArray[i];
+			if (i+1 < locationArray.Length)
+			{
+				jsonMessage $= ",";
+			}
+			
+			for (j = 0; j < SlotData.LocationInfoArray.Length; j++)
+			{
+				if (SlotData.LocationInfoArray[j].ID == locationArray[i])
+				{
+					SlotData.LocationInfoArray[j].Checked = true;
+					if (SlotData.PlayerSlot != SlotData.LocationInfoArray[i].Player)
+					{
+						ScreenMessage("Sent " $SlotData.LocationInfoArray[j].ItemName 
+							$" to " $PlayerIdToName(SlotData.LocationInfoArray[j].Player));
+					}
+					
+					break;
+				}
+			}
+		}
+		
+		SaveGame();
 	}
 	else
 	{
 		jsonMessage = "[{\"cmd\":\"LocationScouts\",\"locations\":[";
-	}
-	
-	for (i = 0; i < locationArray.Length; i++)
-	{
-		jsonMessage $= locationArray[i];
-		if (i+1 < locationArray.Length)
+		for (i = 0; i < locationArray.Length; i++)
 		{
-			jsonMessage $= ",";
+			jsonMessage $= locationArray[i];
+			if (i+1 < locationArray.Length)
+			{
+				jsonMessage $= ",";
+			}
 		}
 	}
 	
@@ -2332,7 +2622,10 @@ function bool IsActReallyCompleted(Hat_ChapterActInfo act)
 			{
 				shuffled = GetShuffledAct(act);
 				if (shuffled != None && shuffled.hourglass == "") // Free Roam
+				{
+					SetAPBits("ActComplete_"$act.hourglass, 1);
 					return true;
+				}
 			}
 		}
 		else if (act.hourglass == "")
@@ -2408,6 +2701,9 @@ function ScreenMessage(String message, optional Name type)
 {
 	local PlayerController pc;
 	pc = GetALocalPlayerController();
+    if (pc == None)
+		return;
+
     pc.ClientMessage(message, type, 8);
 	pc.MyHUD.DisplayConsoleMessages();
 }
@@ -2420,6 +2716,9 @@ function DebugMessage(String message, optional Name type)
 		return;
 	
 	pc = GetALocalPlayerController();
+    if (pc == None)
+		return;
+
     pc.ClientMessage(message, type, 8);
 	pc.MyHUD.DisplayConsoleMessages();
 }
@@ -2467,7 +2766,13 @@ function int GetChapterIDRange(Hat_ChapterInfo chapter)
 
 function string PlayerIdToName(int id)
 {
-	return PlayerNames[id];
+	if (id <= 0)
+		return "Server";
+	
+	if (id >= SlotData.PlayerNames.Length || SlotData.PlayerNames[id] == "")
+		return "Unknown Player";
+	
+	return SlotData.PlayerNames[id];
 }
 
 // Equivalent to Repl(), but only replaces the given string once

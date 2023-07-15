@@ -3,6 +3,9 @@ class Archipelago_SlotData extends Object
 
 var transient bool Initialized;
 var array<ShuffledAct> ShuffledActList;
+var array<LocationInfo> LocationInfoArray;
+var array<ShopItemInfo> ShopItemList;
+var array<string> PlayerNames;
 
 var bool ConnectedOnce;
 
@@ -36,7 +39,6 @@ var array< class<Hat_SnatcherContract_Act> > ObtainedContracts;
 var array< class<Hat_SnatcherContract_Act> > TakenContracts;
 var array< class<Hat_SnatcherContract_Act> > CheckedContracts;
 var array<string> TakenTimePieces;
-var array<int> OpenedContainerIDs; // for Compass Badge
 
 // hat stitch order
 var EHatType Hat1;

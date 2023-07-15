@@ -170,7 +170,7 @@ event Tick(float d)
 		count = ReadBinary(255, byteMessage);
 		if (count <= 0)
 			return;
-
+		
 		// Check for a ping first
 		if (!ParsingMessage)
 		{
@@ -207,23 +207,17 @@ event Tick(float d)
 			
 			if (character == "[")
 			{
-				// fix odd problem where two square brackets are present at start for some reason
-				if (!ParsingMessage && Chr(byteMessage[i+1]) == "[")
-				{
-					continue;
-				}
-				
 				if (ParsingMessage)
 				{
 					BracketCounter--;
 				}
 				else // This is the beginning of a JSON message
 				{
-					CurrentMessage = "[";
+					CurrentMessage = "";
 					ParsingMessage = true;
 				}
 			}
-			else if (character == "]")
+			else if (ParsingMessage && character == "]")
 			{
 				BracketCounter++;
 				if (BracketCounter > 0)
@@ -303,7 +297,6 @@ function ParseJSON(string json)
 			}
 			
 			// Initialize our player's names
-			`AP.PlayerNames.Length = 0;
 			`AP.ReplOnce(json, "players", "players_0", json, true);
 			b = true;
 			count = 0;
@@ -328,7 +321,7 @@ function ParseJSON(string json)
 				if (jsonChild == None)
 					continue;
 					
-				`AP.PlayerNames[jsonChild.GetIntValue("slot")] = jsonChild.GetStringValue("alias");
+				`AP.SlotData.PlayerNames[jsonChild.GetIntValue("slot")] = jsonChild.GetStringValue("alias");
 			}
 			
 			// Fully connected
@@ -390,17 +383,19 @@ function bool IsValidMessageType(string msgType)
 	return (msgType != "ItemSend" && msgType != "Hint" && msgType != "player_id");
 }
 
-// TODO: Cache locations and their items per map so we don't have to do this every time.
 function OnLocationInfoCommand(string json)
 {
+	local LocationInfo locInfo;
 	local bool b, isItem;
 	local int i, locId, count;
-	local string s;
+	local string s, mapName;
 	local JsonObject jsonObj, jsonChild;
 	local Archipelago_RandomizedItem_Base item;
 	local Hat_Collectible_Important collectible;
 	local class<Archipelago_ShopItem_Base> shopItemClass;
 	local Actor container;
+	
+	mapName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename();
 	
 	`AP.ReplOnce(json, "locations", "locations_0", json, true);
 	b = true;
@@ -450,7 +445,7 @@ function OnLocationInfoCommand(string json)
 				{
 					`AP.DebugMessage("Replacing item: "$collectible $", Location ID: "$locId);
 					
-					CreateItem(locId, 
+					`AP.CreateItem(locId, 
 						jsonChild.GetIntValue("item"),
 						jsonChild.GetIntValue("flags"),
 						jsonChild.GetIntValue("player"),
@@ -465,11 +460,13 @@ function OnLocationInfoCommand(string json)
 			locId = jsonChild.GetIntValue("location");
 			if (!isItem && `AP.IsLocationIDContainer(locId, container))
 			{
-				if (jsonChild.GetIntValue("flags") != ItemFlag_Garbage)
-				{
-					`AP.ImportantContainers.AddItem(container);
-				}
-				
+				locInfo.ID = locId;
+				locInfo.ItemID = jsonChild.GetIntValue("item");
+				locInfo.Player = jsonChild.GetIntValue("player");
+				locInfo.Flags = jsonChild.GetIntValue("flags");
+				locInfo.MapName = mapName;
+				locInfo.ContainerClass = container.class;
+				`AP.SlotData.LocationInfoArray.AddItem(locInfo);
 				continue;
 			}
 			
@@ -479,85 +476,30 @@ function OnLocationInfoCommand(string json)
 				|| locId == `AP.CameraBadgeCheck2 && `AP.HasAPBit("Camera2Check", 1))
 					continue;
 				
-				item = CreateItem(locId, 
+				item = `AP.CreateItem(locId, 
 					jsonChild.GetIntValue("item"),
 					jsonChild.GetIntValue("flags"),
 					jsonChild.GetIntValue("player"),
 					,
 					locId == `AP.CameraBadgeCheck1 ? `AP.Camera1Loc : `AP.Camera2Loc);
 				
-				item.OriginalCollectibleName = locId == `AP.CameraBadgeCheck1 ? "AP_Camera1Check" : "AP_Camera2Check";
-				item.Init();
+				if (item != None)
+				{
+					item.OriginalCollectibleName = locId == `AP.CameraBadgeCheck1 ? "AP_Camera1Check" : "AP_Camera2Check";
+					item.Init();
+				}
 			}
-		}		
+		}
+	}
+	
+	if (!`AP.IsMapScouted(mapName))
+	{
+		`AP.SetAPBits("MapScouted_"$Locs(mapName), 1);
+		`AP.SaveGame();
 	}
 	
 	jsonObj = None;
 	jsonChild = None;
-}
-
-function Archipelago_RandomizedItem_Base CreateItem(int locId, int itemId, int flags, int player, 
-	optional Hat_Collectible_Important collectible, optional Vector pos)
-{
-	local string timePieceId, itemName;
-	local class worldClass;
-	local Archipelago_RandomizedItem_Base item;
-	
-	if (!class'Archipelago_ItemInfo'.static.GetNativeItemData(itemId, itemName, worldClass)) // not a regular item
-	{
-		timePieceId = class'Archipelago_ItemInfo'.static.GetTimePieceFromItemID(itemId, , itemName);
-		
-		if (timePieceId != "")
-		{
-			worldClass = class'Archipelago_RandomizedItem_TimeObject';
-		}
-		else
-		{
-			// belongs to another game that isn't A Hat in Time
-			worldClass = class'Archipelago_RandomizedItem_Misc';
-		}
-	}
-	
-	item = Archipelago_RandomizedItem_Base(Spawn(class<Actor>(worldClass), , , collectible != None ? collectible.Location : pos, , , true));
-	item.LocationId = locId;
-	item.ItemId = itemId;
-	item.ItemFlags = flags;
-	item.ItemOwner = player;
-	
-	if (collectible != None)
-	{
-		item.OriginalCollectibleName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename(string(collectible.GetLevelName()))$"."$collectible.Name;
-	}
-
-	item.Init();
-					
-	if (worldClass != class'Archipelago_RandomizedItem_Misc')
-	{
-		item.ItemDisplayName = itemName;
-	}
-	else
-	{
-		switch (flags)
-		{
-			case ItemFlag_Important:
-				item.ItemDisplayName = "AP Item - Important"; 
-				break;
-				
-			case ItemFlag_ImportantSkipBalancing:
-				item.ItemDisplayName = "AP Item - Important"; 
-				break;
-			
-			case ItemFlag_Useful: 
-				item.ItemDisplayName = "AP Item - Useful"; 
-				break;
-			
-			default: 
-				item.ItemDisplayName = "AP Item"; 
-				break;
-		}
-	}
-	
-	return item;
 }
 
 function OnReceivedItemsCommand(string json, optional bool connection)
@@ -567,15 +509,13 @@ function OnReceivedItemsCommand(string json, optional bool connection)
 	local JsonObject jsonObj, jsonChild;
 	local bool b;
 	
-	`AP.DebugMessage("Receiving items...");
-
 	`AP.ReplOnce(json, "items", "items_0", json, true);
 	b = true;
 	count = 0;
 	
 	while (b)
 	{
-		if (`AP.ReplOnce(json, ",{", ",\"items_"$ count+1 $"\":{", s, false))
+		if (`AP.ReplOnce(json, ",{", ",\"items_"$count+1 $"\":{", s, false))
 		{
 			json = s;
 			count++;
@@ -586,6 +526,7 @@ function OnReceivedItemsCommand(string json, optional bool connection)
 		}
 	}
 	
+	`AP.DebugMessage("Receiving items... "$json);
 	jsonObj = class'JsonObject'.static.DecodeJson(json);
 	index = `AP.GetAPBits("LastItemIndex");
 	
@@ -618,12 +559,12 @@ function OnReceivedItemsCommand(string json, optional bool connection)
 
 			if (timePieceId != "") // Time Piece?
 			{
-				GrantTimePiece(timePieceId, bool(isAct), timePieceName);
+				GrantTimePiece(timePieceId, bool(isAct), timePieceName, jsonChild.GetIntValue("player"));
 			}	
 			else
 			{
 				// regular item
-				GrantItem(id);
+				GrantItem(id, jsonChild.GetIntValue("player"));
 			}
 				
 			total++;
@@ -636,7 +577,7 @@ function OnReceivedItemsCommand(string json, optional bool connection)
 	`AP.SaveGame();
 }
 
-function GrantTimePiece(string timePieceId, bool IsAct, string itemName)
+function GrantTimePiece(string timePieceId, bool IsAct, string itemName, int playerId)
 {
 	local Archipelago_RandomizedItem_Base item;
 	local Pawn player;
@@ -647,11 +588,18 @@ function GrantTimePiece(string timePieceId, bool IsAct, string itemName)
 	item.PickupActor = player;
 	item.OnCollected(player);
 	
-	`AP.ScreenMessage("Got Time Piece: " $itemName);
+	if (playerId != `AP.SlotData.PlayerSlot)
+	{
+		`AP.ScreenMessage("Got Time Piece: " $itemName $" (from " $`AP.PlayerIdToName(playerId)$")");
+	}
+	else
+	{
+		`AP.ScreenMessage("Got Time Piece: " $itemName);
+	}
 	
 	// Tell AP to stop removing this Time Piece in OnTimePieceCollected()
 	`AP.SetAPBits(timePieceId, 1);
-
+	
 	`AP.IsItemTimePiece = true;
 	`SaveManager.GetCurrentSaveData().GiveTimePiece(timePieceId, IsAct);
 	`AP.IsItemTimePiece = false;
@@ -663,7 +611,7 @@ function GrantTimePiece(string timePieceId, bool IsAct, string itemName)
 	}
 }
 
-function GrantItem(int itemId)
+function GrantItem(int itemId, int playerId)
 {
 	local class worldClass;
 	local class invOverride;
@@ -708,7 +656,14 @@ function GrantItem(int itemId)
 		// We already show a different message for yarn
 		if (itemId != class'Archipelago_ItemInfo'.static.GetYarnItemID())
 		{
-			`AP.ScreenMessage("Got " $itemName);
+			if (playerId != `AP.SlotData.PlayerSlot)
+			{
+				`AP.ScreenMessage("Got " $itemName $" (from "$`AP.PlayerIdToName(playerId)$")");
+			}
+			else
+			{
+				`AP.ScreenMessage("Got " $itemName);
+			}
 		}
 	}
 	else
@@ -716,7 +671,7 @@ function GrantItem(int itemId)
 		// screen message so players report problems
 		`AP.ScreenMessage("[GrantItem] Unknown item ID: " $itemId);
 	}
-
+	
 	if (class'Archipelago_ItemInfo'.static.GetContractFromID(itemId) != None)
 	{
 		contract = class'Archipelago_ItemInfo'.static.GetContractFromID(itemId);
