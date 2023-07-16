@@ -18,7 +18,7 @@ simulated function BuildActs(HUD H)
 		for (i = UnlockedActIDs.Length-1; i >= 0; i--)
 		{
 			if (UnlockedActIDs[i].ActID != 99 && (ChapterInfo.ActIDAfterIntro <= 0 || UnlockedActIDs[i].ActID != ChapterInfo.ActIDAfterIntro)) continue;
-			UnlockedActIDs.Remove(i,1);
+				UnlockedActIDs.Remove(i,1);
 		}
 	}
 	
@@ -181,110 +181,6 @@ simulated function BuildActs(HUD H)
 	UpdatePlanetRotation(1);
 }
 
-simulated function SetChapterInfo(HUD H, Hat_ChapterInfo i, optional String InModChapterPackageName)
-{
-	local Hat_DynamicStaticActor sa;
-
-	local Array<Hat_ChapterActInfo> UnlockedActIDs;
-	ChapterInfo = i;
-	ModChapterPackageName = InModChapterPackageName;
-	
-	UnlockedActIDs = GetUnlockedActIDs(ChapterInfo,,ModChapterPackageName);
-	
-	IsActiveStandoff = ChapterInfo.IsStandoff && UnlockedActIDs.Length > 1;
-	
-	if (IsActiveStandoff)
-	{
-		IconsCenterLocation.X = 0.5f;
-		IconsCenterLocation.Y = 0.4f;
-	}
-	BuildHourglasses(H);
-	
-	if (ActSelectStandoffEmitter != None)
-		ActSelectStandoffEmitter.ParticleSystemComponent.SetActive(IsActiveStandoff);
-	
-	UpdateColorSchemes(H);
-	if (IsActiveStandoff)
-		UpdateStandoffPoints(H);
-
-	if (PlanetActor != None)
-		PlanetActor.SetHidden(ChapterInfo.HasLavaPlanet);
-
-	foreach GetWorldInfo().AllActors(class'Hat_DynamicStaticActor',sa)
-	{
-		if (sa.Tag == 'ActSelectLavaPlanetActor')
-		{
-			sa.SetHidden(!ChapterInfo.HasLavaPlanet);
-			break;
-		}
-	}
-}
-
-function Array<Hat_ChapterActInfo> GetUnlockedActIDs(Hat_ChapterInfo ci, optional bool IncludePreviewFinale = false, optional string ModPackageName, optional bool bShouldSort)
-{
-	local Array<Hat_ChapterActInfo> UnlockedActIDs;
-	local int i, actid;
-	local bool ChapterFinaleIsUnlocked;
-	local Hat_ChapterActInfo FinaleChapterActInfo;
-	
-	ChapterFinaleIsUnlocked = false;
-	UnlockedActIDs.Length = 0;
-	FinaleChapterActInfo = None;
-	ci.ConditionalUpdateActList();
-	for (i = 0; i < ci.ChapterActInfo.Length; i++)
-	{
-		if (ci.ChapterActInfo[i].IsBonus) continue;
-		
-		// Finale act should show up even if its not complete
-		if (ci.FinaleActID == actid)
-			FinaleChapterActInfo = ci.ChapterActInfo[i];
-		
-		if (!`AP.IsChapterActInfoUnlocked(ci.ChapterActInfo[i], ModPackageName)) continue;
-		UnlockedActIDs.AddItem(ci.ChapterActInfo[i]);
-		actid = ci.ChapterActInfo[i].ActID;
-		if (ci.FinaleActID == actid) ChapterFinaleIsUnlocked = true;
-	}
-	
-	if (IncludePreviewFinale && FinaleChapterActInfo != None && ci.FinaleActID > 0 && UnlockedActIDs.Length > 1 && !ChapterFinaleIsUnlocked)
-	{
-		// always show up
-		UnlockedActIDs.AddItem(FinaleChapterActInfo);
-	}
-	
-	if (bShouldSort)
-		UnlockedActIDs.Sort(SortChapterActInfoByActID);
-	
-	return UnlockedActIDs;
-}
-
-// Makes the assumption both ChapterActInfo are from the same ChapterInfo
-function int SortChapterActInfoByActID(Hat_ChapterActInfo a, Hat_ChapterActInfo b)
-{
-	local int AdjustedActIDA, AdjustedActIDB;
-	local Hat_ChapterInfo ci;
-	
-	AdjustedActIDA = a.ActID;
-	AdjustedActIDB = b.ActID;
-	
-	ci = a.ChapterInfo;
-	if (ci != None)
-	{
-		if (a.ActID == ci.FinaleActID) AdjustedActIDA = 999; // finale is always last
-		if (b.ActID == ci.FinaleActID) AdjustedActIDB = 999; // finale is always last
-		
-		if (a.ActID == 99) AdjustedActIDA = -2; // free roam is always first
-		if (b.ActID == 99) AdjustedActIDB = -2; // free roam is always first
-		
-		if (ci.ActIDAfterIntro > 0)
-		{
-			if (a.ActID == ci.ActIDAfterIntro) AdjustedActIDA = -1; // ActIDAfterIntro is right after free roam in the list
-			if (b.ActID == ci.ActIDAfterIntro) AdjustedActIDB = -1; // ActIDAfterIntro is right after free roam in the list
-		}
-	}
-	
-	return AdjustedActIDB-AdjustedActIDA;
-}
-
 simulated function BuildSpecialHourglasses(HUD H)
 {
 	local MenuSelectHourglass s;
@@ -403,7 +299,7 @@ simulated function BuildSpecialHourglasses(HUD H)
 			{
 				shuffledAct = `AP.GetShuffledAct(s.ChapterActInfo, basement);
 			}
-
+			
 			if (shuffledAct == None)
 				shuffledAct = s.ChapterActInfo;
 		}
@@ -424,6 +320,8 @@ simulated function BuildSpecialHourglasses(HUD H)
 				s.ActInfoboxTitle = class'Hat_Localizer'.static.GetSystem("levels", "Act") $ " " $ s.ActID;
 			s.ActInfoboxName = GetLocalizedActName(shuffledAct, context);
 		}
+		
+		s.ActDisplayLabel = s.ActInfoboxName;
 		
 		s.InstancedIcon = None;
 		if (!s.IsComplete)
@@ -446,9 +344,9 @@ simulated function BuildSpecialHourglasses(HUD H)
 		s.PosX = IconsCenterLocation.X;
 		s.PosY = IconsCenterLocation.Y + 0.05;
 		s.Hourglass =  "freeroam";
-		s.ActInfoboxTitle = class'Hat_Localizer'.static.GetSystem("levels", "FreeRoamDesc");
-		s.ActInfoboxName = Caps(class'Hat_Localizer'.static.GetGame("levels", "FreeRoam"));
-		s.ActDisplayLabel = "";
+		//s.ActInfoboxTitle = class'Hat_Localizer'.static.GetSystem("levels", "FreeRoamDesc");
+		//s.ActInfoboxName = Caps(class'Hat_Localizer'.static.GetGame("levels", "FreeRoam"));
+		//s.ActDisplayLabel = "";
 		s.IsDefault = true;
 		s.IsUnlocked = true;
 		s.PonPayCost = 0;
@@ -484,6 +382,33 @@ simulated function BuildSpecialHourglasses(HUD H)
 			s.SpecialAnimation = None;
 		s.IsValid = true;
 		
+		if (`AP.SlotData.ActRando)
+		{
+			if (ChapterInfo.ChapterID == 2 && s.ActID == 6 && `AP.IsAwardCeremonyCompleted())
+			{
+				shuffledAct = `AP.GetDeadBirdBasementShuffledAct();
+			}
+			else
+			{
+				shuffledAct = `AP.GetShuffledAct(s.ChapterActInfo, basement);
+			}
+			
+			if (shuffledAct == None)
+				shuffledAct = s.ChapterActInfo;
+		}
+		else
+		{
+			shuffledAct = s.ChapterActInfo;
+		}
+		
+		context = shuffledAct.IsBonus ? 1 : `AP.IsActFreeRoam(shuffledAct) ? 2 : 0;
+		
+		s.ActInfoboxName = basement == 0 ? GetLocalizedActName(shuffledAct, context) : 
+			GetLocalizedActName(Hat_ChapterActInfo(DynamicLoadObject(
+				"hatintime_chapterinfo.BattleOfTheBirds.BattleOfTheBirds_AwardCeremony", class'Hat_ChapterActInfo')), 0);
+		
+		s.ActDisplayLabel = s.ActInfoboxName;
+
 		Hourglasses.AddItem(s);
 	}
 	else if (HasFreeRoam)
@@ -492,9 +417,9 @@ simulated function BuildSpecialHourglasses(HUD H)
 		s.PosX = IconsCenterLocation.X - (HasFinale ? 0.07 : 0.0);
 		s.PosY = IconsCenterLocation.Y - 0.4;
 		s.Hourglass =  "freeroam";
-		s.ActInfoboxTitle = class'Hat_Localizer'.static.GetSystem("levels", "FreeRoamDesc");
-		s.ActInfoboxName = Caps(class'Hat_Localizer'.static.GetGame("levels", "FreeRoam"));
-		s.ActDisplayLabel = "";
+		//s.ActInfoboxTitle = class'Hat_Localizer'.static.GetSystem("levels", "FreeRoamDesc");
+		//s.ActInfoboxName = Caps(class'Hat_Localizer'.static.GetGame("levels", "FreeRoam"));
+		//s.ActDisplayLabel = "";
 		s.IsDefault = false;
 		s.IsUnlocked = true;
 		s.PonPayCost = 0;
@@ -525,6 +450,33 @@ simulated function BuildSpecialHourglasses(HUD H)
 			s.SpecialAnimation = None;
 		s.IsValid = true;
 		
+		if (`AP.SlotData.ActRando)
+		{
+			if (ChapterInfo.ChapterID == 2 && s.ActID == 6 && `AP.IsAwardCeremonyCompleted())
+			{
+				shuffledAct = `AP.GetDeadBirdBasementShuffledAct();
+			}
+			else
+			{
+				shuffledAct = `AP.GetShuffledAct(s.ChapterActInfo, basement);
+			}
+			
+			if (shuffledAct == None)
+				shuffledAct = s.ChapterActInfo;
+		}
+		else
+		{
+			shuffledAct = s.ChapterActInfo;
+		}
+		
+		context = shuffledAct.IsBonus ? 1 : `AP.IsActFreeRoam(shuffledAct) ? 2 : 0;
+		
+		s.ActInfoboxName = basement == 0 ? GetLocalizedActName(shuffledAct, context) : 
+			GetLocalizedActName(Hat_ChapterActInfo(DynamicLoadObject(
+				"hatintime_chapterinfo.BattleOfTheBirds.BattleOfTheBirds_AwardCeremony", class'Hat_ChapterActInfo')), 0);
+		
+		s.ActDisplayLabel = s.ActInfoboxName;
+
 		Hourglasses.AddItem(s);
 	}
 }
@@ -675,6 +627,82 @@ simulated function BuildBonusHourglassesSide(HUD H, Array<Hat_ChapterActInfo> Ho
 	}
 }
 
+simulated function SetChapterInfo(HUD H, Hat_ChapterInfo i, optional String InModChapterPackageName)
+{
+	local Hat_DynamicStaticActor sa;
+
+	local Array<Hat_ChapterActInfo> UnlockedActIDs;
+	ChapterInfo = i;
+	ModChapterPackageName = InModChapterPackageName;
+	
+	UnlockedActIDs = GetUnlockedActIDs(ChapterInfo,,ModChapterPackageName);
+	
+	IsActiveStandoff = ChapterInfo.IsStandoff && UnlockedActIDs.Length > 1;
+	
+	if (IsActiveStandoff)
+	{
+		IconsCenterLocation.X = 0.5f;
+		IconsCenterLocation.Y = 0.4f;
+	}
+	BuildHourglasses(H);
+	
+	if (ActSelectStandoffEmitter != None)
+		ActSelectStandoffEmitter.ParticleSystemComponent.SetActive(IsActiveStandoff);
+	
+	UpdateColorSchemes(H);
+	if (IsActiveStandoff)
+		UpdateStandoffPoints(H);
+
+	if (PlanetActor != None)
+		PlanetActor.SetHidden(ChapterInfo.HasLavaPlanet);
+
+	foreach GetWorldInfo().AllActors(class'Hat_DynamicStaticActor',sa)
+	{
+		if (sa.Tag == 'ActSelectLavaPlanetActor')
+		{
+			sa.SetHidden(!ChapterInfo.HasLavaPlanet);
+			break;
+		}
+	}
+}
+
+function Array<Hat_ChapterActInfo> GetUnlockedActIDs(Hat_ChapterInfo ci, optional bool IncludePreviewFinale = false, optional string ModPackageName, optional bool bShouldSort)
+{
+	local Array<Hat_ChapterActInfo> UnlockedActIDs;
+	local int i, actid;
+	local bool ChapterFinaleIsUnlocked;
+	local Hat_ChapterActInfo FinaleChapterActInfo;
+	
+	ChapterFinaleIsUnlocked = false;
+	UnlockedActIDs.Length = 0;
+	FinaleChapterActInfo = None;
+	ci.ConditionalUpdateActList();
+	for (i = 0; i < ci.ChapterActInfo.Length; i++)
+	{
+		if (ci.ChapterActInfo[i].IsBonus) continue;
+		
+		// Finale act should show up even if its not complete
+		if (ci.FinaleActID == actid)
+			FinaleChapterActInfo = ci.ChapterActInfo[i];
+		
+		if (!`AP.IsChapterActInfoUnlocked(ci.ChapterActInfo[i], ModPackageName)) continue;
+		UnlockedActIDs.AddItem(ci.ChapterActInfo[i]);
+		actid = ci.ChapterActInfo[i].ActID;
+		if (ci.FinaleActID == actid) ChapterFinaleIsUnlocked = true;
+	}
+	
+	if (IncludePreviewFinale && FinaleChapterActInfo != None && ci.FinaleActID > 0 && UnlockedActIDs.Length > 1 && !ChapterFinaleIsUnlocked)
+	{
+		// always show up
+		UnlockedActIDs.AddItem(FinaleChapterActInfo);
+	}
+	
+	if (bShouldSort)
+		UnlockedActIDs.Sort(SortChapterActInfoByActID);
+	
+	return UnlockedActIDs;
+}
+
 simulated function bool HasActiveBlockingFinale(HUD H)
 {
 	local int TotalRequired, CompletedRequiredActsLength;
@@ -774,4 +802,32 @@ function bool PayTimePiece(string TimePieceID)
 	t.Paid = true;
     save.TimeObjects.AddItem(t);
     return true;
+}
+
+// Makes the assumption both ChapterActInfo are from the same ChapterInfo
+function int SortChapterActInfoByActID(Hat_ChapterActInfo a, Hat_ChapterActInfo b)
+{
+	local int AdjustedActIDA, AdjustedActIDB;
+	local Hat_ChapterInfo ci;
+	
+	AdjustedActIDA = a.ActID;
+	AdjustedActIDB = b.ActID;
+	
+	ci = a.ChapterInfo;
+	if (ci != None)
+	{
+		if (a.ActID == ci.FinaleActID) AdjustedActIDA = 999; // finale is always last
+		if (b.ActID == ci.FinaleActID) AdjustedActIDB = 999; // finale is always last
+		
+		if (a.ActID == 99) AdjustedActIDA = -2; // free roam is always first
+		if (b.ActID == 99) AdjustedActIDB = -2; // free roam is always first
+		
+		if (ci.ActIDAfterIntro > 0)
+		{
+			if (a.ActID == ci.ActIDAfterIntro) AdjustedActIDA = -1; // ActIDAfterIntro is right after free roam in the list
+			if (b.ActID == ci.ActIDAfterIntro) AdjustedActIDB = -1; // ActIDAfterIntro is right after free roam in the list
+		}
+	}
+	
+	return AdjustedActIDB-AdjustedActIDA;
 }

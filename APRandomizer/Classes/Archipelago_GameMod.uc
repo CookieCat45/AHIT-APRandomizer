@@ -2051,6 +2051,7 @@ function OnCollectedCollectible(Object collectible)
 	if (SlotData.ShuffleStorybookPages && collectible.IsA('Hat_Collectible_StoryBookPage'))
 	{
 		SendLocationCheck(ObjectToLocationId(collectible));
+		SetAPBits(class'Hat_SaveBitHelper'.static.GetBitID(collectible), 1);
 	}
 	else // Normal item
 	{

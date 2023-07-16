@@ -48,9 +48,9 @@ function UpdateClosestMarker(HUD H)
 		if (m.ChestArray.Find(chest) == -1) continue;
 		
 		locId = m.ObjectToLocationId(chest);
-		if (!CanReachLocation(locId) || `AP.IsLocationChecked(locId)) continue;
+		if (!CanReachLocation(locId) || m.IsLocationChecked(locId)) continue;
 		
-		locInfo = `AP.GetLocationInfoFromID(locId);
+		locInfo = m.GetLocationInfoFromID(locId);
 		if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
 		
 		UpdateClosestMarker_Actor(H, chest, closest_distance, bestindx);
@@ -60,7 +60,7 @@ function UpdateClosestMarker(HUD H)
 	foreach H.PlayerOwner.DynamicActors(class'Hat_Collectible_StoryBookPage', page)
 	{
 		locId = m.ObjectToLocationId(page);
-		if (!CanReachLocation(locId) || `AP.IsLocationChecked(locId)) continue;
+		if (!CanReachLocation(locId) || m.HasAPBit(class'Hat_SaveBitHelper'.static.GetBitID(page), 1)) continue;
 		UpdateClosestMarker_Actor(H, page, closest_distance, bestindx);
 	}
 	
@@ -69,9 +69,9 @@ function UpdateClosestMarker(HUD H)
 		foreach H.PlayerOwner.DynamicActors(class'Hat_ImpactInteract_Breakable_ChemicalBadge', b)
 		{
 			locId = m.ObjectToLocationId(b);
-			if (!CanReachLocation(locId) || `AP.IsLocationChecked(locId)) continue;
+			if (!CanReachLocation(locId) || m.IsLocationChecked(locId)) continue;
 			
-			locInfo = `AP.GetLocationInfoFromID(locId);
+			locInfo = m.GetLocationInfoFromID(locId);
 			if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
 			
 			for (i = 0; i < b.Rewards.Length; i++)
@@ -93,9 +93,9 @@ function UpdateClosestMarker(HUD H)
 				continue;
 			
 			locId = m.ObjectToLocationId(b);
-			if (!CanReachLocation(locId) || `AP.IsLocationChecked(locId)) continue;
+			if (!CanReachLocation(locId) || m.IsLocationChecked(locId)) continue;
 			
-			locInfo = `AP.GetLocationInfoFromID(locId);
+			locInfo = m.GetLocationInfoFromID(locId);
 			if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
 			
 			UpdateClosestMarker_Actor(H, a, closest_distance, bestindx);
@@ -185,16 +185,22 @@ function bool CanReachLocation(int id)
 	// Chest behind Mafia HQ
 	if (id == 303486)
 	{
-		return (`GameManager.GetCurrentAct() == 4 || `GameManager.GetCurrentAct() == 6);
+		return (`GameManager.IsCurrentAct(4) || `GameManager.IsCurrentAct(6));
 	}
 	
 	// Subcon boss arena chest
 	if (id == 323735)
 	{
-		return `GameManager.GetCurrentAct() == 3 && class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Hookshot')
-		|| `GameManager.GetCurrentAct() == 6;
+		return `GameManager.IsCurrentAct(3) && class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Hookshot')
+		|| `GameManager.IsCurrentAct(6);
 	}
-
+	
+	if (`GameManager.IsCurrentChapter(4))
+	{
+		if (!class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Hookshot'))
+			return id == 334855 || id == 334856;
+	}
+	
 	// HUMT
 	if (`GameManager.IsCurrentChapter(1) && `GameManager.IsCurrentAct(6))
 	{
@@ -267,6 +273,16 @@ defaultproperties
 	DwellerMaskRequiredLocs[7] = 336497;
 	DwellerMaskRequiredLocs[8] = 336395;
 	DwellerMaskRequiredLocs[9] = 323734;
+	DwellerMaskRequiredLocs[10] = 334434;
+	DwellerMaskRequiredLocs[11] = 336478;
+	DwellerMaskRequiredLocs[12] = 335826;
 	
 	BrewingHatRequiredLocs[0] = 305701;
+	BrewingHatRequiredLocs[1] = 334758;
+	BrewingHatRequiredLocs[2] = 335756;
+	BrewingHatRequiredLocs[3] = 336497;
+	BrewingHatRequiredLocs[4] = 336496;
+	BrewingHatRequiredLocs[5] = 335885;
+	BrewingHatRequiredLocs[6] = 335886;
+	BrewingHatRequiredLocs[7] = 335492;
 }
