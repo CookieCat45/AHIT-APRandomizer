@@ -185,6 +185,23 @@ class YarnAvailable(Range):
     default = 45
 
 
+# Shops
+class MinPonCost(Range):
+    """The minimum amount of Pons that any shop item can cost."""
+    display_name = "Minimum Shop Pon Cost"
+    range_start = 10
+    range_end = 800
+    default = 75
+
+
+class MaxPonCost(Range):
+    """The maximum amount of Pons that any shop item can cost."""
+    display_name = "Maximum Shop Pon Cost"
+    range_start = 10
+    range_end = 800
+    default = 400
+
+
 # Traps
 class TrapChance(Range):
     """The chance for any junk item in the pool to be replaced by a trap."""
@@ -248,6 +265,9 @@ ahit_options: typing.Dict[str, type(Option)] = {
     "YarnCostMin":              YarnCostMin,
     "YarnCostMax":              YarnCostMax,
     "YarnAvailable":            YarnAvailable,
+
+    "MinPonCost":               MinPonCost,
+    "MaxPonCost":               MaxPonCost,
 
     "TrapChance":               TrapChance,
     "BabyTrapWeight":           BabyTrapWeight,

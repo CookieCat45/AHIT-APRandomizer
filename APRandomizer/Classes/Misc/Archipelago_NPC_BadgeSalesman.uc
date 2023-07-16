@@ -107,7 +107,7 @@ function OpenShop(Controller c)
 	shop = Hat_HUDMenuShop(Hat_HUD(MyHUD).OpenHUD(class'Hat_HUDMenuShop'));
 	if (shop == None) 
 		return;
-
+	
 	shop.MerchantActor = self;
 	shop.SetShopInventory(MyHUD, GetShopInventory(Hat_PlayerController(c)));
 	shop.PurchaseDelegates.AddItem(self.OnPurchase);
@@ -174,6 +174,7 @@ function CalculateIndicesToSell(Hat_PlayerController pc)
 function Hat_ShopInventory GetShopInventory(Hat_PlayerController pc)
 {
 	local Hat_ShopInventory s;
+	local ShopItemInfo shopInfo;
 	local int i;
 	
 	if (ShopInventory != None) return ShopInventory;
@@ -186,8 +187,9 @@ function Hat_ShopInventory GetShopInventory(Hat_PlayerController pc)
 	s.ItemsForSale.Add(CurrentItemsToSell.Length);
 	for (i = 0; i < CurrentItemsToSell.Length; i++)
 	{
+		`AP.GetShopItemInfo(CurrentItemsToSell[i], shopInfo);
 		s.ItemsForSale[i].CollectibleClass = CurrentItemsToSell[i];
-		s.ItemsForSale[i].ItemCost = 25;
+		s.ItemsForSale[i].ItemCost = shopInfo.PonCost;
 		s.ItemsForSale[i].PreventRePurchase = true;
 	}
 	

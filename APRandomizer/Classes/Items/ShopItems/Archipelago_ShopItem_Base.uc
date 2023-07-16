@@ -13,7 +13,7 @@ simulated static function string GetLocalizedItemName()
 
 static function SetDisplayName(string newName)
 {
-    `GameManager.ConsoleCommand("set "$default.class $" "$newName);
+    `GameManager.ConsoleCommand("set "$string(default.class) $" DisplayName "$newName);
 }
 
 simulated function bool OnCollected(Actor Collector)

@@ -32,6 +32,7 @@ struct immutable ShopItemInfo
 	var class<Archipelago_ShopItem_Base> ItemClass;
 	var int ItemID;
 	var int ItemFlags;
+	var int PonCost;
 };
 
 struct immutable LocationInfo
@@ -734,6 +735,12 @@ function LoadSlotData(JsonObject json)
 	SlotData.DwellerYarnCost = json.GetIntValue("DwellerYarnCost");
 	SlotData.TimeStopYarnCost = json.GetIntValue("TimeStopYarnCost");
 	
+	SlotData.MinPonCost = json.GetIntValue("MinPonCost");
+	SlotData.MaxPonCost = json.GetIntValue("MaxPonCost");
+	
+	SlotData.MinPonCost = Min(SlotData.MinPonCost, SlotData.MaxPonCost);
+	SlotData.MaxPonCost = Max(SlotData.MinPonCost, SlotData.MaxPonCost);
+	
 	// hat stitch order
 	SlotData.Hat1 = EHatType(json.GetIntValue("Hat1"));
 	SlotData.Hat2 = EHatType(json.GetIntValue("Hat2"));
@@ -967,7 +974,9 @@ function OnPreOpenHUD(HUD InHUD, out class<Object> InHUDElement)
 function CheckShopOverride(Hat_HUD hud)
 {
 	local Actor merchant;
+	local int i;
 	local Hat_HUDMenuShop shop;
+	local ShopItemInfo shopInfo;
 	local Archipelago_ShopInventory_MafiaBoss mShop;
 	
 	shop = Hat_HUDMenuShop(hud.GetHUD(class'Hat_HUDMenuShop'));
@@ -976,6 +985,12 @@ function CheckShopOverride(Hat_HUD hud)
 	if (merchant.IsA('Hat_NPC_MafiaBossJar'))
 	{
 		mShop = new class'Archipelago_ShopInventory_MafiaBoss';
+		for (i = 0; i < mShop.ItemsForSale.Length; i++)
+		{
+			GetShopItemInfo(class<Archipelago_ShopItem_Base>(mShop.ItemsForSale[i].CollectibleClass), shopInfo);
+			mShop.ItemsForSale[0].ItemCost = shopInfo.PonCost;
+		}
+		
 		shop.SetShopInventory(hud, mShop);
 	}
 }
@@ -1428,6 +1443,9 @@ function ShuffleCollectibles()
 	
 	for (i = 0; i < ChestArray.Length; i++)
 	{
+		if (ChestArray[i] == None)
+			continue;
+		
 		locationArray.AddItem(ObjectToLocationId(ChestArray[i]));
 	}
 	
@@ -1487,8 +1505,16 @@ function ShuffleCollectibles()
 			for (i = 0; i < locationArray.Length; i++)
 				CreateItemFromInfo(GetLocationInfoFromID(locationArray[i]));
 			
-			if (shopLocationArray.Length > 0)
-				SendMultipleLocationChecks(shopLocationArray, true);
+			foreach DynamicActors(class'Hat_Collectible_Important', collectible)
+			{
+				if (collectible.IsA('Hat_Collectible_VaultCode_Base') || collectible.IsA('Hat_Collectible_Sticker'))
+					continue;
+				
+				collectible.Destroy();
+			}
+			
+			//if (shopLocationArray.Length > 0)
+			//	SendMultipleLocationChecks(shopLocationArray, true);
 		}
 	}
 	
@@ -1520,7 +1546,7 @@ function bool IsShopItemCached(class<Archipelago_ShopItem_Base> shopClass)
 	
 	for (i = 0; i < SlotData.ShopItemList.Length; i++)
 	{
-		if (SlotData.ShopItemList[i].ItemClass == class)
+		if (SlotData.ShopItemList[i].ItemClass == shopClass)
 			return true;
 	}
 	
@@ -1702,6 +1728,7 @@ function ShopItemInfo CreateShopItemInfo(class<Archipelago_ShopItem_Base> itemCl
 	shopInfo.ItemClass = itemClass;
 	shopInfo.ItemID = itemId;
 	shopInfo.ItemFlags = flags;
+	shopInfo.PonCost = RandRange(SlotData.MinPonCost, SlotData.MaxPonCost);
 	SlotData.ShopItemList.AddItem(shopInfo);
 	InitShopItemDisplayName(itemClass);
 	
@@ -1719,6 +1746,10 @@ function InitShopItemDisplayName(class<Archipelago_ShopItem_Base> itemClass)
 	if (class'Archipelago_ItemInfo'.static.GetNativeItemData(shopInfo.ItemID, displayName))
 	{
 		itemClass.static.SetDisplayName(displayName);
+	}
+	else if (class'Archipelago_ItemInfo'.static.GetTimePieceFromItemID(shopInfo.ItemID, , displayName) != "")
+	{
+		itemClass.static.SetDisplayName("Time Piece - " $displayName);
 	}
 	else
 	{
@@ -1978,7 +2009,6 @@ function OnCollectibleSpawned(Object collectible)
 			
 			if (Actor(collectible).Owner.IsA('Hat_Goodie_Vault_Base'))
 			{
-				// We don't have the data of this item so just spawn a misc
 				spawnClass = class'Archipelago_RandomizedItem_Misc';
 				item = Archipelago_RandomizedItem_Misc(Spawn(spawnClass,,,Actor(collectible).Location, Actor(collectible).Rotation,,true));
 				item.LocationId = ObjectToLocationId(Actor(collectible).Owner);
@@ -2159,8 +2189,14 @@ function SendLocationCheck(int id, optional bool scout)
 	local string jsonMessage;
 	local int i;
 	
-	if (!IsFullyConnected() && !scout)
+	if (!IsFullyConnected())
 	{
+		if (scout)
+		{
+			DebugMessage("[WARNING] Tried to scout a location while not connected!");
+			return;
+		}
+
 		ItemResender.AddLocation(id);
 		SaveGame();
 		return;
@@ -2200,8 +2236,14 @@ function SendMultipleLocationChecks(array<int> locationArray, optional bool scou
 	local string jsonMessage;
 	local int i, j;
 	
-	if (!IsFullyConnected() && !scout && !hint)
+	if (!IsFullyConnected())
 	{
+		if (scout || hint)
+		{
+			DebugMessage("[WARNING] Tried to scout locations while not connected!");
+			return;
+		}
+
 		ItemResender.AddMultipleLocations(locationArray);
 		SaveGame();
 		return;
@@ -2700,12 +2742,12 @@ function Hat_ChapterActInfo GetRiftActFromMapName(string MapName)
 function ScreenMessage(String message, optional Name type)
 {
 	local PlayerController pc;
+
 	pc = GetALocalPlayerController();
     if (pc == None)
 		return;
-
+    
     pc.ClientMessage(message, type, 8);
-	pc.MyHUD.DisplayConsoleMessages();
 }
 
 function DebugMessage(String message, optional Name type)
@@ -2718,15 +2760,19 @@ function DebugMessage(String message, optional Name type)
 	pc = GetALocalPlayerController();
     if (pc == None)
 		return;
-
+    
     pc.ClientMessage(message, type, 8);
-	pc.MyHUD.DisplayConsoleMessages();
 }
 
 function int ObjectToLocationId(Object obj)
 {
 	local int i, id;
 	local string fullName;
+
+	if (obj == None)
+	{
+		ScriptTrace();
+	}
 	
 	fullName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename(string(Actor(obj).GetLevelName()))$"."$obj.Name;
 	

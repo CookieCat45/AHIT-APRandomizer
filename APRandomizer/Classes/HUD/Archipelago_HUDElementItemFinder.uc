@@ -89,6 +89,9 @@ function UpdateClosestMarker(HUD H)
 	{
 		if (a.IsA('Hat_Goodie_Vault_Base') || a.IsA('Hat_NPC_Bullied'))
 		{
+			if (a.Name == 'Hat_Goodie_Vault_1') // golden vault
+				continue;
+			
 			locId = m.ObjectToLocationId(b);
 			if (!CanReachLocation(locId) || `AP.IsLocationChecked(locId)) continue;
 			

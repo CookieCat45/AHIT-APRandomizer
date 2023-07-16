@@ -34,6 +34,9 @@ var int IceYarnCost;
 var int DwellerYarnCost;
 var int TimeStopYarnCost;
 
+var int MinPonCost;
+var int MaxPonCost;
+
 var array<Hat_ChapterActInfo> LockedBlueRifts;
 var array< class<Hat_SnatcherContract_Act> > ObtainedContracts;
 var array< class<Hat_SnatcherContract_Act> > TakenContracts;

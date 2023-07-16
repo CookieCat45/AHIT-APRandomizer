@@ -101,6 +101,15 @@ exec function ap_give_yarn(int count)
 	`AP.ScreenMessage("Gave " $count $" yarn");
 }
 
+exec function ap_complete_act(string id)
+{
+	if (!bool(`AP.DebugMode))
+		return;
+		
+	`AP.SetAPBits("ActComplete_"$id, 1);
+	`AP.ScreenMessage("Completed act: " $id);
+}
+
 function Hat_PlayerController GetPlayerController()
 {
 	local Hat_PlayerController c;

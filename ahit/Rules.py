@@ -181,11 +181,12 @@ def set_rules(world: World):
              lambda state: can_clear_alpine(state, w))
 
     # Cooking Cat requires the player to either have a full relic set, or have 1 relic missing from a set
+    # AND have the base piece
     add_rule(mw.get_location("Spaceship - Cooking Cat", p),
-             lambda state: state.count_group("Burger", world.player) >= 1
-             or state.count_group("Train", world.player) >= 1
-             or state.count_group("UFO", world.player) >= 3
-             or state.count_group("Crayon", world.player) >= 3)
+             lambda state: state.has("Relic (Burger Patty)", p)
+             or state.has("Relic (Mountain Set)", p)
+             or (state.count_group("UFO", p) >= 3 and state.has("Relic (UFO)", p))
+             or (state.count_group("Crayon", p) >= 3 and state.has("Relic (Crayon Box)", p)))
 
     # Old guys don't appear in SCFOS
     add_rule(mw.get_location("Mafia Town - Old Man (Steel Beams)", p),

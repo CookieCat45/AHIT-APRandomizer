@@ -194,10 +194,7 @@ event Tick(float d)
 			
 			CurrentMessage = "";
 			if (pong != "")
-			{
-				Super.Tick(d);
 				return;
-			}
 		}
 		
 		for (i = 0; i < count; i++)
@@ -264,6 +261,10 @@ function ParseJSON(string json)
 	json = Repl(json, "[{", "{");
 	json = Repl(json, "}]", "}");
 	
+	// Dumb, but fixes the incorrect player slot being assigned
+	if (InStr(json, "Connected") != -1)
+		`AP.ReplOnce(json, "slot", "my_slot", json);
+	
 	`AP.DebugMessage("[ParseJSON] Reformatted command: " $json);
 	
 	jsonObj = new class'JsonObject';
@@ -279,7 +280,7 @@ function ParseJSON(string json)
 		case "Connected":
 			`AP.OnPreConnected();
 			`AP.ScreenMessage("Successfully connected to " $`AP.SlotData.Host $":"$`AP.SlotData.Port);
-			`AP.SlotData.PlayerSlot = jsonObj.GetIntValue("slot");
+			`AP.SlotData.PlayerSlot = jsonObj.GetIntValue("my_slot");
 			FullyConnected = true;
 			ConnectingToAP = false;
 			
