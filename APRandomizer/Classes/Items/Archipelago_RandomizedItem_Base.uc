@@ -119,6 +119,9 @@ simulated function bool OnCollected(Actor Collector)
 
 function SetOriginalLevelBit()
 {
+	if (OriginalCollectibleName == "")
+		return;
+	
 	if (InStr(OriginalCollectibleName, "AP_Camera") != -1)
 	{
 		`AP.SetAPBits(OriginalCollectibleName, 1);
@@ -130,6 +133,9 @@ function SetOriginalLevelBit()
 
 function bool HasOriginalLevelBit()
 {
+	if (OriginalCollectibleName == "")
+		return false;
+	
 	if (InStr(OriginalCollectibleName, "AP_Camera") != -1)
 	{
 		return `AP.HasAPBit(OriginalCollectibleName, 1);

@@ -15,6 +15,8 @@ var string Password;
 var string Host;
 var int Port;
 
+var array<string> PendingMessages;
+
 var bool ActRando;
 var bool ShuffleStorybookPages;
 var bool ShuffleActContracts;

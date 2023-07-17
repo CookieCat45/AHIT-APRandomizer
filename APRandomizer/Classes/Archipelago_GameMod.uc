@@ -11,6 +11,7 @@ var transient bool IsItemTimePiece; // used to tell if a time piece being given 
 var transient bool CollectiblesShuffled;
 var transient bool ControllerCapsLock;
 var transient bool ContractEventActive;
+var transient string DebugMsg;
 
 var config int DebugMode;
 var config int DisableInjection;
@@ -488,6 +489,16 @@ function OnPostInitGame()
 						DebugMessage("Disabling trigger volume: "$trigger.Name);
 						trigger.ShutDown();
 					}
+					
+					// If contracts are shuffled, disable the bag trap trigger if we already checked the Subcon Well contract
+					if (SlotData.ShuffleActContracts && trigger.Name == 'TriggerVolume_23')
+					{
+						if (SlotData.CheckedContracts.Find(class'Hat_SnatcherContract_IceWall') != -1)
+						{
+							DebugMessage("Disabling trigger volume: "$trigger.Name);
+							trigger.ShutDown();
+						}
+					}
 				}
 			}
 		}
@@ -696,12 +707,19 @@ function OnFullyConnected()
 	if (class'Engine'.static.BasicLoadObject(ItemResender, 
 	"APRandomizer/item_resender"$`SaveManager.GetCurrentSaveData().CreationTimeStamp, false, 1))
 	{
-		DebugMessage("Loaded item resender successfully!");
-		ItemResender.ResendLocations();
+		SetTimer(0.5, false, NameOf(ResendLocations));
 	}
 	
 	// Call this just to see if we can craft a hat
 	OnYarnCollected(0);
+}
+
+function ResendLocations()
+{
+	if (!IsFullyConnected() || ItemResender == None)
+		return;
+
+	ItemResender.ResendLocations();
 }
 
 function LoadSlotData(JsonObject json)
@@ -1410,7 +1428,7 @@ function ShuffleCollectibles()
 	local Hat_Collectible_Important collectible;
 	local Hat_NPC npc;
 	local int locId, i;
-	local Actor vault;
+	local Actor a;
 	local array<int> locationArray, shopLocationArray;
 	local array<class<Object>> shopItemClasses;
 	local class<Object> shopItem;
@@ -1449,14 +1467,28 @@ function ShuffleCollectibles()
 		locationArray.AddItem(ObjectToLocationId(ChestArray[i]));
 	}
 	
-	foreach DynamicActors(class'Actor', vault)
+	foreach DynamicActors(class'Actor', a)
 	{
-		if (vault.IsA('Hat_Goodie_Vault_Base'))
+		if (a.IsA('Hat_Goodie_Vault_Base'))
 		{
-			if (vault.Name == 'Hat_Goodie_Vault_1') // golden vault
+			if (a.Name == 'Hat_Goodie_Vault_1') // golden vault
 				continue;
 			
-			locationArray.AddItem(ObjectToLocationId(vault));
+			locationArray.AddItem(ObjectToLocationId(a));
+		}
+		else if (a.IsA('Hat_ImpactInteract_Breakable_ChemicalBadge'))
+		{
+			if (Hat_ImpactInteract_Breakable_ChemicalBadge(a).Rewards.Length <= 0)
+				continue;
+
+			for (i = 0; i < Hat_ImpactInteract_Breakable_ChemicalBadge(a).Rewards.Length; i++)
+			{
+				if (class<Hat_Collectible_Important>(Hat_ImpactInteract_Breakable_ChemicalBadge(a).Rewards[i]) != None)
+				{
+					locationArray.AddItem(ObjectToLocationId(a));
+					break;
+				}
+			}
 		}
 	}
 	
@@ -1503,7 +1535,12 @@ function ShuffleCollectibles()
 		{
 			// Load from cache
 			for (i = 0; i < locationArray.Length; i++)
+			{
+				if (GetLocationInfoFromID(locationArray[i]).ContainerClass != None)
+					continue;
+				
 				CreateItemFromInfo(GetLocationInfoFromID(locationArray[i]));
+			}
 			
 			foreach DynamicActors(class'Hat_Collectible_Important', collectible)
 			{
@@ -1578,7 +1615,7 @@ function Archipelago_RandomizedItem_Base CreateItem(int locId, int itemId, int f
 	optional Hat_Collectible_Important collectible, optional Vector pos)
 {
 	local string timePieceId, itemName, mapName;
-	local class worldClass;
+	local class<Actor> worldClass;
 	local Archipelago_RandomizedItem_Base item;
 	local int i;
 	local bool found;
@@ -1599,7 +1636,7 @@ function Archipelago_RandomizedItem_Base CreateItem(int locId, int itemId, int f
 		}
 	}
 	
-	item = Archipelago_RandomizedItem_Base(Spawn(class<Actor>(worldClass), , , collectible != None ? collectible.Location : pos, , , true));
+	item = Archipelago_RandomizedItem_Base(Spawn(worldClass, , , collectible != None ? collectible.Location : pos, , , true));
 	item.LocationId = locId;
 	item.ItemId = itemId;
 	item.ItemFlags = flags;
@@ -1607,7 +1644,14 @@ function Archipelago_RandomizedItem_Base CreateItem(int locId, int itemId, int f
 	
 	if (collectible != None)
 	{
-		item.OriginalCollectibleName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename(string(collectible.GetLevelName()))$"."$collectible.Name;
+		if (locId == CameraBadgeCheck1 || locId == CameraBadgeCheck2)
+		{
+			item.OriginalCollectibleName = locId == CameraBadgeCheck1 ? "AP_Camera1Check" : "AP_Camera2Check";
+		}
+		else
+		{
+			item.OriginalCollectibleName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename(string(collectible.GetLevelName()))$"."$collectible.Name;
+		}
 	}
 	
 	if (!item.Init())
@@ -1749,7 +1793,7 @@ function InitShopItemDisplayName(class<Archipelago_ShopItem_Base> itemClass)
 	}
 	else if (class'Archipelago_ItemInfo'.static.GetTimePieceFromItemID(shopInfo.ItemID, , displayName) != "")
 	{
-		itemClass.static.SetDisplayName("Time Piece - " $displayName);
+		itemClass.static.SetDisplayName(displayName);
 	}
 	else
 	{
@@ -1886,13 +1930,14 @@ function OnPreBreakableBreak(Actor Breakable, Pawn Breaker)
 {
 	local Hat_ImpactInteract_Breakable_ChemicalBadge b;
 	local class<Actor> spawnClass;
-	local Archipelago_RandomizedItem_Misc item;
+	local Archipelago_RandomizedItem_Base item;
 	local int i;
 	local bool hasImportantItem;
 	local string message;
 	local Rotator rot;
 	local Vector vel;
 	local float rangeMin, rangeMax;
+	local LocationInfo locInfo;
 	
 	if (!IsArchipelagoEnabled())
 		return;
@@ -1915,9 +1960,6 @@ function OnPreBreakableBreak(Actor Breakable, Pawn Breaker)
 		
 		if (hasImportantItem)
 		{
-			if (IsLocationChecked(ObjectToLocationId(b)))
-				return;
-			
 			if (bool(DebugMode))
 			{
 				message = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename(string(b.GetLevelName()));
@@ -1926,9 +1968,16 @@ function OnPreBreakableBreak(Actor Breakable, Pawn Breaker)
 				DebugMessage(message);
 			}
 			
-			spawnClass = class'Archipelago_RandomizedItem_Misc';
-			item = Archipelago_RandomizedItem_Misc(Spawn(spawnClass,,,b.Location + vect(0,0,50),,,true));
-			item.LocationId = ObjectToLocationId(b);
+			locInfo = GetLocationInfoFromID(ObjectToLocationId(b));
+			if (locInfo.Checked)
+				return;
+			
+			spawnClass = locInfo.ItemClass;
+			item = Archipelago_RandomizedItem_Base(Spawn(spawnClass,,,b.Location + vect(0,0,50),,,true));
+			item.LocationId = locInfo.ID;
+			item.ItemDisplayName = locInfo.ItemName;
+			item.ItemFlags = locInfo.Flags;
+			item.Init();
 			
 			rangeMin = 65536 / 16;
 			rangeMax = 65536 / 8;
@@ -1973,12 +2022,13 @@ function OnLoadoutChanged(PlayerController controller, Object loadout, Object ba
 
 function OnCollectibleSpawned(Object collectible)
 {
-	local Archipelago_RandomizedItem_Misc item;
+	local Archipelago_RandomizedItem_Base item;
 	local class<Actor> spawnClass;
 	local Vector vel;
 	local Rotator rot;
 	local float range;
-	
+	local LocationInfo locInfo;
+
 	if (!IsArchipelagoEnabled() || collectible.IsA('Archipelago_RandomizedItem_Base')
 	|| collectible.IsA('Archipelago_ShopItem_Base'))
 		return;
@@ -2005,13 +2055,24 @@ function OnCollectibleSpawned(Object collectible)
 	{
 		if (Actor(collectible).Owner != None)
 		{
-			DebugMessage(collectible.Name $"Owner Name: " $Actor(collectible).Owner.Name);
+			DebugMessage(collectible.Name $" - Owner Name: " $Actor(collectible).Owner.Name);
 			
 			if (Actor(collectible).Owner.IsA('Hat_Goodie_Vault_Base'))
 			{
-				spawnClass = class'Archipelago_RandomizedItem_Misc';
-				item = Archipelago_RandomizedItem_Misc(Spawn(spawnClass,,,Actor(collectible).Location, Actor(collectible).Rotation,,true));
-				item.LocationId = ObjectToLocationId(Actor(collectible).Owner);
+				locInfo = GetLocationInfoFromID(ObjectToLocationId(Actor(collectible).Owner));
+				
+				if (locInfo.Checked)
+				{
+					Actor(collectible).Destroy();
+					return;
+				}
+				
+				spawnClass = locInfo.ItemClass;
+				item = Archipelago_RandomizedItem_Base(Spawn(spawnClass,,,Actor(collectible).Location, Actor(collectible).Rotation,,true));
+				item.LocationId = locInfo.ID;
+				item.ItemDisplayName = locInfo.ItemName;
+				item.ItemFlags = locInfo.Flags;
+				item.Init();
 				
 				rot = item.Rotation;
 				range = 65536/8;
@@ -2091,7 +2152,7 @@ function OnYarnCollected(optional int amount=1)
 	{
 		if (amount > 0)
 		{
-			ScreenMessage("Yarn: "$count $"/"$cost);
+			ScreenMessage("Yarn: "$count $"/"$cost, 'Warning');
 		}
 		
 		// Stitch our new hat!
@@ -2100,7 +2161,7 @@ function OnYarnCollected(optional int amount=1)
 			item = class'Hat_Loadout'.static.MakeLoadoutItem(abilityClass);
 			loadout.AddBackpack(item);
 			PlayHatStitchAnimation(pc, item);
-			ScreenMessage("Got " $GetHatName(abilityClass));
+			ScreenMessage("Got " $GetHatName(abilityClass), 'Warning');
 			
 			`GameManager.AddBadgePoints(-cost);
 			SetAPBits("TotalYarnCollected", 0);
@@ -2111,7 +2172,7 @@ function OnYarnCollected(optional int amount=1)
 	{
 		pons = 20 * amount;
 		`GameManager.AddEnergyBits(pons);
-		ScreenMessage("Got " $pons $" Pons");
+		ScreenMessage("Got " $pons $" Pons", 'Warning');
 	}
 }
 
@@ -2197,7 +2258,7 @@ function SendLocationCheck(int id, optional bool scout)
 			DebugMessage("[WARNING] Tried to scout a location while not connected!");
 			return;
 		}
-
+		
 		ItemResender.AddLocation(id);
 		SaveGame();
 		return;
@@ -2215,7 +2276,7 @@ function SendLocationCheck(int id, optional bool scout)
 				if (SlotData.PlayerSlot != SlotData.LocationInfoArray[i].Player)
 				{
 					ScreenMessage("Sent " $SlotData.LocationInfoArray[i].ItemName 
-						$" to " $PlayerIdToName(SlotData.LocationInfoArray[i].Player));
+						$" to " $PlayerIdToName(SlotData.LocationInfoArray[i].Player), 'Warning');
 				}
 				
 				break;
@@ -2266,10 +2327,10 @@ function SendMultipleLocationChecks(array<int> locationArray, optional bool scou
 				if (SlotData.LocationInfoArray[j].ID == locationArray[i])
 				{
 					SlotData.LocationInfoArray[j].Checked = true;
-					if (SlotData.PlayerSlot != SlotData.LocationInfoArray[i].Player)
+					if (SlotData.PlayerSlot != SlotData.LocationInfoArray[j].Player)
 					{
 						ScreenMessage("Sent " $SlotData.LocationInfoArray[j].ItemName 
-							$" to " $PlayerIdToName(SlotData.LocationInfoArray[j].Player));
+							$" to " $PlayerIdToName(SlotData.LocationInfoArray[j].Player), 'Warning');
 					}
 					
 					break;
@@ -2742,8 +2803,11 @@ function Hat_ChapterActInfo GetRiftActFromMapName(string MapName)
 
 function ScreenMessage(String message, optional Name type)
 {
+	// Don't ask.
 	local PlayerController pc;
-
+	DebugMsg = message;
+	ConsoleCommand("getall Archipelago_GameMod DebugMsg");
+	
 	pc = GetALocalPlayerController();
     if (pc == None)
 		return;
@@ -2754,7 +2818,9 @@ function ScreenMessage(String message, optional Name type)
 function DebugMessage(String message, optional Name type)
 {
 	local PlayerController pc;
-
+	DebugMsg = message;
+	ConsoleCommand("getall Archipelago_GameMod DebugMsg");
+	
 	if (!bool(DebugMode))
 		return;
 	
@@ -2769,9 +2835,10 @@ function int ObjectToLocationId(Object obj)
 {
 	local int i, id;
 	local string fullName;
-
+	
 	if (obj == None)
 	{
+		DebugMessage("[ObjectToLocationId] obj is None");
 		ScriptTrace();
 	}
 	

@@ -155,7 +155,8 @@ event Tick(float d)
 {
 	local byte byteMessage[255];
 	local int count, i;
-	local string character, pong;
+	local string character, pong, msg;
+	local Archipelago_GameMod m;
 	
 	Super.Tick(d);
 	
@@ -172,7 +173,7 @@ event Tick(float d)
 			return;
 		
 		// Check for a ping first
-		if (!ParsingMessage)
+		if (!ParsingMessage && count <= 10)
 		{
 			for (i = 0; i < count; i++)
 			{
@@ -229,18 +230,15 @@ event Tick(float d)
 			}
 		}
 	}
-}
-
-function string NumberString(string src)
-{
-	local string result;
-	local int i;
-	for (i = 0; i < Len(src); i++)
+	else if (!ParsingMessage)
 	{
-		result $= string(Asc(Mid("a"$src, i, 1))) $" ";
+		m = `AP;
+		for (i = 0; i < m.SlotData.PendingMessages.Length; i++)
+		{
+			msg = m.SlotData.PendingMessages[i];
+			SendBinaryMessage(msg, false, len(msg) <= 10 && InStr(msg, Chr(`CODE_PONG), false, true) != -1);
+		}
 	}
-	
-	return result;
 }
 
 // ALL JsonObjects MUST be set to None after use!!!!!!!
@@ -251,43 +249,45 @@ function ParseJSON(string json)
 	local int i, count, split;
 	local string s, text;
 	local JsonObject jsonObj, jsonChild;
+	local Archipelago_GameMod m;
 	
+	m = `AP;
 	if (Len(json) <= 10) // this is probably garbage that we thought was a json
 		return;
 	
-	`AP.DebugMessage("[ParseJSON] Received command: " $json);
-		
+	m.DebugMessage("[ParseJSON] Received command: " $json);
+	
 	// UnrealScript's JSON parser does not like []
 	json = Repl(json, "[{", "{");
 	json = Repl(json, "}]", "}");
 	
 	// Dumb, but fixes the incorrect player slot being assigned
 	if (InStr(json, "Connected") != -1)
-		`AP.ReplOnce(json, "slot", "my_slot", json);
+		m.ReplOnce(json, "slot", "my_slot", json);
 	
-	`AP.DebugMessage("[ParseJSON] Reformatted command: " $json);
+	m.DebugMessage("[ParseJSON] Reformatted command: " $json);
 	
 	jsonObj = new class'JsonObject';
 	jsonObj = class'JsonObject'.static.DecodeJson(json);
 	if (jsonObj == None)
 	{
-		`AP.DebugMessage("[ParseJSON] Failed to parse JSON: " $json);
+		m.DebugMessage("[ParseJSON] Failed to parse JSON: " $json);
 		return;
 	}
 	
 	switch (jsonObj.GetStringValue("cmd"))
 	{
 		case "Connected":
-			`AP.OnPreConnected();
-			`AP.ScreenMessage("Successfully connected to " $`AP.SlotData.Host $":"$`AP.SlotData.Port);
-			`AP.SlotData.PlayerSlot = jsonObj.GetIntValue("my_slot");
+			m.OnPreConnected();
+			m.ScreenMessage("Successfully connected to " $m.SlotData.Host $":"$m.SlotData.Port);
+			m.SlotData.PlayerSlot = jsonObj.GetIntValue("my_slot");
 			FullyConnected = true;
 			ConnectingToAP = false;
 			
-			if (!`AP.SlotData.Initialized)
+			if (!m.SlotData.Initialized)
 			{
 				jsonChild = jsonObj.GetObject("slot_data");
-				`AP.LoadSlotData(jsonChild);
+				m.LoadSlotData(jsonChild);
 			}
 			
 			// sometimes this command will be paired with ReceivedItems
@@ -298,13 +298,13 @@ function ParseJSON(string json)
 			}
 			
 			// Initialize our player's names
-			`AP.ReplOnce(json, "players", "players_0", json, true);
+			m.ReplOnce(json, "players", "players_0", json, true);
 			b = true;
 			count = 0;
 			
 			while (b)
 			{
-				if (`AP.ReplOnce(json, ",{", ",\"players_"$count+1 $"\":{", s, false))
+				if (m.ReplOnce(json, ",{", ",\"players_"$count+1 $"\":{", s, false))
 				{
 					json = s;
 					count++;
@@ -322,11 +322,11 @@ function ParseJSON(string json)
 				if (jsonChild == None)
 					continue;
 					
-				`AP.SlotData.PlayerNames[jsonChild.GetIntValue("slot")] = jsonChild.GetStringValue("alias");
+				m.SlotData.PlayerNames[jsonChild.GetIntValue("slot")] = jsonChild.GetStringValue("alias");
 			}
 			
 			// Fully connected
-			`AP.OnFullyConnected();
+			m.OnFullyConnected();
 			break;
 			
 			
@@ -340,7 +340,7 @@ function ParseJSON(string json)
 					text = jsonChild.GetStringValue("text");
 					if (InStr(text, "[Hint]:") == -1)
 					{
-						`AP.ScreenMessage(text);
+						m.ScreenMessage(text);
 					}
 				}
 			}
@@ -350,7 +350,7 @@ function ParseJSON(string json)
 			
 		case "ConnectionRefused":
 			ConnectingToAP = false;
-			`AP.ScreenMessage("Connection refused by server. Check to make sure your slot name, password, etc. are correct.");
+			m.ScreenMessage("Connection refused by server. Check to make sure your slot name, password, etc. are correct.");
 			Refused = true;
 			Close();
 			break;
@@ -388,23 +388,25 @@ function OnLocationInfoCommand(string json)
 {
 	local LocationInfo locInfo;
 	local bool b, isItem;
-	local int i, locId, count;
+	local int i, locId, count, itemId, flags;
 	local string s, mapName;
 	local JsonObject jsonObj, jsonChild;
 	local Archipelago_RandomizedItem_Base item;
 	local Hat_Collectible_Important collectible;
 	local class<Archipelago_ShopItem_Base> shopItemClass;
 	local Actor container;
+	local Archipelago_GameMod m;
 	
 	mapName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename();
 	
-	`AP.ReplOnce(json, "locations", "locations_0", json, true);
+	m = `AP;
+	m.ReplOnce(json, "locations", "locations_0", json, true);
 	b = true;
 	count = 0;
 	
 	while (b)
 	{
-		if (`AP.ReplOnce(json, ",{", ",\"locations_" $count+1 $"\":{", s, false))
+		if (m.ReplOnce(json, ",{", ",\"locations_" $count+1 $"\":{", s, false))
 		{
 			json = s;
 			count++;
@@ -423,11 +425,11 @@ function OnLocationInfoCommand(string json)
 		if (jsonChild == None)
 			continue;
 		
-		if (`AP.GetShopItemClassFromLocation(jsonChild.GetIntValue("location"), shopItemClass))
+		if (m.GetShopItemClassFromLocation(jsonChild.GetIntValue("location"), shopItemClass))
 		{
-			if (!`AP.GetShopItemInfo(shopItemClass))
+			if (!m.GetShopItemInfo(shopItemClass))
 			{
-				`AP.CreateShopItemInfo(shopItemClass, 
+				m.CreateShopItemInfo(shopItemClass, 
 					jsonChild.GetIntValue("item"),
 					jsonChild.GetIntValue("flags"));
 			}
@@ -441,12 +443,12 @@ function OnLocationInfoCommand(string json)
 				if (collectible.IsA('Hat_Collectible_VaultCode_Base') || collectible.IsA('Hat_Collectible_InstantCamera'))
 					continue;
 				
-				locId = `AP.ObjectToLocationId(collectible);
+				locId = m.ObjectToLocationId(collectible);
 				if (locId == jsonChild.GetIntValue("location"))
 				{
-					`AP.DebugMessage("Replacing item: "$collectible $", Location ID: "$locId);
+					m.DebugMessage("Replacing item: "$collectible $", Location ID: "$locId);
 					
-					`AP.CreateItem(locId, 
+					m.CreateItem(locId, 
 						jsonChild.GetIntValue("item"),
 						jsonChild.GetIntValue("flags"),
 						jsonChild.GetIntValue("player"),
@@ -459,44 +461,66 @@ function OnLocationInfoCommand(string json)
 			}
 			
 			locId = jsonChild.GetIntValue("location");
-			if (!isItem && `AP.IsLocationIDContainer(locId, container))
+			if (!isItem && m.IsLocationIDContainer(locId, container))
 			{
+				itemId = jsonChild.GetIntValue("item");
+				flags = jsonChild.GetIntValue("flags");
+				
 				locInfo.ID = locId;
-				locInfo.ItemID = jsonChild.GetIntValue("item");
+				locInfo.ItemID = itemId;
 				locInfo.Player = jsonChild.GetIntValue("player");
-				locInfo.Flags = jsonChild.GetIntValue("flags");
+				locInfo.Flags = flags;
 				locInfo.MapName = mapName;
 				locInfo.ContainerClass = container.class;
-				`AP.SlotData.LocationInfoArray.AddItem(locInfo);
+				
+				if (!class'Archipelago_ItemInfo'.static.GetNativeItemData(itemId, locInfo.ItemName, locInfo.ItemClass))
+				{
+					switch (flags)
+					{
+						case ItemFlag_Important:
+							locInfo.ItemName = "AP Item - Important"; 
+							break;
+							
+						case ItemFlag_ImportantSkipBalancing:
+							locInfo.ItemName = "AP Item - Important"; 
+							break;
+						
+						case ItemFlag_Useful: 
+							locInfo.ItemName = "AP Item - Useful"; 
+							break;
+						
+						default: 
+							locInfo.ItemName = "AP Item"; 
+							break;
+					}
+				}
+				
+				m.SlotData.LocationInfoArray.AddItem(locInfo);
 				continue;
 			}
 			
-			if (locId == `AP.CameraBadgeCheck1 || locId == `AP.CameraBadgeCheck2)
+			if (locId == m.CameraBadgeCheck1 || locId == m.CameraBadgeCheck2)
 			{
-				if (locId == `AP.CameraBadgeCheck1 && `AP.HasAPBit("Camera1Check", 1)
-				|| locId == `AP.CameraBadgeCheck2 && `AP.HasAPBit("Camera2Check", 1))
-					continue;
-				
-				item = `AP.CreateItem(locId, 
+				item = m.CreateItem(locId, 
 					jsonChild.GetIntValue("item"),
 					jsonChild.GetIntValue("flags"),
 					jsonChild.GetIntValue("player"),
 					,
-					locId == `AP.CameraBadgeCheck1 ? `AP.Camera1Loc : `AP.Camera2Loc);
+					locId == m.CameraBadgeCheck1 ? m.Camera1Loc : m.Camera2Loc);
 				
 				if (item != None)
 				{
-					item.OriginalCollectibleName = locId == `AP.CameraBadgeCheck1 ? "AP_Camera1Check" : "AP_Camera2Check";
+					item.OriginalCollectibleName = locId == m.CameraBadgeCheck1 ? "AP_Camera1Check" : "AP_Camera2Check";
 					item.Init();
 				}
 			}
 		}
 	}
 	
-	if (!`AP.IsMapScouted(mapName))
+	if (!m.IsMapScouted(mapName))
 	{
-		`AP.SetAPBits("MapScouted_"$Locs(mapName), 1);
-		`AP.SaveGame();
+		m.SetAPBits("MapScouted_"$Locs(mapName), 1);
+		m.SaveGame();
 	}
 	
 	jsonObj = None;
@@ -509,14 +533,16 @@ function OnReceivedItemsCommand(string json, optional bool connection)
 	local string timePieceId, timePieceName, s;
 	local JsonObject jsonObj, jsonChild;
 	local bool b;
+	local Archipelago_GameMod m;
 	
-	`AP.ReplOnce(json, "items", "items_0", json, true);
+	m = `AP;
+	m.ReplOnce(json, "items", "items_0", json, true);
 	b = true;
 	count = 0;
 	
 	while (b)
 	{
-		if (`AP.ReplOnce(json, ",{", ",\"items_"$count+1 $"\":{", s, false))
+		if (m.ReplOnce(json, ",{", ",\"items_"$count+1 $"\":{", s, false))
 		{
 			json = s;
 			count++;
@@ -527,9 +553,9 @@ function OnReceivedItemsCommand(string json, optional bool connection)
 		}
 	}
 	
-	`AP.DebugMessage("Receiving items... "$json);
+	m.DebugMessage("Receiving items... "$json);
 	jsonObj = class'JsonObject'.static.DecodeJson(json);
-	index = `AP.GetAPBits("LastItemIndex");
+	index = m.GetAPBits("LastItemIndex");
 	
 	// This means we are reconnecting to a previous session, and the server is giving us our entire list of items,
 	// so we need to begin from the next new item in our list or don't give anything otherwise
@@ -574,8 +600,8 @@ function OnReceivedItemsCommand(string json, optional bool connection)
 	
 	jsonObj = None;
 	jsonChild = None;
-	`AP.SetAPBits("LastItemIndex", index+total);
-	`AP.SaveGame();
+	m.SetAPBits("LastItemIndex", index+total);
+	m.SaveGame();
 }
 
 function GrantTimePiece(string timePieceId, bool IsAct, string itemName, int playerId)
@@ -591,11 +617,11 @@ function GrantTimePiece(string timePieceId, bool IsAct, string itemName, int pla
 	
 	if (playerId != `AP.SlotData.PlayerSlot)
 	{
-		`AP.ScreenMessage("Got Time Piece: " $itemName $" (from " $`AP.PlayerIdToName(playerId)$")");
+		`AP.ScreenMessage("Got " $itemName $" (from " $`AP.PlayerIdToName(playerId)$")", 'Warning');
 	}
 	else
 	{
-		`AP.ScreenMessage("Got Time Piece: " $itemName);
+		`AP.ScreenMessage("Got " $itemName, 'Warning');
 	}
 	
 	// Tell AP to stop removing this Time Piece in OnTimePieceCollected()
@@ -614,8 +640,7 @@ function GrantTimePiece(string timePieceId, bool IsAct, string itemName, int pla
 
 function GrantItem(int itemId, int playerId)
 {
-	local class worldClass;
-	local class invOverride;
+	local class<Actor> worldClass, invOverride;
 	local class<Hat_SnatcherContract_Act> contract;
 	local string itemName;
 	local Archipelago_RandomizedItem_Base item;
@@ -758,8 +783,7 @@ function DoTrapItemEffects(ETrapType trap)
 // this is currently just to check for DeathLink packets
 function OnBounceCommand(string json)
 {
-	local JsonObject jsonObj;
-	local JsonObject jsonChild;
+	local JsonObject jsonObj, jsonChild;
 	local Hat_Player player;
 	
 	Repl(json, "[", "");
@@ -789,12 +813,35 @@ function SendBinaryMessage(string message, optional bool continuation, optional 
 {
 	local byte byteMessage[255];
 	local string buffer;
-	local int length;
+	local int length, offset, keyIndex, i, totalSent;
 	local int maskKey[4];
-	local int keyIndex;
-	local int offset;
-	local int i;
-	local int totalSent;
+	local bool found;
+	
+	if (!continuation)
+	{
+		// wait until this is finished
+		if (ParsingMessage)
+		{
+			for (i = 0; i < `AP.SlotData.PendingMessages.Length; i++)
+			{
+				if (`AP.SlotData.PendingMessages[i] == message)
+				{
+					found = true;
+					break;
+				}
+			}
+			
+			if (!found)
+			{
+				`AP.SlotData.PendingMessages.AddItem(message);
+			}
+		}
+		else
+		{
+			`AP.SlotData.PendingMessages.RemoveItem(message);
+			`AP.DebugMessage("Sending message: "$message);
+		}
+	}
 	
 	for (i = 0; i < 4; i++)
 	{
@@ -812,12 +859,10 @@ function SendBinaryMessage(string message, optional bool continuation, optional 
 		if (!continuation) // start our continuation message
 		{
 			byteMessage[0] = `CODE_TEXT;
-			//`log("[DEBUG] Sending message (CODE_TEXT): "$buffer);
 		}
 		else // continue our message
 		{
 			byteMessage[0] = `CODE_CONTINUATION;
-			//`log("[DEBUG] Sending message (CODE_CONTINUATION): "$buffer);
 		}
 	}
 	else
@@ -832,12 +877,10 @@ function SendBinaryMessage(string message, optional bool continuation, optional 
 		else if (continuation) // End our continuation message
 		{
 			byteMessage[0] = `CODE_CONTINUATION_FIN;
-			//`log("[DEBUG] Sending message (CODE_CONTINUATION_FIN): "$buffer);
 		}
 		else
 		{
 			byteMessage[0] = `CODE_TEXT_FIN;
-			//`log("[DEBUG] Sending message (CODE_TEXT_FIN): "$buffer);
 		}
 	}
 	
@@ -882,7 +925,7 @@ event Closed()
 {
 	if (!Refused)
 	{
-		`AP.ScreenMessage("Connection was closed. Reconnecting in 5 seconds... Winsock Error Code: " $GetLastError());
+		`AP.ScreenMessage("Connection was closed. Reconnecting in 5 seconds...");
 	}
 	
 	CurrentMessage = "";

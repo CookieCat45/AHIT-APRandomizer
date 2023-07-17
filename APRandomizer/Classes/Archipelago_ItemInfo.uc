@@ -110,8 +110,8 @@ static function ESpecialItemType GetItemSpecialType(int itemId)
  */
 static function bool GetNativeItemData(int itemId, // Archipelago item ID
 optional out string itemName, // Display name
-optional out class worldClass, // Item in the world
-optional out class inventoryOverride) // Item inventory class override. Mainly for relics.
+optional out class<Actor> worldClass, // Item in the world
+optional out class<Actor> inventoryOverride) // Item inventory class override. Mainly for relics.
 {
 	switch (itemId)
 	{
@@ -316,6 +316,7 @@ optional out class inventoryOverride) // Item inventory class override. Mainly f
 			return true;
 		
 		default:
+			worldClass = class'Archipelago_RandomizedItem_Misc';
 			return false;
 	}
 }
@@ -329,183 +330,183 @@ static function string GetTimePieceFromItemID(int id, optional out int IsAct, op
 		// -------------------------------------------------- MAFIA TOWN ------------------------------------------------------------- \\
 	
 		case 300048:
-			displayName = "Welcome to Mafia Town";
+			displayName = "Time Piece - Welcome to Mafia Town";
 			return "chapter1_tutorial";
 			
 		case 300049:
-			displayName = "Barrel Battle";
+			displayName = "Time Piece - Barrel Battle";
 			return "chapter1_barrelboss";
 			
 		case 300050:
-			displayName = "She Came from Outer Space";
+			displayName = "Time Piece - She Came from Outer Space";
 			return "chapter1_cannon_repair";
 			
 		case 300051:
-			displayName = "Down with the Mafia!";
+			displayName = "Time Piece - Down with the Mafia!";
 			return "chapter1_boss";
 			
 		case 300052:
-			displayName = "Cheating the Race";
+			displayName = "Time Piece - Cheating the Race";
 			return "harbor_impossible_race";
 			
 		case 300053:
-			displayName = "Heating Up Mafia Town";
+			displayName = "Time Piece - Heating Up Mafia Town";
 			return "mafiatown_lava";
 			
 		case 300054:
-			displayName = "The Golden Vault";
+			displayName = "Time Piece - The Golden Vault";
 			return "mafiatown_goldenvault";
 			
 		case 300055:
-			displayName = "Time Rift - Sewers";
+			displayName = "Time Piece - Time Rift - Sewers";
 			IsAct = 0;
 			return "TimeRift_Water_Mafia_Easy";
 			
 		case 300056:
-			displayName = "Time Rift - Bazaar";
+			displayName = "Time Piece - Time Rift - Bazaar";
 			IsAct = 0;
 			return "TimeRift_Water_Mafia_Hard";
 			
 		case 300057:
-			displayName = "Time Rift - Mafia of Cooks";
+			displayName = "Time Piece - Time Rift - Mafia of Cooks";
 			IsAct = 0;
 			return "TimeRift_Cave_Mafia";
 			
 		// -------------------------------------------------- BATTLE OF THE BIRDS ----------------------------------------------------- \\
 			
 		case 300058:
-			displayName = "Dead Bird Studio";
+			displayName = "Time Piece - Dead Bird Studio";
 			return "DeadBirdStudio";
 			
 		case 300059:
-			displayName = "Murder on the Owl Express";
+			displayName = "Time Piece - Murder on the Owl Express";
 			return "chapter3_murder";
 			
 		case 300060:
-			displayName = "Train Rush";
+			displayName = "Time Piece - Train Rush";
 			return "trainwreck_selfdestruct";
 			
 		case 300061:
-			displayName = "Picture Perfect";
+			displayName = "Time Piece - Picture Perfect";
 			return "moon_camerasnap";
 			
 		case 300062:
-			displayName = "The Big Parade";
+			displayName = "Time Piece - The Big Parade";
 			return "moon_parade";
 			
 		case 300063:
-			displayName = "Award Ceremony";
+			displayName = "Time Piece - Award Ceremony";
 			return "award_ceremony";
 			
 		case 300064:
-			displayName = "Award Ceremony - Boss";
+			displayName = "Time Piece - Award Ceremony - Boss";
 			return "chapter3_secret_finale";
 			
 		case 300065:
-			displayName = "Time Rift - The Owl Express";
+			displayName = "Time Piece - Time Rift - The Owl Express";
 			IsAct = 0;
 			return "TimeRift_Water_TWreck_Panels";
 			
 		case 300066:
-			displayName = "Time Rift - The Moon";
+			displayName = "Time Piece - Time Rift - The Moon";
 			IsAct = 0;
 			return "TimeRift_Water_TWreck_Parade";
 			
 		case 300067:
-			displayName = "Time Rift - Dead Bird Studio";
+			displayName = "Time Piece - Time Rift - Dead Bird Studio";
 			IsAct = 0;
 			return "TimeRift_Cave_BirdBasement";
 			
 		// -------------------------------------------------- SUBCON FOREST ----------------------------------------------------- \\
 		case 300068:
-			displayName = "Contractual Obligations";
+			displayName = "Time Piece - Contractual Obligations";
 			return "subcon_village_icewall";
 			
 		case 300069:
-			displayName = "The Subcon Well";
+			displayName = "Time Piece - The Subcon Well";
 			return "subcon_cave";
 			
 		case 300070:
-			displayName = "Toilet of Doom";
+			displayName = "Time Piece - Toilet of Doom";
 			return "chapter2_toiletboss";
 			
 		case 300071:
-			displayName = "Queen Vanessa's Manor";
+			displayName = "Time Piece - Queen Vanessa's Manor";
 			return "vanessa_manor_attic";
 			
 		case 300072:
-			displayName = "Mail Delivery Service";
+			displayName = "Time Piece - Mail Delivery Service";
 			return "subcon_maildelivery";
 			
 		case 300073:
-			displayName = "Your Contract Has Expired";
+			displayName = "Time Piece - Your Contract Has Expired";
 			return "snatcher_boss";
 			
 		case 300074:
-			displayName = "Time Rift - Pipe";
+			displayName = "Time Piece - Time Rift - Pipe";
 			IsAct = 0;
 			return "TimeRift_Water_Subcon_Hookshot";
 			
 		case 300075:
-			displayName = "Time Rift - Village";
+			displayName = "Time Piece - Time Rift - Village";
 			IsAct = 0;
 			return "TimeRift_Water_Subcon_Dwellers";
 			
 		case 300076:
-			displayName = "Time Rift - Sleepy Subcon";
+			displayName = "Time Piece - Time Rift - Sleepy Subcon";
 			IsAct = 0;
 			return "TimeRift_Cave_Raccoon";
 			
 			
 		// -------------------------------------------------- ALPINE SKYLINE ----------------------------------------------------- \\
 		case 300077:
-			displayName = "The Birdhouse";
+			displayName = "Time Piece - The Birdhouse";
 			return "Alps_Birdhouse";
 			
 		case 300078:
-			displayName = "The Lava Cake";
+			displayName = "Time Piece - The Lava Cake";
 			return "AlpineSkyline_WeddingCake";
 			
 		case 300079:
-			displayName = "The Twilight Bell";
+			displayName = "Time Piece - The Twilight Bell";
 			return "Alpine_Twilight";
 			
 		case 300080:
-			displayName = "The Windmill";
+			displayName = "Time Piece - The Windmill";
 			return "AlpineSkyline_Windmill";
 			
 		case 300081:
-			displayName = "The Illness Has Spread";
+			displayName = "Time Piece - The Illness Has Spread";
 			return "AlpineSkyline_Finale";
 			
 		case 300082:
-			displayName = "Time Rift - The Twilight Bell";
+			displayName = "Time Piece - Time Rift - The Twilight Bell";
 			IsAct = 0;
 			return "TimeRift_Water_Alp_Goats";
 			
 		case 300083:
-			displayName = "Time Rift - Curly Tail Trail";
+			displayName = "Time Piece - Time Rift - Curly Tail Trail";
 			IsAct = 0;
 			return "TimeRift_Water_AlpineSkyline_Cats";
 			
 		case 300084:
-			displayName = "Time Rift - Alpine Skyline";
+			displayName = "Time Piece - Time Rift - Alpine Skyline";
 			IsAct = 0;
 			return "TimeRift_Cave_Alps";
 			
 		case 300085:
-			displayName = "Time Rift - Gallery";
+			displayName = "Time Piece - Time Rift - Gallery";
 			IsAct = 0;
 			return "Spaceship_WaterRift_Gallery";
 			
 		case 300086:
-			displayName = "Time Rift - The Lab";
+			displayName = "Time Piece - Time Rift - The Lab";
 			IsAct = 0;
 			return "Spaceship_WaterRift_MailRoom";
 			
 		// Time's End
 		case 300087:
-			displayName = "The Finale";
+			displayName = "Time Piece - The Finale";
 			return "TheFinale_FinalBoss";
 		
 		default:

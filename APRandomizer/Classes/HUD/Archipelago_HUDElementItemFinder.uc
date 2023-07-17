@@ -92,7 +92,7 @@ function UpdateClosestMarker(HUD H)
 			if (a.Name == 'Hat_Goodie_Vault_1') // golden vault
 				continue;
 			
-			locId = m.ObjectToLocationId(b);
+			locId = m.ObjectToLocationId(a);
 			if (!CanReachLocation(locId) || m.IsLocationChecked(locId)) continue;
 			
 			locInfo = m.GetLocationInfoFromID(locId);
