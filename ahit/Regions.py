@@ -163,6 +163,14 @@ first_chapter_blacklist = [
     "Time Rift - Gallery",
 ]
 
+umbrella_logic_act_blacklist = [
+    "Your Contract has Expired",
+    "Heating Up Mafia Town",
+    "Queen Vanessa's Manor",
+    "Dead Bird Studio",
+    "The Big Parade",
+]
+
 # One of the first three acts of a chapter in act rando must be one of these
 first_chapter_guaranteed_acts = [
     "Welcome to Mafia Town",
@@ -341,6 +349,9 @@ def randomize_act_entrances(world: World):
     act_whitelist: typing.List[Region] = []
     for region in region_list.copy():
         if region.name not in first_chapter_blacklist:
+            if world.multiworld.UmbrellaLogic[world.player].value > 0 and region.name in umbrella_logic_act_blacklist:
+                continue
+
             act_whitelist.append(region)
 
     has_guaranteed_act: bool = False
@@ -397,30 +408,38 @@ def randomize_act_entrances(world: World):
 
     # First, map Alpine Free Roam to something other than its own Time Rift
     alpine = world.multiworld.get_region("Alpine Free Roam", world.player)
-    e = entrance_list[world.multiworld.random.randint(0, len(entrance_list) - 1)]
-
-    # Obviously don't map it to the finale, that's impossible
-    while e.name == "Alpine Skyline - Finale":
-        e = entrance_list[world.multiworld.random.randint(0, len(entrance_list) - 1)]
-
     original_region: Region
 
-    # There are about 40% Time Rifts vs Acts in the game, so 40% chance to be mapped to a Time Rift
-    if world.multiworld.random.randint(1, 5) > 2:
-        original_region = e.connected_region
-        reconnect_regions(e, e.parent_region, alpine)
-        world.update_chapter_act_info(original_region, alpine)
+    if world.multiworld.VanillaAlpine[world.player].value == 0:
+        e = entrance_list[world.multiworld.random.randint(0, len(entrance_list) - 1)]
+
+        # Obviously don't map it to the finale, that's impossible
+        while e.name == "Alpine Skyline - Finale":
+            e = entrance_list[world.multiworld.random.randint(0, len(entrance_list) - 1)]
+
+        # There are about 40% Time Rifts vs Acts in the game, so 40% chance to be mapped to a Time Rift
+        if world.multiworld.random.randint(1, 5) > 2:
+            original_region = e.connected_region
+            reconnect_regions(e, e.parent_region, alpine)
+            world.update_chapter_act_info(original_region, alpine)
+        else:
+            original_region = time_rifts[world.multiworld.random.randint(0, len(time_rifts) - 1)]
+            connect_time_rift(original_region, alpine, e, world)
+            world.update_chapter_act_info(original_region, alpine)
+            rift_dict.setdefault(original_region.name, alpine)
+            time_rifts.remove(original_region)
+
+        entrance_list.remove(e)
+        alpine_freeroam_chapter = [index for index, name in chapter_regions.items()
+                                   if name == act_chapters[original_region.name]][0]
     else:
-        original_region = time_rifts[world.multiworld.random.randint(0, len(time_rifts) - 1)]
-        connect_time_rift(original_region, alpine, e, world)
-        world.update_chapter_act_info(original_region, alpine)
-        rift_dict.setdefault(original_region.name, alpine)
-        time_rifts.remove(original_region)
+        alpine_freeroam_chapter = ChapterIndex.ALPINE
+        entrance_list.remove(alpine.entrances[0])
+        if world.multiworld.VanillaAlpine[world.player].value == 2:
+            alpine_finale = world.multiworld.get_region("The Illness has Spread", world.player)
+            region_list.remove(alpine_finale)
+            entrance_list.remove(alpine_finale.entrances[0])
 
-    alpine_freeroam_chapter = [index for index, name in chapter_regions.items()
-                               if name == act_chapters[original_region.name]][0]
-
-    entrance_list.remove(e)
     region_list.remove(alpine)
 
     while len(entrance_list) > 0 or len(region_list) > 0 or len(time_rifts) > 0:

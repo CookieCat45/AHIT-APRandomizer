@@ -15,6 +15,7 @@ var transient string DebugMsg;
 
 var config int DebugMode;
 var config int DisableInjection;
+var config int VerboseLogging;
 var const editconst Vector SpaceshipSpawnLocation;
 
 var transient array<Hat_SnatcherContract_Selectable> SelectContracts;
@@ -31,9 +32,11 @@ struct immutable ShuffledAct
 struct immutable ShopItemInfo
 {
 	var class<Archipelago_ShopItem_Base> ItemClass;
+	var int ID;
 	var int ItemID;
 	var int ItemFlags;
 	var int PonCost;
+	var bool Hinted;
 };
 
 struct immutable LocationInfo
@@ -44,7 +47,7 @@ struct immutable LocationInfo
 	var int Flags;
 	var bool Checked;
 	var string MapName;
-	var string OriginalName;
+	
 	var string ItemName;
 	var Vector Position;
 	var class<Actor> ItemClass;
@@ -360,8 +363,10 @@ function OnPostInitGame()
 	local TriggerVolume trigger;
 	local Hat_SaveGame save;
 	local Hat_Player ply;
+	local Hat_PlayerController ctr;
 	local Hat_NPC mu;
 	local Actor a;
+	local Emitter emitter;
 	
 	// If on titlescreen, find any Archipelago-enabled save files and do this stuff 
 	// to prevent the game from forcing the player into Mafia Town.
@@ -468,6 +473,18 @@ function OnPostInitGame()
 			ChestArray.AddItem(chest);
 			chest.Content = class'Hat_Collectible_EnergyBit';
 		}
+
+		if (`GameManager.GetChapterInfo().ChapterID == 1)
+		{
+			foreach AllActors(class'Emitter', emitter)
+			{
+				if (emitter.ParticleSystemComponent.Template == ParticleSystem'HatInTime_Items.ParticleSystems.ImportantItem')
+				{
+					emitter.ParticleSystemComponent.KillParticlesForced();
+					emitter.Destroy();
+				}
+			}
+		}
 		
 		// Shuffle items from cache?
 		if (IsMapScouted(class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename()))
@@ -504,6 +521,8 @@ function OnPostInitGame()
 		}
 	}
 	
+	ctr = Hat_PlayerController(GetALocalPlayerController());
+	
 	// If we load a new save file with at least 1 time piece, the game will force the umbrella into our inventory.
 	save = `SaveManager.GetCurrentSaveData();
 	for (i = 0; i < save.MyBackpack2017.Weapons.Length; i++)
@@ -514,7 +533,14 @@ function OnPostInitGame()
 			if (class<Hat_Weapon_Umbrella>(item.BackpackClass) != None 
 			&& class<Archipelago_Weapon_Umbrella>(item.BackpackClass) == None)
 			{
-				Hat_PlayerController(GetALocalPlayerController()).MyLoadout.RemoveBackpack(item);
+				ctr.MyLoadout.RemoveBackpack(item);
+			}
+			
+			if (SlotData.UmbrellaLogic && class<Hat_Weapon_Unarmed>(item.BackpackClass) != None)
+			{
+				ctr.MyLoadout.RemoveBackpack(item);
+				item.BackpackClass = class'Archipelago_Weapon_Unarmed';
+				ctr.MyLoadout.AddBackpack(item, true, true, Hat_Player(ctr.Pawn));
 			}
 		}
 	}
@@ -737,6 +763,8 @@ function LoadSlotData(JsonObject json)
 	SlotData.ActRando = json.GetBoolValue("ActRandomizer");
 	SlotData.ShuffleStorybookPages = json.GetBoolValue("ShuffleStorybookPages");
 	SlotData.ShuffleActContracts = json.GetBoolValue("ShuffleActContracts");
+	SlotData.ShuffleZiplines = json.GetBoolValue("ShuffleAlpineZiplines");
+	SlotData.UmbrellaLogic = json.GetBoolValue("UmbrellaLogic");
 	SlotData.DeathLink = json.GetBoolValue("death_link");
 	
 	SlotData.CompassBadgeMode = json.GetIntValue("CompassBadgeMode");
@@ -1007,6 +1035,14 @@ function CheckShopOverride(Hat_HUD hud)
 		{
 			GetShopItemInfo(class<Archipelago_ShopItem_Base>(mShop.ItemsForSale[i].CollectibleClass), shopInfo);
 			mShop.ItemsForSale[0].ItemCost = shopInfo.PonCost;
+
+			if (!shopInfo.Hinted)
+			{
+				if (shopInfo.ItemFlags == ItemFlag_Important || shopInfo.ItemFlags == ItemFlag_ImportantSkipBalancing)
+				{
+					SendLocationCheck(shopInfo.ID, true, true);
+				}
+			}
 		}
 		
 		shop.SetShopInventory(hud, mShop);
@@ -1431,6 +1467,7 @@ function ShuffleCollectibles()
 	local Actor a;
 	local array<int> locationArray, shopLocationArray;
 	local array<class<Object>> shopItemClasses;
+	local LocationInfo locInfo;
 	local class<Object> shopItem;
 	local string mapName;
 	
@@ -1480,7 +1517,7 @@ function ShuffleCollectibles()
 		{
 			if (Hat_ImpactInteract_Breakable_ChemicalBadge(a).Rewards.Length <= 0)
 				continue;
-
+			
 			for (i = 0; i < Hat_ImpactInteract_Breakable_ChemicalBadge(a).Rewards.Length; i++)
 			{
 				if (class<Hat_Collectible_Important>(Hat_ImpactInteract_Breakable_ChemicalBadge(a).Rewards[i]) != None)
@@ -1536,7 +1573,9 @@ function ShuffleCollectibles()
 			// Load from cache
 			for (i = 0; i < locationArray.Length; i++)
 			{
-				if (GetLocationInfoFromID(locationArray[i]).ContainerClass != None)
+				locInfo = GetLocationInfoFromID(locationArray[i]);
+				if (locInfo.ContainerClass != None || locInfo.Checked
+				|| locInfo.Position.x == 0 && locInfo.Position.y == 0 && locInfo.position.z == 0)
 					continue;
 				
 				CreateItemFromInfo(GetLocationInfoFromID(locationArray[i]));
@@ -1705,7 +1744,6 @@ function Archipelago_RandomizedItem_Base CreateItem(int locId, int itemId, int f
 		locInfo.MapName = mapName;
 		locInfo.ItemClass = item.class;
 		locInfo.ItemName = item.ItemDisplayName;
-		locInfo.OriginalName = item.OriginalCollectibleName;
 		locInfo.Position = item.Location;
 		SlotData.LocationInfoArray.AddItem(locInfo);
 	}
@@ -1723,7 +1761,6 @@ function Archipelago_RandomizedItem_Base CreateItemFromInfo(LocationInfo locInfo
 	item.ItemFlags = locInfo.Flags;
 	item.ItemOwner = locInfo.Player;
 	item.ItemDisplayName = locInfo.ItemName;
-	item.OriginalCollectibleName = locInfo.OriginalName;
 	
 	if (!item.Init())
 		return None;
@@ -1769,6 +1806,7 @@ function ShopItemInfo CreateShopItemInfo(class<Archipelago_ShopItem_Base> itemCl
 {
 	local ShopItemInfo shopInfo;
 	
+	shopInfo.ID = itemClass.default.LocationID;
 	shopInfo.ItemClass = itemClass;
 	shopInfo.ItemID = itemId;
 	shopInfo.ItemFlags = flags;
@@ -1787,39 +1825,35 @@ function InitShopItemDisplayName(class<Archipelago_ShopItem_Base> itemClass)
 	if (!GetShopItemInfo(itemClass, shopInfo))
 		return;
 	
-	if (class'Archipelago_ItemInfo'.static.GetNativeItemData(shopInfo.ItemID, displayName))
-	{
-		itemClass.static.SetDisplayName(displayName);
-	}
-	else if (class'Archipelago_ItemInfo'.static.GetTimePieceFromItemID(shopInfo.ItemID, , displayName) != "")
-	{
-		itemClass.static.SetDisplayName(displayName);
-	}
-	else
+	if (!class'Archipelago_ItemInfo'.static.GetNativeItemData(shopInfo.ItemID, displayName)
+	&& class'Archipelago_ItemInfo'.static.GetTimePieceFromItemID(shopInfo.ItemID, , displayName) == "")
 	{
 		switch (shopInfo.ItemFlags)
 		{
 			case ItemFlag_Important:
-				itemClass.static.SetDisplayName("AP Item (Progression)");
+				displayName = "AP Item (Progression)";
 				break;
 			
 			case ItemFlag_ImportantSkipBalancing:
-				itemClass.static.SetDisplayName("AP Item (Progression)");
+				displayName = "AP Item (Progression)";
 				break;
 			
 			case ItemFlag_Trap:
-				itemClass.static.SetDisplayName("AP Item (Progression)");
+				displayName = "AP Item (Progression)";
 				break;
 			
 			case ItemFlag_Useful:
-				itemClass.static.SetDisplayName("AP Item (Useful)");
+				displayName = "AP Item (Useful)";
 				break;
 			
 			default:
-				itemClass.static.SetDisplayName("AP Item");
+				displayName = "AP Item";
 				break;
 		}
 	}
+	
+	displayName $= " (" $itemClass.default.DisplayName $")";
+	itemClass.static.SetDisplayName(displayName);
 }
 
 function int GetShopItemID(class<Archipelago_ShopItem_Base> itemClass)
@@ -1995,7 +2029,8 @@ function OnPlayerDeath(Pawn Player)
 	if (!IsDeathLinkEnabled() || !IsArchipelagoEnabled() || !IsFullyConnected())
 		return;
 	
-	message = "[{\"cmd\":\"Bounce\",\"tags\":[\"DeathLink\"],\"data\":{\"time\":" $float(TimeStamp()) $",\"source\":\"CookieHat\",\"cause\":\"\"}}]";
+	// commit myurder
+	message = "[{\"cmd\":\"Bounce\",\"tags\":[\"DeathLink\"],\"data\":{\"time\":" $float(TimeStamp()) $",\"source\:" $SlotData.SlotName $",\"cause\":\"\"}}]";
 	client.SendBinaryMessage(message);
 }
 
@@ -2010,6 +2045,17 @@ function OnLoadoutChanged(PlayerController controller, Object loadout, Object ba
 	if (item == None)
 		return;
 	
+	if (SlotData.Initialized && SlotData.UmbrellaLogic)
+	{
+		if (class<Hat_Weapon_Unarmed>(item.BackpackClass) != None
+		&& class<Archipelago_Weapon_Unarmed>(item.BackpackClass) == None)
+		{
+			Hat_Loadout(loadout).RemoveBackpack(item);
+			item.BackpackClass = class'Archipelago_Weapon_Unarmed';
+			Hat_Loadout(loadout).AddBackpack(item, true, true, Hat_Player(Hat_PlayerController(controller).Pawn));
+		}
+	}
+	
 	// remove base game umbrella in favor of our own. This is the umbrella check in Mafia Town.
 	if (class<Hat_Weapon_Umbrella>(item.BackpackClass) != None 
 	&& class<Archipelago_Weapon_Umbrella>(item.BackpackClass) == None)
@@ -2017,6 +2063,33 @@ function OnLoadoutChanged(PlayerController controller, Object loadout, Object ba
 		Hat_Loadout(loadout).RemoveBackpack(item);
 		SendLocationCheck(UmbrellaCheck);
 		SetAPBits("UmbrellaCheck", 1);
+	}
+}
+
+function OnAbilityUsed(Pawn Player, Inventory Ability)
+{
+	local Actor hookpoint;
+	if (!IsArchipelagoEnabled())
+		return;
+	
+	if (SlotData.ShuffleZiplines && Hat_Ability_Hookshot(ability) != None)
+	{
+		Hat_Ability_Hookshot(ability).UpdateTargetedSwingActor();
+		hookpoint = Hat_Ability_Hookshot(ability).TargetedSwingActor;
+		
+		if (hookpoint.IsA('Hat_HookPoint_Desert'))
+		{
+			if (hookpoint.Name == 'Hat_HookPoint_Desert_2' || hookpoint.Name == 'Hat_HookPoint_Desert_16'
+			|| hookpoint.Name == 'Hat_HookPoint_Desert_1' || hookpoint.Name == 'Hat_HookPoint_Desert_24')
+			{
+				if (!HasAPBit("ZiplineUnlock_"$string(hookpoint.Name), 1))
+				{
+					Hat_Ability_Hookshot(ability).DoDeactivate(false, true);
+					Hat_Ability(ability).Activated = false;
+					ScreenMessage("You don't have the unlock for this zipline");
+				}
+			}
+		}
 	}
 }
 
@@ -2246,7 +2319,7 @@ function int GetHatYarnCost(class<Hat_Ability> hatClass)
 	return 0;
 }
 
-function SendLocationCheck(int id, optional bool scout)
+function SendLocationCheck(int id, optional bool scout, optional bool hint)
 {
 	local string jsonMessage;
 	local int i;
@@ -2287,7 +2360,14 @@ function SendLocationCheck(int id, optional bool scout)
 	}
 	else
 	{
-		jsonMessage = "[{\"cmd\":\"LocationScouts\",\"locations\":[" $id $"]}]";
+		if (hint)
+		{
+			jsonMessage = "[{\"cmd\":\"LocationScouts\",\"locations\":[" $id $"],\"create_as_hint\":1}]";
+		}
+		else
+		{
+			jsonMessage = "[{\"cmd\":\"LocationScouts\",\"locations\":[" $id $"]}]";
+		}
 	}
 	
 	Client.SendBinaryMessage(jsonMessage);
@@ -2305,7 +2385,7 @@ function SendMultipleLocationChecks(array<int> locationArray, optional bool scou
 			DebugMessage("[WARNING] Tried to scout locations while not connected!");
 			return;
 		}
-
+		
 		ItemResender.AddMultipleLocations(locationArray);
 		SaveGame();
 		return;
@@ -2452,7 +2532,7 @@ function BabyTrapTimer()
 		if (player.IsA('Hat_Player_MustacheGirl'))
 			continue;
 	
-		if (RandRange(1, 150) == 1)
+		if (RandRange(1, 250) == 2)
 		{
 			stackClass = class'Archipelago_Stackable_Conductor';
 		}
@@ -2505,6 +2585,9 @@ function DropAllBabies(Pawn Player)
 function LaserTrapTimer()
 {
 	local Hat_Player player;
+	
+	if (WorldInfo.Pauser != None)
+		return;
 	
 	foreach DynamicActors(class'Hat_Player', player)
 	{
@@ -2803,10 +2886,14 @@ function Hat_ChapterActInfo GetRiftActFromMapName(string MapName)
 
 function ScreenMessage(String message, optional Name type)
 {
-	// Don't ask.
 	local PlayerController pc;
-	DebugMsg = message;
-	ConsoleCommand("getall Archipelago_GameMod DebugMsg");
+	
+	if (bool(VerboseLogging))
+	{
+		// Don't ask.
+		DebugMsg = message;
+		ConsoleCommand("getall Archipelago_GameMod DebugMsg");
+	}
 	
 	pc = GetALocalPlayerController();
     if (pc == None)
@@ -2818,8 +2905,12 @@ function ScreenMessage(String message, optional Name type)
 function DebugMessage(String message, optional Name type)
 {
 	local PlayerController pc;
-	DebugMsg = message;
-	ConsoleCommand("getall Archipelago_GameMod DebugMsg");
+	
+	if (bool(VerboseLogging))
+	{
+		DebugMsg = message;
+		ConsoleCommand("getall Archipelago_GameMod DebugMsg");
+	}
 	
 	if (!bool(DebugMode))
 		return;

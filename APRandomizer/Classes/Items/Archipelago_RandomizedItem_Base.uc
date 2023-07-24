@@ -23,16 +23,12 @@ var string OriginalCollectibleName; // the "Name" variable, NOT the display name
 
 var AudioComponent IdleAudioComponent;
 var ParticleSystemComponent ImportantItemParticle;
+var ParticleSystemComponent JunkItemParticle;
 var PointLightComponent LightComponent;
 
 function bool Init()
 {
-	if (HasOriginalLevelBit()) // Already collected
-	{
-		Destroy();
-		return false;
-	}
-	else if (ItemFlags == ItemFlag_Garbage)
+	if (ItemFlags == ItemFlag_Garbage)
 	{
 		// No flashy effects for garbage items (still for traps though :v)
 		if (!IsA('Archipelago_RandomizedItem_Yarn'))
@@ -47,7 +43,12 @@ function bool Init()
 			}
 		}
 	}
-
+	else
+	{
+		JunkItemParticle.SetActive(false);
+		JunkItemParticle.KillParticlesForced();
+	}
+	
 	return true;
 }
 
@@ -131,19 +132,6 @@ function SetOriginalLevelBit()
 	class'Hat_SaveBitHelper'.static.SetLevelBits(OriginalCollectibleName, 1, class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename(string(GetLevelName())), `SaveManager.GetCurrentSaveData());
 }
 
-function bool HasOriginalLevelBit()
-{
-	if (OriginalCollectibleName == "")
-		return false;
-	
-	if (InStr(OriginalCollectibleName, "AP_Camera") != -1)
-	{
-		return `AP.HasAPBit(OriginalCollectibleName, 1);
-	}
-
-	return class'Hat_SaveBitHelper'.static.HasLevelBit(OriginalCollectibleName, 1, class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename(string(GetLevelName())), `SaveManager.GetCurrentSaveData());
-}
-
 function bool WasFromServer()
 {
 	return LocationId == 0;
@@ -207,12 +195,22 @@ defaultproperties
     Begin Object Class=ParticleSystemComponent Name=hParticle0
         Template = ParticleSystem'HatInTime_Items.ParticleSystems.BadgeAttentionParticle';
 		Translation=(Z=10);
-		MaxDrawDistance = 6000;
+		MaxDrawDistance = 99999;
 		bSelectable = false;
     End Object 
     Components.Add(hParticle0);
 	RotationComponents.Add(hParticle0);
     ImportantItemParticle = hParticle0;
+	
+	Begin Object Class=ParticleSystemComponent Name=hParticle1
+        Template = ParticleSystem'HatInTime_Items.ParticleSystems.ImportantItem';
+		Translation=(Z=10);
+		MaxDrawDistance = 99999;
+		bSelectable = false;
+    End Object 
+    Components.Add(hParticle1);
+	RotationComponents.Add(hParticle1);
+    JunkItemParticle = hParticle1;
 	
 	Begin Object Class=PointLightComponent Name=PointLightComponent0
 	    LightAffectsClassification=LAC_STATIC_AFFECTING

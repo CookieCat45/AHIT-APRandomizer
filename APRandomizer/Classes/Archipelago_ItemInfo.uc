@@ -315,6 +315,26 @@ optional out class<Actor> inventoryOverride) // Item inventory class override. M
 			worldClass = class'Archipelago_RandomizedItem_Contract';
 			return true;
 		
+		case 300204:
+			itemName = "Zipline Unlock (The Birdhouse Path)";
+			worldClass = class'Archipelago_RandomizedItem_Misc';
+			return true;
+		
+		case 300205:
+			itemName = "Zipline Unlock (The Lava Cake Path)";
+			worldClass = class'Archipelago_RandomizedItem_Misc';
+			return true;
+		
+		case 300206:
+			itemName = "Zipline Unlock (The Windmill Path)";
+			worldClass = class'Archipelago_RandomizedItem_Misc';
+			return true;
+		
+		case 300207:
+			itemName = "Zipline Unlock (The Twilight Bell Path)";
+			worldClass = class'Archipelago_RandomizedItem_Misc';
+			return true;
+
 		default:
 			worldClass = class'Archipelago_RandomizedItem_Misc';
 			return false;
@@ -461,7 +481,7 @@ static function string GetTimePieceFromItemID(int id, optional out int IsAct, op
 		// -------------------------------------------------- ALPINE SKYLINE ----------------------------------------------------- \\
 		case 300077:
 			displayName = "Time Piece - The Birdhouse";
-			return "Alps_Birdhouse";
+			return "Alps_Birdhouse1";
 			
 		case 300078:
 			displayName = "Time Piece - The Lava Cake";
@@ -477,7 +497,7 @@ static function string GetTimePieceFromItemID(int id, optional out int IsAct, op
 			
 		case 300081:
 			displayName = "Time Piece - The Illness Has Spread";
-			return "AlpineSkyline_Finale";
+			return "AlpineSkyline_Finale1";
 			
 		case 300082:
 			displayName = "Time Piece - Time Rift - The Twilight Bell";

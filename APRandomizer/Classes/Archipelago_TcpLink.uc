@@ -366,8 +366,8 @@ function ParseJSON(string json)
 			break;
 		
 		
-		case "Bounce":
-			OnBounceCommand(json);
+		case "Bounced":
+			OnBouncedCommand(json);
 			break;
 			
 			
@@ -475,23 +475,30 @@ function OnLocationInfoCommand(string json)
 				
 				if (!class'Archipelago_ItemInfo'.static.GetNativeItemData(itemId, locInfo.ItemName, locInfo.ItemClass))
 				{
-					switch (flags)
+					if (class'Archipelago_ItemInfo'.static.GetTimePieceFromItemID(itemId, , locInfo.ItemName) != "")
 					{
-						case ItemFlag_Important:
-							locInfo.ItemName = "AP Item - Important"; 
-							break;
+						locInfo.itemClass = class'Archipelago_RandomizedItem_TimeObject';
+					}
+					else
+					{
+						switch (flags)
+						{
+							case ItemFlag_Important:
+								locInfo.ItemName = "AP Item - Important"; 
+								break;
+								
+							case ItemFlag_ImportantSkipBalancing:
+								locInfo.ItemName = "AP Item - Important"; 
+								break;
 							
-						case ItemFlag_ImportantSkipBalancing:
-							locInfo.ItemName = "AP Item - Important"; 
-							break;
-						
-						case ItemFlag_Useful: 
-							locInfo.ItemName = "AP Item - Useful"; 
-							break;
-						
-						default: 
-							locInfo.ItemName = "AP Item"; 
-							break;
+							case ItemFlag_Useful: 
+								locInfo.ItemName = "AP Item - Useful"; 
+								break;
+							
+							default: 
+								locInfo.ItemName = "AP Item"; 
+								break;
+						}
 					}
 				}
 				
@@ -510,7 +517,6 @@ function OnLocationInfoCommand(string json)
 				
 				if (item != None)
 				{
-					item.OriginalCollectibleName = locId == m.CameraBadgeCheck1 ? "AP_Camera1Check" : "AP_Camera2Check";
 					item.Init();
 				}
 			}
@@ -606,35 +612,37 @@ function OnReceivedItemsCommand(string json, optional bool connection)
 
 function GrantTimePiece(string timePieceId, bool IsAct, string itemName, int playerId)
 {
+	local Archipelago_GameMod m;
 	local Archipelago_RandomizedItem_Base item;
 	local Pawn player;
 	
+	m = `AP;
 	player = GetALocalPlayerController().Pawn;
 	
 	item = Spawn(class'Archipelago_RandomizedItem_TimeObject', , , player.Location, , , true);
 	item.PickupActor = player;
 	item.OnCollected(player);
 	
-	if (playerId != `AP.SlotData.PlayerSlot)
+	if (playerId != m.SlotData.PlayerSlot)
 	{
-		`AP.ScreenMessage("Got " $itemName $" (from " $`AP.PlayerIdToName(playerId)$")", 'Warning');
+		m.ScreenMessage("Got " $itemName $" (from " $m.PlayerIdToName(playerId)$")", 'Warning');
 	}
 	else
 	{
-		`AP.ScreenMessage("Got " $itemName, 'Warning');
+		m.ScreenMessage("Got " $itemName, 'Warning');
 	}
 	
 	// Tell AP to stop removing this Time Piece in OnTimePieceCollected()
-	`AP.SetAPBits(timePieceId, 1);
+	m.SetAPBits(timePieceId, 1);
 	
-	`AP.IsItemTimePiece = true;
+	m.IsItemTimePiece = true;
 	`SaveManager.GetCurrentSaveData().GiveTimePiece(timePieceId, IsAct);
-	`AP.IsItemTimePiece = false;
+	m.IsItemTimePiece = false;
 	
-	if (`AP.IsInSpaceship() && `AP.SlotData.Initialized)
+	if (m.IsInSpaceship() && m.SlotData.Initialized)
 	{
-		`AP.UpdateActUnlocks();
-		`AP.UpdatePowerPanels();
+		m.UpdateActUnlocks();
+		m.UpdatePowerPanels();
 	}
 }
 
@@ -710,6 +718,39 @@ function GrantItem(int itemId, int playerId)
 		
 		contract.static.UnlockActs(save);
 	}
+	else if (itemId == 300204 || itemId == 300205 || itemId == 300206 || itemId == 300207)
+	{
+		UnlockZipline(itemId);
+	}
+}
+
+function UnlockZipline(int id)
+{
+	local string zipline;
+
+	switch (id)
+	{
+		case 300204: // Birdhouse Path
+			zipline = "Hat_HookPoint_Desert_2";
+			break;
+
+		case 300205: // Lava Cake Path
+			zipline = "Hat_HookPoint_Desert_16";
+			break;
+		
+		case 300206: // Windmill Path
+			zipline = "Hat_HookPoint_Desert_1";
+			break;
+		
+		case 300207: // Twilight Bell Path
+			zipline = "Hat_HookPoint_Desert_24";
+			break;
+		
+		default:
+			return;
+	}
+
+	`AP.SetAPBits("ZiplineUnlock_"$zipline, 1);
 }
 
 function DoSpecialItemEffects(ESpecialItemType special)
@@ -745,34 +786,38 @@ function DoSpecialItemEffects(ESpecialItemType special)
 
 function DoTrapItemEffects(ETrapType trap)
 {
+	local Archipelago_GameMod m;
+	m = `AP;
+	
 	switch (trap)
 	{
 		case TrapType_Baby:
-			if (`AP.BabyCount > 0)
+			if (m.BabyCount > 0)
 			{
-				`AP.BabyCount += 10;
+				m.BabyCount += 10;
 			}
 			else
 			{
-				`AP.BabyCount = 10;
-				`AP.SetTimer(0.5, true, NameOf(`AP.BabyTrapTimer), `AP);
+				m.BabyCount = 10;
+				m.SetTimer(0.5, true, NameOf(m.BabyTrapTimer));
+				m.SetTimer(60.0, false, NameOf(m.DropAllBabies), m, GetALocalPlayerController().Pawn);
 			}
 			break;
 			
 		case TrapType_Laser:
-			if (`AP.LaserCount > 0)
+			if (m.LaserCount > 0)
 			{
-				`AP.LaserCount += 15;
+				m.LaserCount += 15;
 			}
 			else
 			{
-				`AP.LaserCount = 15;
-				`AP.SetTimer(1.0, true, NameOf(`AP.LaserTrapTimer), `AP);
+				m.LaserCount = 15;
+				m.SetTimer(1.0, true, NameOf(m.LaserTrapTimer));
 			}
 			break;
 			
 		case TrapType_Parade:
-			`AP.DoParadeTrap();
+			m.DoParadeTrap();
 			break;
 			
 		default:
@@ -780,30 +825,35 @@ function DoTrapItemEffects(ETrapType trap)
 	}
 }
 
-// this is currently just to check for DeathLink packets
-function OnBounceCommand(string json)
+function OnBouncedCommand(string json)
 {
 	local JsonObject jsonObj, jsonChild;
+	local string cause, msg, source;
 	local Hat_Player player;
-	
-	Repl(json, "[", "");
-	Repl(json, "]", "");
 	
 	jsonObj = class'JsonObject'.static.DecodeJson(json);
 	if (jsonObj == None)
 		return;
 	
 	jsonChild = jsonObj.GetObject("data");
-	if (jsonChild != None && `AP.IsDeathLinkEnabled() && jsonObj.GetStringValue("tags") == "DeathLink")
+	if (jsonChild != None && `AP.IsDeathLinkEnabled())
 	{
-		// commit myurder
-		foreach DynamicActors(class'Hat_Player', player)
-			player.Suicide();
-		
-		if (jsonChild != None)
-			`AP.ScreenMessage("You were myurrderrred by: " $jsonChild.GetStringValue("source"));
+		source = jsonChild.GetStringValue("source");
+		if (source != "")
+		{
+			// commit myurder
+			foreach DynamicActors(class'Hat_Player', player)
+				player.Suicide();
+			
+			msg = "You were MYURRDERRRRED by: " $source;
+			cause = jsonChild.GetStringValue("cause");
+			if (cause != "")
+				msg $= " (" $cause $")";
+			
+			`AP.ScreenMessage(msg);
+		}
 	}
-
+	
 	jsonObj = None;
 	jsonChild = None;
 }
@@ -811,6 +861,7 @@ function OnBounceCommand(string json)
 // the optional boolean is for recursion, do not use it
 function SendBinaryMessage(string message, optional bool continuation, optional bool pong)
 {
+	local Archipelago_GameMod m;
 	local byte byteMessage[255];
 	local string buffer;
 	local int length, offset, keyIndex, i, totalSent;
@@ -819,12 +870,13 @@ function SendBinaryMessage(string message, optional bool continuation, optional 
 	
 	if (!continuation)
 	{
+		m = `AP;
 		// wait until this is finished
 		if (ParsingMessage)
 		{
-			for (i = 0; i < `AP.SlotData.PendingMessages.Length; i++)
+			for (i = 0; i < m.SlotData.PendingMessages.Length; i++)
 			{
-				if (`AP.SlotData.PendingMessages[i] == message)
+				if (m.SlotData.PendingMessages[i] == message)
 				{
 					found = true;
 					break;
@@ -833,13 +885,13 @@ function SendBinaryMessage(string message, optional bool continuation, optional 
 			
 			if (!found)
 			{
-				`AP.SlotData.PendingMessages.AddItem(message);
+				m.SlotData.PendingMessages.AddItem(message);
 			}
 		}
 		else
 		{
-			`AP.SlotData.PendingMessages.RemoveItem(message);
-			`AP.DebugMessage("Sending message: "$message);
+			m.SlotData.PendingMessages.RemoveItem(message);
+			m.DebugMessage("Sending message: "$message);
 		}
 	}
 	

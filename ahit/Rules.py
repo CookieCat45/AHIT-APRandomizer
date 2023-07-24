@@ -1,6 +1,6 @@
 from worlds.AutoWorld import World, CollectionState
 from worlds.generic.Rules import add_rule, set_rule
-from .Locations import location_table, humt_locations, tihs_locations, storybook_pages
+from .Locations import location_table, humt_locations, tihs_locations, storybook_pages, zipline_unlocks
 from .Types import HatType, ChapterIndex
 from BaseClasses import Location, Entrance, Region
 import typing
@@ -55,6 +55,13 @@ def has_relic_combo(state: CollectionState, world: World, relic: str) -> bool:
 
 def get_relic_count(state: CollectionState, world: World, relic: str) -> int:
     return state.count_group(relic, world.player)
+
+
+def can_hit_bells(state: CollectionState, world: World):
+    if world.multiworld.UmbrellaLogic[world.player].value == 0:
+        return True
+
+    return state.has("Umbrella", world.player) or can_use_hat(state, world, HatType.BREWING)
 
 
 # Only use for rifts
@@ -133,17 +140,12 @@ def set_rules(world: World):
     add_rule(mw.get_entrance("-> Alpine Skyline", p),
              lambda state: state.has_group("Time Pieces", p, w.get_chapter_cost(ChapterIndex.ALPINE)))
 
-    add_rule(mw.get_entrance("-> The Birdhouse", p),
-             lambda state: can_use_hat(state, w, HatType.BREWING))
-
-    add_rule(mw.get_entrance("-> The Twilight Bell", p),
-             lambda state: can_use_hat(state, w, HatType.DWELLER))
-
     add_rule(mw.get_entrance("-> Time's End", p),
              lambda state: state.has_group("Time Pieces", p, w.get_chapter_cost(ChapterIndex.FINALE))
              and can_use_hat(state, w, HatType.BREWING) and can_use_hat(state, w, HatType.DWELLER))
 
     set_indirect_connections(w)
+
     if mw.ActRandomizer[p].value == 0:
         set_default_rift_rules(w)
 
@@ -169,6 +171,69 @@ def set_rules(world: World):
         if data.hookshot:
             add_rule(location, lambda state: can_use_hookshot(state, w))
 
+        if data.umbrella and mw.UmbrellaLogic[p].value > 0:
+            add_rule(location, lambda state: state.has("Umbrella", p))
+
+        if data.dweller_bell > 0:
+            if data.dweller_bell == 1:  # Required to be hit regardless of Dweller Mask
+                add_rule(location, lambda state: can_hit_bells(state, w))
+            else:  # Can bypass with Dweller Mask
+                add_rule(location, lambda state: can_hit_bells(state, w) or can_use_hat(state, w, HatType.DWELLER))
+
+    set_specific_rules(w)
+
+    if mw.LogicDifficulty[p].value >= 1:
+        mw.SDJLogic[p].value = 1
+
+    if mw.SDJLogic[p].value > 0:
+        set_sdj_rules(world)
+
+    if mw.ShuffleAlpineZiplines[p].value > 0:
+        set_alps_zipline_rules(w)
+
+    for (key, acts) in act_connections.items():
+        i: int = 1
+        entrance: Entrance = mw.get_entrance(key, p)
+        region: Region = entrance.connected_region
+        access_rules: typing.List[typing.Callable[[CollectionState], bool]] = []
+        entrance.parent_region.exits.remove(entrance)
+        entrance.parent_region = None
+
+        # Entrances to this act that we have to set access_rules on
+        entrances: typing.List[Entrance] = []
+
+        for act in acts:
+            act_entrance: Entrance = mw.get_entrance(act, p)
+            access_rules.append(act_entrance.access_rule)
+            required_region = act_entrance.connected_region
+            name: str = format("%s: Connection %i" % (key, i))
+            new_entrance: Entrance = connect_regions(required_region, region, name, p)
+            entrances.append(new_entrance)
+
+            # Copy access rules from act completions
+            if "Free Roam" not in required_region.name:
+                rule: typing.Callable[[CollectionState], bool]
+                name = format("Act Completion (%s)" % required_region.name)
+                rule = mw.get_location(name, p).access_rule
+                access_rules.append(rule)
+
+            i += 1
+
+        for e in entrances:
+            for rules in access_rules:
+                add_rule(e, rules)
+
+    mw.completion_condition[p] = lambda state: can_use_hat(state, w, HatType.BREWING) \
+        and can_use_hat(state, w, HatType.DWELLER) \
+        and can_use_hookshot(state, w) \
+        and state.has_group("Time Pieces", p, w.get_chapter_cost(ChapterIndex.FINALE))
+
+
+def set_specific_rules(world: World):
+    mw = world.multiworld
+    w = world
+    p = world.player
+
     add_rule(mw.get_entrance("Spaceship - Time Rift A", p),
              lambda state: can_use_hat(state, w, HatType.BREWING)
              and state.has_group("Time Pieces", p, w.get_chapter_cost(ChapterIndex.BIRDS)))
@@ -180,6 +245,23 @@ def set_rules(world: World):
     add_rule(mw.get_entrance("Alpine Skyline - Finale", p),
              lambda state: can_clear_alpine(state, w))
 
+    # Normal logic
+    if mw.LogicDifficulty[p].value == 0:
+        add_rule(mw.get_entrance("-> The Birdhouse", p),
+                 lambda state: can_use_hat(state, w, HatType.BREWING))
+
+    # Hard logic, includes SDJ stuff
+    if mw.LogicDifficulty[p].value >= 1:
+        add_rule(mw.get_location("Act Completion (Time Rift - The Twilight Bell)", p),
+                 lambda state: can_use_hat(state, w, HatType.SPRINT) and state.has("Scooter Badge", p), "or")
+
+    # Expert logic
+    if mw.LogicDifficulty[p].value >= 2:
+        set_rule(mw.get_location("Alpine Skyline - The Twilight Path", p), lambda state: True)
+    else:
+        add_rule(mw.get_entrance("-> The Twilight Bell", p),
+                 lambda state: can_use_hat(state, w, HatType.DWELLER))
+
     # Cooking Cat requires the player to either have a full relic set, or have 1 relic missing from a set
     # AND have the base piece
     add_rule(mw.get_location("Spaceship - Cooking Cat", p),
@@ -187,6 +269,12 @@ def set_rules(world: World):
              or state.has("Relic (Mountain Set)", p)
              or (state.count_group("UFO", p) >= 3 and state.has("Relic (UFO)", p))
              or (state.count_group("Crayon", p) >= 3 and state.has("Relic (Crayon Box)", p)))
+
+    add_rule(mw.get_location("Mafia Town - Behind HQ Chest", p),
+             lambda state: state.can_reach("Act Completion (Heating Up Mafia Town)", "Location", p)
+             or state.can_reach("Down with the Mafia!", "Region", p)
+             or state.can_reach("Cheating the Race", "Region", p)
+             or state.can_reach("The Golden Vault", "Region", p))
 
     # Old guys don't appear in SCFOS
     add_rule(mw.get_location("Mafia Town - Old Man (Steel Beams)", p),
@@ -247,6 +335,10 @@ def set_rules(world: World):
              lambda state: state.can_reach("Toilet of Doom", "Region", p)
              or state.can_reach("Your Contract has Expired", "Region", p))
 
+    if mw.UmbrellaLogic[p].value > 0:
+        add_rule(mw.get_location("Act Completion (Toilet of Doom)", p),
+                 lambda state: state.has("Umbrella", p) or can_use_hat(state, w, HatType.BREWING))
+
     set_rule(mw.get_location("Act Completion (Time Rift - Village)", p),
              lambda state: can_use_hat(state, w, HatType.BREWING) or state.has("Umbrella", p)
              or can_use_hat(state, w, HatType.DWELLER))
@@ -268,63 +360,45 @@ def set_rules(world: World):
 
     for entrance in mw.get_region("Alpine Free Roam", p).entrances:
         add_rule(entrance, lambda state: can_use_hookshot(state, w))
-
-    if mw.SDJLogic[p].value > 0:
-        set_sdj_rules(world)
-
-    for (key, acts) in act_connections.items():
-        i: int = 1
-        entrance: Entrance = mw.get_entrance(key, p)
-        region: Region = entrance.connected_region
-        access_rules: typing.List[typing.Callable[[CollectionState], bool]] = []
-        entrance.parent_region.exits.remove(entrance)
-        entrance.parent_region = None
-
-        # Entrances to this act that we have to set access_rules on
-        entrances: typing.List[Entrance] = []
-
-        for act in acts:
-            act_entrance: Entrance = mw.get_entrance(act, p)
-            access_rules.append(act_entrance.access_rule)
-            required_region = act_entrance.connected_region
-            name: str = format("%s: Connection %i" % (key, i))
-            new_entrance: Entrance = connect_regions(required_region, region, name, p)
-            entrances.append(new_entrance)
-
-            # Copy access rules from act completions
-            if "Free Roam" not in required_region.name:
-                rule: typing.Callable[[CollectionState], bool]
-                name = format("Act Completion (%s)" % required_region.name)
-                rule = mw.get_location(name, p).access_rule
-                access_rules.append(rule)
-
-            i += 1
-
-        for e in entrances:
-            for rules in access_rules:
-                add_rule(e, rules)
-
-    mw.completion_condition[p] = lambda state: can_use_hat(state, w, HatType.BREWING) \
-        and can_use_hat(state, w, HatType.DWELLER) \
-        and can_use_hookshot(state, w) \
-        and state.has_group("Time Pieces", p, w.get_chapter_cost(ChapterIndex.FINALE))
+        if mw.UmbrellaLogic[p].value > 0:
+            add_rule(entrance, lambda state: state.has("Umbrella", p))
 
 
 def set_sdj_rules(world: World):
-    set_rule(world.multiworld.get_location("Subcon Forest - Long Tree Climb Chest", world.player),
-             lambda state: can_use_hat(state, world, HatType.DWELLER) or can_sdj(state, world))
+    add_rule(world.multiworld.get_location("Subcon Forest - Long Tree Climb Chest", world.player),
+             lambda state: can_sdj(state, world), "or")
 
-    set_rule(world.multiworld.get_location("Alpine Skyline - The Birdhouse: Dweller Platforms Relic", world.player),
-             lambda state: can_use_hat(state, world, HatType.DWELLER) or can_sdj(state, world))
+    add_rule(world.multiworld.get_location("Subcon Forest - Green and Purple Dweller Rocks", world.player),
+             lambda state: can_sdj(state, world), "or")
 
-    set_rule(world.multiworld.get_location("Alpine Skyline - The Twilight Bell: Ice Platform", world.player),
-             lambda state: can_use_hat(state, world, HatType.ICE) or can_sdj(state, world))
+    add_rule(world.multiworld.get_location("Alpine Skyline - The Birdhouse: Dweller Platforms Relic", world.player),
+             lambda state: can_sdj(state, world), "or")
 
-    set_rule(world.multiworld.get_location("Act Completion (Time Rift - Gallery)", world.player),
-             lambda state: can_use_hat(state, world, HatType.BREWING) or can_sdj(state, world))
+    add_rule(world.multiworld.get_location("Alpine Skyline - The Twilight Bell: Ice Platform", world.player),
+             lambda state: can_sdj(state, world), "or")
 
-    set_rule(world.multiworld.get_location("Act Completion (Time Rift - Curly Tail Trail)", world.player),
-             lambda state: can_use_hat(state, world, HatType.ICE) or can_sdj(state, world))
+    add_rule(world.multiworld.get_location("Act Completion (Time Rift - Gallery)", world.player),
+             lambda state: can_sdj(state, world), "or")
+
+    add_rule(world.multiworld.get_location("Act Completion (Time Rift - Curly Tail Trail)", world.player),
+             lambda state: can_sdj(state, world), "or")
+
+
+def set_alps_zipline_rules(world: World):
+    add_rule(world.multiworld.get_entrance("-> The Birdhouse", world.player),
+             lambda state: state.has("Zipline Unlock - The Birdhouse Path", world.player))
+
+    add_rule(world.multiworld.get_entrance("-> The Lava Cake", world.player),
+             lambda state: state.has("Zipline Unlock - The Lava Cake Path", world.player))
+
+    add_rule(world.multiworld.get_entrance("-> The Windmill", world.player),
+             lambda state: state.has("Zipline Unlock - The Windmill Path", world.player))
+
+    add_rule(world.multiworld.get_entrance("-> The Twilight Bell", world.player),
+             lambda state: state.has("Zipline Unlock - The Twilight Bell Path", world.player))
+
+    for (loc, zipline) in zipline_unlocks.items():
+        add_rule(world.multiworld.get_location(loc, world.player), lambda state: state.has(zipline, world.player))
 
 
 def reg_act_connection(world: World, region: typing.Union[str, Region], unlocked_entrance: typing.Union[str, Entrance]):

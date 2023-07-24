@@ -12,6 +12,10 @@ class LocData(NamedTuple):
     hookshot: Optional[bool] = False
     dlc_flags: Optional[HatDLC] = HatDLC.none
 
+    # For UmbrellaLogic setting
+    umbrella: Optional[bool] = False  # Umbrella required for this check
+    dweller_bell: Optional[int] = 0  # Dweller bell hit required, 1 means must hit bell, 2 means can bypass w/mask
+
 
 class HatInTimeLocation(Location):
     game: str = "A Hat in Time"
@@ -52,7 +56,7 @@ def location_dlc_enabled(world: World, location: str) -> bool:
 
 
 ahit_locations = {
-    "Spaceship - Rumbi": LocData(301000, "Spaceship", required_tps=4),
+    "Spaceship - Rumbi": LocData(301000, "Spaceship", required_tps=4, dweller_bell=1),  # same hit requirements, yes
     "Spaceship - Cooking Cat": LocData(301001, "Spaceship", required_tps=5),
 
     # 300000 range - Mafia Town/Batle of the Birds
@@ -94,7 +98,7 @@ ahit_locations = {
     "Mafia Town - Clock Tower Chest": LocData(303481, "Mafia Town Area", hookshot=True),
     "Mafia Town - Top of Lighthouse": LocData(304213, "Mafia Town Area", hookshot=True),
     "Mafia Town - Mafia Geek Platform": LocData(304212, "Mafia Town Area"),
-    "Mafia Town - Behind HQ Chest": LocData(303486, "Down with the Mafia!"),
+    "Mafia Town - Behind HQ Chest": LocData(303486, "Mafia Town Area"),
 
     "Mafia HQ - Hallway Brewing Crate": LocData(305387, "Down with the Mafia!", required_hats=[HatType.BREWING]),
     "Mafia HQ - Freezer Chest": LocData(303241, "Down with the Mafia!"),
@@ -105,10 +109,10 @@ ahit_locations = {
     "Dead Bird Studio - Red Building Top": LocData(305024, "Dead Bird Studio"),  # Can be reached from basement
     "Dead Bird Studio - Behind Water Tower": LocData(305248, "Dead Bird Studio"),  # Can be reached from basement
     "Dead Bird Studio - Side of House": LocData(305247, "Dead Bird Studio"),  # Can be reached from basement
-    "Dead Bird Studio - DJ Grooves Sign Chest": LocData(303901, "Dead Bird Studio"),
-    "Dead Bird Studio - Tightrope Chest": LocData(303898, "Dead Bird Studio"),
-    "Dead Bird Studio - Tepee Chest": LocData(303899, "Dead Bird Studio"),
-    "Dead Bird Studio - Conductor Chest": LocData(303900, "Dead Bird Studio"),
+    "Dead Bird Studio - DJ Grooves Sign Chest": LocData(303901, "Dead Bird Studio", umbrella=True),
+    "Dead Bird Studio - Tightrope Chest": LocData(303898, "Dead Bird Studio", umbrella=True),
+    "Dead Bird Studio - Tepee Chest": LocData(303899, "Dead Bird Studio", umbrella=True),
+    "Dead Bird Studio - Conductor Chest": LocData(303900, "Dead Bird Studio", umbrella=True),
 
     "Murder on the Owl Express - Cafeteria": LocData(305313, "Murder on the Owl Express"),
     "Murder on the Owl Express - Luggage Room Top": LocData(305090, "Murder on the Owl Express"),
@@ -150,7 +154,7 @@ ahit_locations = {
     "Subcon Forest - Swamp Tree Chest": LocData(323728, "Subcon Forest Area"),
     "Subcon Forest - Dweller Stump": LocData(324767, "Subcon Forest Area", required_hats=[HatType.DWELLER]),
     "Subcon Forest - Dweller Floating Rocks": LocData(324464, "Subcon Forest Area", required_hats=[HatType.DWELLER]),
-    "Subcon Forest - Dweller Platforming Tree A": LocData(324709, "Subcon Forest Area", required_hats=[HatType.DWELLER]),
+    "Subcon Forest - Dweller Platforming Tree A": LocData(324709, "Subcon Forest Area"),
     "Subcon Forest - Dweller Platforming Tree B": LocData(324855, "Subcon Forest Area", required_hats=[HatType.DWELLER]),
     "Subcon Forest - Giant Time Piece": LocData(325473, "Subcon Forest Area"),
     "Subcon Forest - Gallows": LocData(325472, "Subcon Forest Area"),
@@ -161,7 +165,7 @@ ahit_locations = {
     "Subcon Forest - Burning House": LocData(324710, "Subcon Forest Area"),
     "Subcon Forest - Burning Tree Climb": LocData(325079, "Subcon Forest Area"),
     "Subcon Forest - Burning Stump Chest": LocData(323731, "Subcon Forest Area"),
-    "Subcon Forest - Burning Forest Treehouse": LocData(325467, "Subcon Forest Area"),
+    "Subcon Forest - Burning Forest Treehouse": LocData(325467, "Subcon Forest Area"),  # Can hit the bell w/a cherry
     "Subcon Forest - Spider Bone Cage A": LocData(324462, "Subcon Forest Area"),
     "Subcon Forest - Spider Bone Cage B": LocData(325080, "Subcon Forest Area"),
     "Subcon Forest - Triple Spider Bounce": LocData(324765, "Subcon Forest Area"),
@@ -169,15 +173,15 @@ ahit_locations = {
     "Subcon Forest - Ice Cube Shack": LocData(324465, "Subcon Forest Area"),
     "Subcon Forest - Long Tree Climb Chest": LocData(323734, "Subcon Forest Area", required_hats=[HatType.DWELLER]),
     "Subcon Forest - Boss Arena Chest": LocData(323735, "Subcon Forest Area"),
-    "Subcon Well - Hookshot Badge Chest": LocData(324114, "The Subcon Well"),
-    "Subcon Well - Above Chest": LocData(324612, "The Subcon Well"),
-    "Subcon Well - On Pipe": LocData(324311, "The Subcon Well", hookshot=True),
-    "Subcon Well - Mushroom": LocData(325318, "The Subcon Well"),
-    "Queen Vanessa's Manor - Rooftop": LocData(325466, "Queen Vanessa's Manor"),
-    "Queen Vanessa's Manor - Cellar": LocData(324841, "Queen Vanessa's Manor"),
-    "Queen Vanessa's Manor - Bedroom Chest": LocData(323808, "Queen Vanessa's Manor"),
-    "Queen Vanessa's Manor - Hall Chest": LocData(323896, "Queen Vanessa's Manor"),
-    "Queen Vanessa's Manor - Chandelier": LocData(325546, "Queen Vanessa's Manor"),
+    "Subcon Forest - Manor Rooftop": LocData(325466, "Subcon Forest Area", dweller_bell=2),
+    "Subcon Well - Hookshot Badge Chest": LocData(324114, "The Subcon Well", dweller_bell=1),
+    "Subcon Well - Above Chest": LocData(324612, "The Subcon Well", dweller_bell=1),
+    "Subcon Well - On Pipe": LocData(324311, "The Subcon Well", hookshot=True, dweller_bell=1),
+    "Subcon Well - Mushroom": LocData(325318, "The Subcon Well", dweller_bell=1),
+    "Queen Vanessa's Manor - Cellar": LocData(324841, "Queen Vanessa's Manor", dweller_bell=2),
+    "Queen Vanessa's Manor - Bedroom Chest": LocData(323808, "Queen Vanessa's Manor", dweller_bell=2),
+    "Queen Vanessa's Manor - Hall Chest": LocData(323896, "Queen Vanessa's Manor", dweller_bell=2),
+    "Queen Vanessa's Manor - Chandelier": LocData(325546, "Queen Vanessa's Manor", dweller_bell=2),
 
     # 330000 range - Alpine Skyline
     "Alpine Skyline - Goat Village: Below Hookpoint": LocData(334856, "Goat Village"),
@@ -204,8 +208,7 @@ ahit_locations = {
     "Alpine Skyline - The Lava Cake: Top Cake": LocData(335418, "The Lava Cake"),
     "Alpine Skyline - The Twilight Path": LocData(334434, "Alpine Free Roam", required_hats=[HatType.DWELLER]),
     "Alpine Skyline - The Twilight Bell: Wide Purple Platform": LocData(336478, "The Twilight Bell"),
-    "Alpine Skyline - The Twilight Bell: Ice Platform": LocData(335826, "The Twilight Bell",
-                                                                required_hats=[HatType.ICE]),
+    "Alpine Skyline - The Twilight Bell: Ice Platform": LocData(335826, "The Twilight Bell"),
     "Alpine Skyline - Goat Outpost Horn": LocData(334760, "Alpine Free Roam"),
     "Alpine Skyline - Windy Passage": LocData(334776, "Alpine Free Roam"),
     "Alpine Skyline - The Windmill: Inside Pon Cluster": LocData(336395, "The Windmill"),
@@ -226,17 +229,17 @@ act_completions = {
     "Act Completion (She Came from Outer Space)": LocData(312262, "She Came from Outer Space"),
     "Act Completion (Down with the Mafia!)": LocData(311326, "Down with the Mafia!"),
     "Act Completion (Cheating the Race)": LocData(312318, "Cheating the Race"),
-    "Act Completion (Heating Up Mafia Town)": LocData(311481, "Heating Up Mafia Town"),
+    "Act Completion (Heating Up Mafia Town)": LocData(311481, "Heating Up Mafia Town", umbrella=True),
     "Act Completion (The Golden Vault)": LocData(312250, "The Golden Vault"),
     "Act Completion (Time Rift - Bazaar)": LocData(312465, "Time Rift - Bazaar"),
     "Act Completion (Time Rift - Sewers)": LocData(312484, "Time Rift - Sewers"),
     "Act Completion (Time Rift - Mafia of Cooks)": LocData(311855, "Time Rift - Mafia of Cooks"),
 
-    "Act Completion (Dead Bird Studio)": LocData(311383, "Dead Bird Studio"),
+    "Act Completion (Dead Bird Studio)": LocData(311383, "Dead Bird Studio", umbrella=True),
     "Act Completion (Murder on the Owl Express)": LocData(311544, "Murder on the Owl Express"),
     "Act Completion (Picture Perfect)": LocData(311587, "Picture Perfect"),
     "Act Completion (Train Rush)": LocData(312481, "Train Rush", hookshot=True),
-    "Act Completion (The Big Parade)": LocData(311157, "The Big Parade"),
+    "Act Completion (The Big Parade)": LocData(311157, "The Big Parade", umbrella=True),
     "Act Completion (Award Ceremony)": LocData(311488, "Award Ceremony"),
     "Act Completion (Dead Bird Studio Basement)": LocData(312253, "Dead Bird Studio Basement", hookshot=True),
     "Act Completion (Time Rift - The Owl Express)": LocData(312807, "Time Rift - The Owl Express"),
@@ -244,11 +247,11 @@ act_completions = {
     "Act Completion (Time Rift - Dead Bird Studio)": LocData(312577, "Time Rift - Dead Bird Studio"),
 
     "Act Completion (Contractual Obligations)": LocData(312317, "Contractual Obligations"),
-    "Act Completion (The Subcon Well)": LocData(311160, "The Subcon Well", hookshot=True),
+    "Act Completion (The Subcon Well)": LocData(311160, "The Subcon Well", hookshot=True, umbrella=True),
     "Act Completion (Toilet of Doom)": LocData(311984, "Toilet of Doom", hookshot=True),
-    "Act Completion (Queen Vanessa's Manor)": LocData(312017, "Queen Vanessa's Manor"),
+    "Act Completion (Queen Vanessa's Manor)": LocData(312017, "Queen Vanessa's Manor", umbrella=True),
     "Act Completion (Mail Delivery Service)": LocData(312032, "Mail Delivery Service", required_hats=[HatType.SPRINT]),
-    "Act Completion (Your Contract has Expired)": LocData(311390, "Your Contract has Expired"),
+    "Act Completion (Your Contract has Expired)": LocData(311390, "Your Contract has Expired", umbrella=True),
     "Act Completion (Time Rift - Pipe)": LocData(313069, "Time Rift - Pipe", hookshot=True),
     "Act Completion (Time Rift - Village)": LocData(313056, "Time Rift - Village"),
     "Act Completion (Time Rift - Sleepy Subcon)": LocData(312086, "Time Rift - Sleepy Subcon"),
@@ -306,6 +309,23 @@ contract_locations = {
     "Snatcher's Contract - Toilet of Doom": LocData(300201, "Subcon Forest Area"),
     "Snatcher's Contract - Queen Vanessa's Manor": LocData(300202, "Subcon Forest Area"),
     "Snatcher's Contract - Mail Delivery Service": LocData(300203, "Subcon Forest Area"),
+}
+
+# Don't put any of the items from peaks here, the rules for those entrances are set already
+zipline_unlocks = {
+    "Alpine Skyline - Bird Pass Fork":                          "Zipline Unlock - The Birdhouse Path",
+    "Alpine Skyline - Yellow Band Hills":                       "Zipline Unlock - The Birdhouse Path",
+    "Alpine Skyline - The Purrloined Village: Horned Stone":    "Zipline Unlock - The Birdhouse Path",
+    "Alpine Skyline - The Purrloined Village: Chest Reward":    "Zipline Unlock - The Birdhouse Path",
+
+    "Alpine Skyline - Mystifying Time Mesa: Zipline":       "Zipline Unlock - The Lava Cake Path",
+    "Alpine Skyline - Mystifying Time Mesa: Gate Puzzle":   "Zipline Unlock - The Lava Cake Path",
+    "Alpine Skyline - Ember Summit":                        "Zipline Unlock - The Lava Cake Path",
+
+    "Alpine Skyline - Goat Outpost Horn":   "Zipline Unlock - The Windmill Path",
+    "Alpine Skyline - Windy Passage":       "Zipline Unlock - The Windmill Path",
+
+    "Alpine Skyline - The Twilight Path":   "Zipline Unlock - The Twilight Bell Path",
 }
 
 shop_locations = {

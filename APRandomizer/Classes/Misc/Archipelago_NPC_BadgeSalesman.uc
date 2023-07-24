@@ -119,9 +119,10 @@ function OpenShop(Controller c)
 			continue;
 		
 		// Only hint progression
-		if (shopInfo.ItemFlags != ItemFlag_Important && shopInfo.ItemFlags != ItemFlag_ImportantSkipBalancing)
+		if (shopInfo.ItemFlags != ItemFlag_Important && shopInfo.ItemFlags != ItemFlag_ImportantSkipBalancing || shopInfo.Hinted)
 			continue;
 		
+		shopInfo.Hinted = true;
 		shopLocationList.AddItem(shopInfo.ItemClass.default.LocationID);
 	}
 	
@@ -129,6 +130,8 @@ function OpenShop(Controller c)
 	{
 		`AP.SendMultipleLocationChecks(shopLocationList, true, true);
 	}
+	
+	`AP.SaveGame();
 }
 
 function bool HasAnythingNewToSell(Controller pc)

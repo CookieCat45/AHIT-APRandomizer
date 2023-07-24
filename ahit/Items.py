@@ -1,5 +1,4 @@
-from BaseClasses import Item, ItemClassification, Location, Region
-from .Locations import HatInTimeLocation
+from BaseClasses import Item, ItemClassification
 from worlds.AutoWorld import World
 from .Types import HatDLC
 import typing
@@ -100,7 +99,7 @@ ahit_items = {
     "Item Magnet Badge": ItemData(300028, ItemClassification.useful),
     "No Bonk Badge": ItemData(300029, ItemClassification.useful),
     "Compass Badge": ItemData(300030, ItemClassification.useful),
-    "Scooter Badge": ItemData(300031, ItemClassification.useful),
+    "Scooter Badge": ItemData(300031, ItemClassification.progression),
     "Badge Pin": ItemData(300043, ItemClassification.useful),
 
     # Other
@@ -188,6 +187,13 @@ act_contracts = {
     "Snatcher's Contract - Mail Delivery Service": ItemData(300203, ItemClassification.progression),
 }
 
+alps_hooks = {
+    "Zipline Unlock - The Birdhouse Path": ItemData(300204, ItemClassification.progression),
+    "Zipline Unlock - The Lava Cake Path": ItemData(300205, ItemClassification.progression),
+    "Zipline Unlock - The Windmill Path": ItemData(300206, ItemClassification.progression),
+    "Zipline Unlock - The Twilight Bell Path": ItemData(300207, ItemClassification.progression),
+}
+
 relic_groups = {
     "Burger": {"Relic (Burger Patty)", "Relic (Burger Cushion)"},
     "Train": {"Relic (Mountain Set)", "Relic (Train)"},
@@ -213,6 +219,7 @@ item_table = {
     **ahit_items,
     **time_pieces,
     **act_contracts,
+    **alps_hooks,
 }
 
 lookup_id_to_name: typing.Dict[int, str] = {data.code: item_name for item_name, data in ahit_items.items() if data.code}

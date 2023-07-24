@@ -9,10 +9,40 @@ class ActRandomizer(Toggle):
     default = 1
 
 
+class ShuffleAlpineZiplines(Toggle):
+    """If enabled, Alpine's zipline paths leading to the peaks will be locked behind items."""
+    display_name = "Shuffle Alpine Ziplines"
+    default = 0
+
+
+class VanillaAlpine(Choice):
+    """If enabled, force Alpine (and optionally its finale) onto their vanilla locations in act shuffle."""
+    display_name = "Vanilla Alpine Skyline"
+    option_no = 0
+    option_yes = 1
+    option_finale = 2
+    default = 0
+
+
+class LogicDifficulty(Choice):
+    """Choose the difficulty setting for logic. Note that Hard or above will force SDJ logic on."""
+    display_name = "Logic Difficulty"
+    option_normal = 0
+    option_hard = 1
+    option_expert = 2
+    default = 0
+
+
 class RandomizeHatOrder(Toggle):
     """Randomize the order that hats are stitched in."""
     display_name = "Randomize Hat Order"
     default = 1
+
+
+class UmbrellaLogic(Toggle):
+    """Makes Hat Kid's default punch attack do absolutely nothing, making the Umbrella much more relevant and useful"""
+    display_name = "Umbrella Logic"
+    default = 0
 
 
 class StartWithCompassBadge(Toggle):
@@ -241,7 +271,11 @@ class ParadeTrapWeight(Range):
 ahit_options: typing.Dict[str, type(Option)] = {
 
     "ActRandomizer":            ActRandomizer,
+    "ShuffleAlpineZiplines":    ShuffleAlpineZiplines,
+    "VanillaAlpine":            VanillaAlpine,
+    "LogicDifficulty":          LogicDifficulty,
     "RandomizeHatOrder":        RandomizeHatOrder,
+    "UmbrellaLogic":            UmbrellaLogic,
     "StartWithCompassBadge":    StartWithCompassBadge,
     "CompassBadgeMode":         CompassBadgeMode,
     "ShuffleStorybookPages":    ShuffleStorybookPages,

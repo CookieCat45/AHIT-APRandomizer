@@ -1,10 +1,10 @@
 from BaseClasses import Item, ItemClassification, Region, LocationProgressType
 
 from .Items import HatInTimeItem, item_table, time_pieces, item_frequencies, item_dlc_enabled, junk_weights,\
-    create_item, create_multiple_items, create_junk_items, relic_groups, act_contracts
+    create_item, create_multiple_items, create_junk_items, relic_groups, act_contracts, alps_hooks
 
 from .Regions import create_region, create_regions, connect_regions, randomize_act_entrances, chapter_act_info, \
-    create_events
+    create_events, chapter_regions, act_chapters
 
 from .Locations import HatInTimeLocation, location_table, get_total_locations, contract_locations
 from .Types import HatDLC, HatType, ChapterIndex
@@ -32,6 +32,11 @@ class HatInTimeWorld(World):
     hat_yarn_costs: typing.Dict[HatType, int]
     chapter_timepiece_costs: typing.Dict[ChapterIndex, int]
     act_connections: typing.Dict[str, str] = {}
+
+    item_name_groups = relic_groups
+    item_name_groups["Time Pieces"] = set({})
+    for name in time_pieces.keys():
+        item_name_groups["Time Pieces"].add(name)
 
     def generate_early(self):
         # If our starting chapter is 4, force hookshot into inventory.
@@ -65,10 +70,6 @@ class HatInTimeWorld(World):
         if self.multiworld.RandomizeHatOrder[self.player].value > 0:
             self.multiworld.random.shuffle(self.hat_craft_order)
 
-        self.item_name_groups = {"Time Pieces": set({})}
-        for key, relics in relic_groups.items():
-            self.item_name_groups.setdefault(key, set(relics))
-
         for name in item_table.keys():
             if name == "Yarn":
                 continue
@@ -83,8 +84,8 @@ class HatInTimeWorld(World):
             if name in act_contracts.keys() and self.multiworld.ShuffleActContracts[self.player].value == 0:
                 continue
 
-            if name in time_pieces.keys():
-                self.item_name_groups["Time Pieces"].add(name)
+            if name in alps_hooks.keys() and self.multiworld.ShuffleAlpineZiplines[self.player].value == 0:
+                continue
 
             itempool += create_multiple_items(self, name, item_frequencies.get(name, 1))
 
@@ -158,6 +159,17 @@ class HatInTimeWorld(World):
 
         return slot_data
 
+    def extend_hint_information(self, hint_data: typing.Dict[int, typing.Dict[int, str]]):
+        new_hint_data = {}
+        for key, data in location_table.items():
+            if data.region not in act_chapters.keys():
+                continue
+
+            location = self.multiworld.get_location(key, self.player)
+            new_hint_data[location.address] = self.get_shuffled_region(location.parent_region.name)
+
+        hint_data[self.player] = new_hint_data
+
     def calculate_yarn_costs(self):
         mw = self.multiworld
         p = self.player
@@ -190,3 +202,16 @@ class HatInTimeWorld(World):
         original_act_info = chapter_act_info[original_region.name]
         new_act_info = chapter_act_info[new_region.name]
         self.act_connections[original_act_info] = new_act_info
+
+    def get_shuffled_region(self, region: str) -> str:
+        if region not in chapter_act_info.keys():
+            return region
+
+        ci: str = chapter_act_info[region]
+        for name in self.act_connections.keys():
+            if ci == name:
+                for key in chapter_act_info.keys():
+                    if chapter_act_info[key] == self.act_connections[ci]:
+                        return key
+
+        return ""

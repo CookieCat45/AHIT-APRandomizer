@@ -20,6 +20,8 @@ var array<string> PendingMessages;
 var bool ActRando;
 var bool ShuffleStorybookPages;
 var bool ShuffleActContracts;
+var bool ShuffleZiplines;
+var bool UmbrellaLogic;
 var bool DeathLink;
 
 var int CompassBadgeMode;
