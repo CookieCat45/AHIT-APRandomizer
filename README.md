@@ -48,7 +48,7 @@ A: Sometimes after installing the mod, it will disable itself in the mod menu in
 Q: **When I complete a relic combo, the relics disappear from the relic stand once I load into the Spaceship again. Why?**
 A: This is intended behaviour. The reason for it being that if this weren't the case, you would potentially be able to lock yourself out of a seed by placing relics in an order that the logic did not expect you to. The Time Rift will still be unlocked.
 
-Q: **Will other mods that I have cause issues or conflicts with the Archipelago mod?**
+Q: **Will other mods that I have cause issues or conflicts with the Archipelago mod?**\n
 A: Not that I know of in particular. However, any of your newer (2021 and later) workshop mods may not load due to their package version being newer. That said, most mods shouldn't cause problems (again, from what I know).
 
 Q: **Why is there a lack of options for adjusting the amount of Time Pieces in the pool?**
