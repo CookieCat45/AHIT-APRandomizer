@@ -43,7 +43,7 @@ Forces the client to attempt a connection to the server. You shouldn't have to u
 
 # FAQ/Common Issues
 **I followed all of the instructions correctly, but when I launch the game the mod doesn't work. What gives?**  
-Sometimes after installing the mod, it will disable itself in the mod menu in-game for an unknown reason. To fix this, go into the Mods (rocket icon) menu in-game, click on the Archipelago icon and make sure the mod is enabled. If the mod isn't in the menu, try making sure you followed the instructions correctly or let me know in the Archipelago Discord thread for A Hat in Time if you can't get the mod to work.
+Sometimes after installing the mod, it will disable itself in the mod menu in-game for an unknown reason. To fix this, go into the Mods menu in-game (rocket icon), click on the Archipelago icon and make sure the mod is enabled. If the mod isn't in the menu, try making sure you followed the instructions correctly or let me know in the Archipelago Discord thread for A Hat in Time if you can't get the mod to work.
 
 
 **When I complete a relic combo, the relics disappear from the relic stand once I load into the Spaceship again. Why?**  
