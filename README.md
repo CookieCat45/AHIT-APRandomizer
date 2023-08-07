@@ -33,7 +33,7 @@ Change the IP and port that the client will connect to on this save file. The IP
 Shows the current IP and port that the client will connect to on this save file.
 
 `ap_say <message>`
-Sends a chat message to the server. Using commands like `ap_say !release` should also work, though you should use !hint in a text client, because the game is unfortunately not able to print hint messages.
+Sends a chat message to the server. Using commands like `ap_say !release` should also work, though you should use !hint in a text client, because the game is unfortunately not able to print hint messages. (at least not yet).
 
 `ap_deathlink`
 Toggle Death Link.
