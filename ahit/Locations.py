@@ -296,7 +296,7 @@ act_completions = {
     "Act Completion (Time Rift - Alpine Skyline)": LocData(311777, "Time Rift - Alpine Skyline"),
 
     "Act Completion (The Finale)": LocData(311872, "The Finale", hookshot=True, required_hats=[HatType.DWELLER]),
-    "Act Completion (Time Rift - Tour)": LocData(311803, "Time Rift - Tour"),
+    "Act Completion (Time Rift - Tour)": LocData(311803, "Time Rift - Tour", dlc_flags=HatDLC.dlc1),
 
     "Act Completion (Bon Voyage!)": LocData(311520, "Bon Voyage!", dlc_flags=HatDLC.dlc1, hookshot=True),
     "Act Completion (Ship Shape)": LocData(311451, "Ship Shape", dlc_flags=HatDLC.dlc1),
