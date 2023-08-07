@@ -55,7 +55,7 @@ Not that I know of in particular. However, any of your newer (2021 and later) wo
 
 
 **Why is there a lack of options for adjusting the amount of Time Pieces in the pool?**  
-The reason for this is mostly because the game enforces a hard-limit on the amount of Time Pieces you can have based on the DLC you have installed. Without any DLC, the limit is 40. With Seal the Deal, the limit is increased by 6, and with Nyakuza Metro, the limit is increased by 10, with a grand total of 56. There is an option to shuffle extra Time Pieces into the pool based on DLC options being enabled (MaxExtraTimePieces), but going above these limits is not possible. As for there being no option to lower the amount of Time Pieces in the pool below 40, I personally don't see any purpose in going below 40. If you want to change how long it takes to unlock chapters, there are plenty of options to customize how chapter costs are calculated.
+The reason for this is mostly because the game enforces a hard-limit on the amount of Time Pieces you can have based on the DLC you have installed. Without any DLC, the limit is 40. With Seal the Deal, the limit is increased by 6, and with Nyakuza Metro, the limit is increased by 10, for a grand total of 56. There is an option to shuffle extra Time Pieces into the pool based on DLC options being enabled (MaxExtraTimePieces), but going above these limits is not possible. As for there being no option to lower the amount of Time Pieces in the pool below 40, I personally don't see any purpose in going below 40. If you want to change how long it takes to unlock chapters, there are plenty of options to customize how chapter costs are calculated.
 
 
 **How do I hint for Time Pieces without having to type the whole name?**  
