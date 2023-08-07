@@ -188,7 +188,7 @@ simulated function BuildSpecialHourglasses(HUD H)
 	local MaterialInstanceConstant matinst;
 	local int FinaleFillBit, TotalRequired, CompletedRequiredActsLength, i, basement, context;
 	local float finalefill;
-	local bool HasFinale, HasFreeRoam;
+	local bool HasFinale, HasFreeRoam, ac;
 	local Hat_ChapterActInfo shuffledAct;
 	
 	HasFreeRoam = false;
@@ -245,7 +245,7 @@ simulated function BuildSpecialHourglasses(HUD H)
 		else
 			s.MapName = ChapterInfo.GetActMap(s.ActID, s.IsComplete);
 		
-
+		
 		FinaleFillBit = class'Hat_SaveBitHelper'.static.GetLevelBits("ActSelectAnimation_FinaleFill_" $ GetChapterBitID());
 		
 		if (TotalRequired > 0)
@@ -291,9 +291,10 @@ simulated function BuildSpecialHourglasses(HUD H)
 		
 		if (`AP.SlotData.ActRando)
 		{
-			if (ChapterInfo.ChapterID == 2 && s.ActID == 6 && `AP.IsAwardCeremonyCompleted())
+			if (ChapterInfo.ChapterID == 2)
 			{
-				shuffledAct = `AP.GetDeadBirdBasementShuffledAct();
+				shuffledAct = `AP.GetDeadBirdBasementShuffledAct(basement);
+				ac = true;
 			}
 			else
 			{
@@ -312,7 +313,14 @@ simulated function BuildSpecialHourglasses(HUD H)
 		
 		s.ActInfoboxName = basement == 0 ? GetLocalizedActName(shuffledAct, context) : 
 			GetLocalizedActName(Hat_ChapterActInfo(DynamicLoadObject(
-				"hatintime_chapterinfo.BattleOfTheBirds.BattleOfTheBirds_AwardCeremony", class'Hat_ChapterActInfo')), 0);
+				"hatintime_chapterinfo.BattleOfTheBirds.BattleOfTheBirds_DeadBirdStudio", class'Hat_ChapterActInfo')), 0)$"?";
+		
+		if (ac)
+		{
+			s.ActInfoboxName = GetLocalizedActName(Hat_ChapterActInfo(DynamicLoadObject(
+				"hatintime_chapterinfo.BattleOfTheBirds.BattleOfTheBirds_AwardCeremony", class'Hat_ChapterActInfo')), 0) 
+				$" (" $s.ActInfoboxName $")";
+		}
 		
 		if (s.IsUnlocked || s.IsComplete)
 		{
@@ -578,11 +586,11 @@ simulated function BuildBonusHourglassesSide(HUD H, Array<Hat_ChapterActInfo> Ho
 		s.ActInfoboxName = basement == 0 ? GetLocalizedActName(shuffledAct, context) : 
 			GetLocalizedActName(Hat_ChapterActInfo(DynamicLoadObject(
 				"hatintime_chapterinfo.BattleOfTheBirds.BattleOfTheBirds_AwardCeremony", class'Hat_ChapterActInfo')), 0);
-
+		
 		s.PosX = posx;
 		s.PosY = posy;
 		s.ActInfoboxTitle = class'Hat_Localizer'.static.GetGame("levels", s.ID == ActSelectType_TimeRift_Water ? "Location_DreamWorld_Water" : "Location_DreamWorld_Cave");
-		s.ActInfoboxName = IsCompleted ? GetLocalizedActName(shuffledAct, context) : "???";
+		s.ActInfoboxName = GetLocalizedActName(shuffledAct, context);
 		s.ActDisplayLabel = s.ActInfoboxName;
 		s.IsDefault = false;
 		s.Photo = s.ID != ActSelectType_TimeRift_Cave_Reminder ? HourglassList[i].Photo : None;

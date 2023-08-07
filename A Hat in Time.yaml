@@ -92,8 +92,11 @@ A Hat in Time:
 
   ActRandomizer:
     # If enabled, shuffle the game's Acts between each other.
+    # Separate Rifts will cause Time Rifts to only be shuffled amongst each other,
+    # and Blue Time Rifts and Purple Time Rifts are shuffled separately.
     false: 0
-    true: 50
+    light: 50
+    insanity: 0
 
   ShuffleAlpineZiplines:
     # If enabled, Alpine's zipline paths leading to the peaks will be locked behind items.
@@ -102,8 +105,8 @@ A Hat in Time:
 
   VanillaAlpine:
     # If enabled, force Alpine (and optionally its finale) onto their vanilla locations in act shuffle.
-    no: 50
-    yes: 0
+    false: 50
+    true: 0
     finale: 0
 
   LogicDifficulty:
@@ -166,7 +169,7 @@ A Hat in Time:
     true: 0
 
   EnableDLC1:
-    # NOT IMPLEMENTED Shuffle content from The Arctic Cruise (Chapter 6) into the game.
+    # Shuffle content from The Arctic Cruise (Chapter 6) into the game. This also includes the Tour time rift.
     # DO NOT ENABLE THIS OPTION IF YOU DO NOT HAVE THE DLC INSTALLED!!!
     false: 50
     true: 0
@@ -226,6 +229,18 @@ A Hat in Time:
     # Minimum value is 1
     # Maximum value is 8
     5: 50
+    random: 0
+    random-low: 0
+    random-high: 0
+
+  MaxExtraTimePieces:
+    # Maximum amount of extra Time Pieces that will be factored in chapter costs and the item pool from the DLCs.
+    # Arctic Cruise will add up to 6. Nyakuza Metro will add up to 10. The absolute maximum is 56.
+    #
+    # You can define additional values between the minimum and maximum values.
+    # Minimum value is 0
+    # Maximum value is 16
+    0: 50
     random: 0
     random-low: 0
     random-high: 0

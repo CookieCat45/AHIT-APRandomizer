@@ -1,6 +1,7 @@
 from worlds.AutoWorld import World, CollectionState
 from worlds.generic.Rules import add_rule, set_rule
-from .Locations import location_table, humt_locations, tihs_locations, storybook_pages, zipline_unlocks
+from .Locations import location_table, tihs_locations, zipline_unlocks, is_location_valid, \
+    contract_locations
 from .Types import HatType, ChapterIndex
 from BaseClasses import Location, Entrance, Region
 import typing
@@ -24,6 +25,9 @@ act_connections = {
     "Subcon Forest - Finale": ["Subcon Forest - Act 1", "Subcon Forest - Act 2",
                                "Subcon Forest - Act 3", "Subcon Forest - Act 4",
                                "Subcon Forest - Act 5"],
+
+    "The Arctic Cruise - Act 2":  ["The Arctic Cruise - Act 1"],
+    "The Arctic Cruise - Finale": ["The Arctic Cruise - Act 2"],
 }
 
 
@@ -89,6 +93,8 @@ def set_rules(world: World):
     mw = world.multiworld
     p = world.player
 
+    dlc1: bool = bool(mw.EnableDLC1[p].value > 0)
+
     # First, chapter access
     starting_chapter = ChapterIndex(mw.StartingChapter[p].value)
     w.set_chapter_cost(starting_chapter, 0)
@@ -96,11 +102,28 @@ def set_rules(world: World):
     # Chapter costs increase progressively. Randomly decide the chapter order, except for Finale
     chapter_list: typing.List[ChapterIndex] = [ChapterIndex.MAFIA, ChapterIndex.BIRDS,
                                                ChapterIndex.SUBCON, ChapterIndex.ALPINE]
+
+    if dlc1:
+        chapter_list.append(ChapterIndex.CRUISE)
+
     chapter_list.remove(starting_chapter)
     mw.random.shuffle(chapter_list)
 
+    if dlc1:
+        index = chapter_list.index(ChapterIndex.ALPINE)
+        chapter_list.remove(ChapterIndex.CRUISE)
+        pos = mw.random.randint(index, len(chapter_list))
+        chapter_list.insert(pos, ChapterIndex.CRUISE)
+
     lowest_cost: int = mw.LowestChapterCost[p].value
     highest_cost: int = mw.HighestChapterCost[p].value
+
+    max_cost_increase: int = 0
+    if dlc1:
+        max_cost_increase += 6
+
+    highest_cost += min(max_cost_increase, mw.MaxExtraTimePieces[p].value)
+
     cost_increment: int = mw.ChapterCostIncrement[p].value
     min_difference: int = mw.ChapterCostMinDifference[p].value
     last_cost: int = 0
@@ -128,21 +151,26 @@ def set_rules(world: World):
     maximum: int = mw.Chapter5MaxCost[p].value
     w.set_chapter_cost(ChapterIndex.FINALE, mw.random.randint(min(minimum, maximum), max(minimum, maximum)))
 
-    add_rule(mw.get_entrance("-> Mafia Town", p),
+    add_rule(mw.get_entrance("Telescope -> Mafia Town", p),
              lambda state: state.has_group("Time Pieces", p, w.get_chapter_cost(ChapterIndex.MAFIA)))
 
-    add_rule(mw.get_entrance("-> Battle of the Birds", p),
+    add_rule(mw.get_entrance("Telescope -> Battle of the Birds", p),
              lambda state: state.has_group("Time Pieces", p, w.get_chapter_cost(ChapterIndex.BIRDS)))
 
-    add_rule(mw.get_entrance("-> Subcon Forest", p),
+    add_rule(mw.get_entrance("Telescope -> Subcon Forest", p),
              lambda state: state.has_group("Time Pieces", p, w.get_chapter_cost(ChapterIndex.SUBCON)))
 
-    add_rule(mw.get_entrance("-> Alpine Skyline", p),
+    add_rule(mw.get_entrance("Telescope -> Alpine Skyline", p),
              lambda state: state.has_group("Time Pieces", p, w.get_chapter_cost(ChapterIndex.ALPINE)))
 
-    add_rule(mw.get_entrance("-> Time's End", p),
+    add_rule(mw.get_entrance("Telescope -> Time's End", p),
              lambda state: state.has_group("Time Pieces", p, w.get_chapter_cost(ChapterIndex.FINALE))
              and can_use_hat(state, w, HatType.BREWING) and can_use_hat(state, w, HatType.DWELLER))
+
+    if dlc1:
+        add_rule(mw.get_entrance("Telescope -> The Arctic Cruise", p),
+                 lambda state: state.has_group("Time Pieces", p, w.get_chapter_cost(ChapterIndex.ALPINE))
+                 and state.has_group("Time Pieces", p, w.get_chapter_cost(ChapterIndex.CRUISE)))
 
     set_indirect_connections(w)
 
@@ -151,15 +179,22 @@ def set_rules(world: World):
 
     location: Location
     for (key, data) in location_table.items():
-        if key in storybook_pages.keys() and mw.ShuffleStorybookPages[p].value == 0:
+        if not is_location_valid(w, key):
+            continue
+
+        if key in contract_locations.keys():
             continue
 
         location = mw.get_location(key, p)
-        if key in humt_locations:
-            add_rule(location, lambda state: state.can_reach("Heating Up Mafia Town", "Region", p), "or")
 
-        if key in tihs_locations:
-            add_rule(location, lambda state: state.can_reach("The Illness has Spread", "Region", p), "or")
+        # Not all locations in Alpine can be reached from The Illness has Spread
+        # as many of the ziplines are blocked off
+        if data.region == "Alpine Skyline Area" and key not in tihs_locations:
+            add_rule(location, lambda state: state.can_reach("Alpine Free Roam", "Region", p), "and")
+
+        if data.region == "The Birdhouse" or data.region == "The Lava Cake" \
+           or data.region == "The Windmill" or data.region == "The Twilight Bell":
+            add_rule(location, lambda state: state.can_reach("Alpine Free Roam", "Region", p), "and")
 
         for hat in data.required_hats:
             if hat is not HatType.NONE:
@@ -192,12 +227,15 @@ def set_rules(world: World):
         set_alps_zipline_rules(w)
 
     for (key, acts) in act_connections.items():
+        if "Arctic Cruise" in key and not dlc1:
+            continue
+
         i: int = 1
         entrance: Entrance = mw.get_entrance(key, p)
         region: Region = entrance.connected_region
         access_rules: typing.List[typing.Callable[[CollectionState], bool]] = []
         entrance.parent_region.exits.remove(entrance)
-        entrance.parent_region = None
+        del entrance.parent_region
 
         # Entrances to this act that we have to set access_rules on
         entrances: typing.List[Entrance] = []
@@ -223,24 +261,14 @@ def set_rules(world: World):
             for rules in access_rules:
                 add_rule(e, rules)
 
-    mw.completion_condition[p] = lambda state: can_use_hat(state, w, HatType.BREWING) \
-        and can_use_hat(state, w, HatType.DWELLER) \
-        and can_use_hookshot(state, w) \
-        and state.has_group("Time Pieces", p, w.get_chapter_cost(ChapterIndex.FINALE))
+    mw.completion_condition[p] = lambda state: state.has("Time Piece Cluster", p)
 
 
 def set_specific_rules(world: World):
     mw = world.multiworld
     w = world
     p = world.player
-
-    add_rule(mw.get_entrance("Spaceship - Time Rift A", p),
-             lambda state: can_use_hat(state, w, HatType.BREWING)
-             and state.has_group("Time Pieces", p, w.get_chapter_cost(ChapterIndex.BIRDS)))
-
-    add_rule(mw.get_entrance("Spaceship - Time Rift B", p),
-             lambda state: can_use_hat(state, w, HatType.DWELLER)
-             and state.has_group("Time Pieces", p, w.get_chapter_cost(ChapterIndex.ALPINE)))
+    dlc1: bool = bool(mw.EnableDLC1[p].value > 0)
 
     add_rule(mw.get_entrance("Alpine Skyline - Finale", p),
              lambda state: can_clear_alpine(state, w))
@@ -249,6 +277,19 @@ def set_specific_rules(world: World):
     if mw.LogicDifficulty[p].value == 0:
         add_rule(mw.get_entrance("-> The Birdhouse", p),
                  lambda state: can_use_hat(state, w, HatType.BREWING))
+
+        add_rule(mw.get_location("Alpine Skyline - Yellow Band Hills", p),
+                 lambda state: can_use_hat(state, w, HatType.BREWING))
+
+        if dlc1:
+            add_rule(mw.get_location("Act Completion (Time Rift - Deep Sea)", p),
+                     lambda state: can_use_hat(state, w, HatType.DWELLER))
+
+            add_rule(mw.get_location("Rock the Boat - Post Captain Rescue", p),
+                     lambda state: can_use_hat(state, w, HatType.ICE))
+
+            add_rule(mw.get_location("Act Completion (Rock the Boat)", p),
+                     lambda state: can_use_hat(state, w, HatType.ICE))
 
     # Hard logic, includes SDJ stuff
     if mw.LogicDifficulty[p].value >= 1:
@@ -268,7 +309,9 @@ def set_specific_rules(world: World):
              lambda state: state.has("Relic (Burger Patty)", p)
              or state.has("Relic (Mountain Set)", p)
              or (state.count_group("UFO", p) >= 3 and state.has("Relic (UFO)", p))
-             or (state.count_group("Crayon", p) >= 3 and state.has("Relic (Crayon Box)", p)))
+             or (state.count_group("Crayon", p) >= 3 and state.has("Relic (Crayon Box)", p))
+             or (state.count_group("Cake", p) >= 3 and state.has("Relic (Cake Stand)", p))
+             or (state.has("Relic (Necklace Bust)", p)))
 
     add_rule(mw.get_location("Mafia Town - Behind HQ Chest", p),
              lambda state: state.can_reach("Act Completion (Heating Up Mafia Town)", "Location", p)
@@ -297,6 +340,16 @@ def set_specific_rules(world: World):
              or state.can_reach("Barrel Battle", "Region", p)
              or state.can_reach("Down with the Mafia!", "Region", p)
              or state.can_reach("Cheating the Race", "Region", p)
+             or state.can_reach("Heating Up Mafia Town", "Region", p)
+             or state.can_reach("The Golden Vault", "Region", p))
+
+    # Only available outside Down with the Mafia! (for some reason)
+    add_rule(mw.get_location("Mafia Town - On Scaffolding", p),
+             lambda state: state.can_reach("Welcome to Mafia Town", "Region", p)
+             or state.can_reach("Barrel Battle", "Region", p)
+             or state.can_reach("She Came from Outer Space", "Region", p)
+             or state.can_reach("Cheating the Race", "Region", p)
+             or state.can_reach("Heating Up Mafia Town", "Region", p)
              or state.can_reach("The Golden Vault", "Region", p))
 
     # For some reason, the brewing crate is removed in HUMT
@@ -313,22 +366,7 @@ def set_specific_rules(world: World):
              lambda state: can_use_hat(state, w, HatType.TIME_STOP)
              or mw.CTRWithSprint[p].value > 0 and can_use_hat(state, w, HatType.SPRINT))
 
-    add_rule(mw.get_location("Dead Bird Studio - DJ Grooves Sign Chest", p),
-             lambda state: state.can_reach("Dead Bird Studio", "Region", p))
-
-    add_rule(mw.get_location("Dead Bird Studio - Tightrope Chest", p),
-             lambda state: state.can_reach("Dead Bird Studio", "Region", p))
-
-    add_rule(mw.get_location("Dead Bird Studio - Tepee Chest", p),
-             lambda state: state.can_reach("Dead Bird Studio", "Region", p))
-
-    add_rule(mw.get_location("Dead Bird Studio - Conductor Chest", p),
-             lambda state: state.can_reach("Dead Bird Studio", "Region", p))
-
-    add_rule(mw.get_location("Act Completion (Dead Bird Studio)", p),
-             lambda state: state.can_reach("Dead Bird Studio", "Region", p))
-
-    add_rule(mw.get_entrance("Dead Bird Studio -> Badge Seller", p),
+    add_rule(mw.get_entrance("DBS -> Badge Seller", p),
              lambda state: state.can_reach("Dead Bird Studio", "Region", p))
 
     set_rule(mw.get_location("Subcon Forest - Boss Arena Chest", p),
@@ -363,6 +401,9 @@ def set_specific_rules(world: World):
         if mw.UmbrellaLogic[p].value > 0:
             add_rule(entrance, lambda state: state.has("Umbrella", p))
 
+    if mw.EnableDLC1[p].value > 0:
+        add_rule(mw.get_entrance("Cruise Ship Entrance BV", p), lambda state: can_use_hookshot(state, w))
+
 
 def set_sdj_rules(world: World):
     add_rule(world.multiworld.get_location("Subcon Forest - Long Tree Climb Chest", world.player),
@@ -372,9 +413,6 @@ def set_sdj_rules(world: World):
              lambda state: can_sdj(state, world), "or")
 
     add_rule(world.multiworld.get_location("Alpine Skyline - The Birdhouse: Dweller Platforms Relic", world.player),
-             lambda state: can_sdj(state, world), "or")
-
-    add_rule(world.multiworld.get_location("Alpine Skyline - The Twilight Bell: Ice Platform", world.player),
              lambda state: can_sdj(state, world), "or")
 
     add_rule(world.multiworld.get_location("Act Completion (Time Rift - Gallery)", world.player),
@@ -418,12 +456,6 @@ def reg_act_connection(world: World, region: typing.Union[str, Region], unlocked
 
 
 def set_indirect_connections(world: World):
-    for entrance in world.multiworld.get_region("Mafia Town Area", world.player).entrances:
-        reg_act_connection(world, "Heating Up Mafia Town", entrance)
-
-    for entrance in world.multiworld.get_region("Alpine Free Roam", world.player).entrances:
-        reg_act_connection(world, "The Illness has Spread", entrance)
-
     reg_act_connection(world, "The Birdhouse", "Alpine Skyline - Finale")
     reg_act_connection(world, "The Lava Cake", "Alpine Skyline - Finale")
     reg_act_connection(world, "The Windmill", "Alpine Skyline - Finale")
@@ -438,6 +470,14 @@ def set_rift_rules(world: World, regions: typing.Dict[str, Region]):
     p = world.player
 
     # This is accessing the regions in place of these time rifts, so we can set the rules on all the entrances.
+    for entrance in regions["Time Rift - Gallery"].entrances:
+        add_rule(entrance, lambda state: can_use_hat(state, w, HatType.BREWING)
+                 and state.has_group("Time Pieces", p, w.get_chapter_cost(ChapterIndex.BIRDS)))
+
+    for entrance in regions["Time Rift - The Lab"].entrances:
+        add_rule(entrance, lambda state: can_use_hat(state, w, HatType.DWELLER)
+                 and state.has_group("Time Pieces", p, w.get_chapter_cost(ChapterIndex.ALPINE)))
+
     for entrance in regions["Time Rift - Sewers"].entrances:
         add_rule(entrance, lambda state: can_clear_act(state, w, "Mafia Town - Act 4"))
         reg_act_connection(w, mw.get_entrance("Mafia Town - Act 4", p).connected_region, entrance)
@@ -484,6 +524,16 @@ def set_rift_rules(world: World, regions: typing.Dict[str, Region]):
     for entrance in regions["Time Rift - Alpine Skyline"].entrances:
         add_rule(entrance, lambda state: has_relic_combo(state, w, "Crayon"))
 
+    if mw.EnableDLC1[p].value > 0:
+        for entrance in regions["Time Rift - Balcony"].entrances:
+            add_rule(entrance, lambda state: can_clear_act(state, w, "The Arctic Cruise - Finale"))
+
+        for entrance in regions["Time Rift - Deep Sea"].entrances:
+            add_rule(entrance, lambda state: has_relic_combo(state, w, "Cake"))
+
+        # for entrance in regions["Time Rift - Tour"].entrances:
+        #   add_rule(entrance, lambda state: state.has_group("Time Pieces", p, mw.TourRequiredTimePieces[p].value))
+
 
 # Basically the same as above, but without the need of the dict since we are just setting defaults
 # Called if Act Rando is disabled
@@ -491,6 +541,14 @@ def set_default_rift_rules(world: World):
     w = world
     mw = world.multiworld
     p = world.player
+
+    for entrance in mw.get_region("Time Rift - Gallery", p).entrances:
+        add_rule(entrance, lambda state: can_use_hat(state, w, HatType.BREWING)
+                 and state.has_group("Time Pieces", p, w.get_chapter_cost(ChapterIndex.BIRDS)))
+
+    for entrance in mw.get_region("Time Rift - The Lab", p).entrances:
+        add_rule(entrance, lambda state: can_use_hat(state, w, HatType.DWELLER)
+                 and state.has_group("Time Pieces", p, w.get_chapter_cost(ChapterIndex.ALPINE)))
 
     for entrance in mw.get_region("Time Rift - Sewers", p).entrances:
         add_rule(entrance, lambda state: can_clear_act(state, world, "Mafia Town - Act 4"))
@@ -537,6 +595,16 @@ def set_default_rift_rules(world: World):
 
     for entrance in mw.get_region("Time Rift - Alpine Skyline", p).entrances:
         add_rule(entrance, lambda state: has_relic_combo(state, w, "Crayon"))
+
+    if mw.EnableDLC1[p].value > 0:
+        for entrance in mw.get_region("Time Rift - Balcony", p).entrances:
+            add_rule(entrance, lambda state: can_clear_act(state, w, "The Arctic Cruise - Finale"))
+
+        for entrance in mw.get_region("Time Rift - Deep Sea", p).entrances:
+            add_rule(entrance, lambda state: has_relic_combo(state, w, "Cake"))
+
+        # for entrance in mw.get_region("Time Rift - Tour", p).entrances:
+        #   add_rule(entrance, lambda state: state.has_group("Time Pieces", p, mw.TourRequiredTimePieces[p].value))
 
 
 def connect_regions(start_region: Region, exit_region: Region, entrancename: str, player: int) -> Entrance:

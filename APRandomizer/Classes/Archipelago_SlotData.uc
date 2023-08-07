@@ -14,6 +14,8 @@ var string SlotName;
 var string Password;
 var string Host;
 var int Port;
+var int Seed;
+var int ShopItemRandStep;
 
 var array<string> PendingMessages;
 
@@ -23,6 +25,8 @@ var bool ShuffleActContracts;
 var bool ShuffleZiplines;
 var bool UmbrellaLogic;
 var bool DeathLink;
+var bool DLC1;
+var bool DLC2;
 
 var int CompassBadgeMode;
 
@@ -31,6 +35,7 @@ var int Chapter2Cost;
 var int Chapter3Cost;
 var int Chapter4Cost;
 var int Chapter5Cost;
+var int Chapter6Cost;
 
 var int SprintYarnCost;
 var int BrewingYarnCost;

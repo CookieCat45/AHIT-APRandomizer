@@ -29,6 +29,19 @@ def item_dlc_enabled(world: World, name: str) -> bool:
     return False
 
 
+def get_total_time_pieces(world: World) -> int:
+    limit: int = 40 + world.multiworld.MaxExtraTimePieces[world.player].value
+    count: int = 0
+    for key in time_pieces.keys():
+        if item_dlc_enabled(world, key):
+            count += 1
+
+        if count >= limit:
+            break
+
+    return count
+
+
 def create_item(world: World, name: str) -> Item:
     data = item_table[name]
     return HatInTimeItem(name, data.classification, data.code, world.player)
@@ -177,7 +190,13 @@ time_pieces = {
     "Time Piece (Time Rift - Gallery)": ItemData(300085, ItemClassification.progression),
     "Time Piece (Time Rift - The Lab)": ItemData(300086, ItemClassification.progression),
 
-    "Time Piece (Time's End - The Finale)": ItemData(300087, ItemClassification.progression),
+    "Time Piece (The Finale)": ItemData(300087, ItemClassification.progression),
+
+    "Time Piece (Bon Voyage!)": ItemData(300088, ItemClassification.progression, HatDLC.dlc1),
+    "Time Piece (Ship Shape)": ItemData(300089, ItemClassification.progression, HatDLC.dlc1),
+    "Time Piece (Rock the Boat)": ItemData(300090, ItemClassification.progression, HatDLC.dlc1),
+    "Time Piece (Time Rift - Balcony)": ItemData(300091, ItemClassification.progression, HatDLC.dlc1),
+    "Time Piece (Time Rift - Deep Sea)": ItemData(300092, ItemClassification.progression, HatDLC.dlc1),
 }
 
 act_contracts = {

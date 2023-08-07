@@ -11,15 +11,18 @@ var transient bool IsItemTimePiece; // used to tell if a time piece being given 
 var transient bool CollectiblesShuffled;
 var transient bool ControllerCapsLock;
 var transient bool ContractEventActive;
+var transient bool ItemSoundCooldown;
 var transient string DebugMsg;
 
 var config int DebugMode;
 var config int DisableInjection;
 var config int VerboseLogging;
+var config int DisableAutoConnect;
 var const editconst Vector SpaceshipSpawnLocation;
 
 var transient array<Hat_SnatcherContract_Selectable> SelectContracts;
 var transient bool TrapsDestroyed;
+var float TimeSinceLastItem;
 
 struct immutable ShuffledAct
 {
@@ -72,6 +75,8 @@ const UmbrellaCheck = 301002;
 // These have to be hardcoded because camera badge item disappears if you have the camera badge
 const CameraBadgeCheck1 = 302003;
 const CameraBadgeCheck2 = 302004;
+const SubconBushCheck1 = 325478;
+const SubconBushCheck2 = 325479;
 var const editconst Vector Camera1Loc;
 var const editconst Vector Camera2Loc;
 
@@ -90,8 +95,17 @@ var array<Texture2D> UnlockScreenNumbers;
 
 event OnModLoaded()
 {
+	local string mapName;
 	HookActorSpawn(class'Hat_Player', 'Player');
-	HookActorSpawn(class'Actor', 'ContractEvent');
+	
+	if (IsArchipelagoEnabled())
+	{
+		mapName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename();
+		if (mapName ~= "subconforest")
+		{
+			HookActorSpawn(class'Actor', 'ContractEvent');
+		}
+	}
 }
 
 event OnModUnloaded()
@@ -123,10 +137,58 @@ function SaveGame()
 	`SaveManager.SaveToFile(true);
 }
 
+event Tick(float d)
+{
+	local int i;
+	local array<LocalPlayer> players;
+	
+	Super.Tick(d);
+	if (!IsArchipelagoEnabled())
+		return;
+	
+	IterateChestArray();
+	
+	if (ParadeArray.Length > 0)
+	{
+		players = class'Engine'.static.GetEngine().GamePlayers;
+	
+		for (i = 0; i < ParadeArray.Length; i++)
+		{
+			if (ParadeArray[i].MimicPlayerIndex >= players.Length)
+				continue;
+			
+			if (ShouldFreezeParade(Hat_PlayerController(players[ParadeArray[i].MimicPlayerIndex].Actor.Pawn.Controller)))
+			{
+				ParadeArray[i].SetTickIsDisabled(true);
+				ParadeArray[i].SetCollision(false);
+			}
+			else
+			{
+				ParadeArray[i].SetTickIsDisabled(false);
+				ParadeArray[i].SetCollision(true);
+			}
+		}
+	}
+}
+
+function bool ShouldFreezeParade(Hat_PlayerController c)
+{
+	if (c.IsTalking()) return true;
+	if (c.PlayerCamera != None && Hat_PlayerCamera(c.PlayerCamera) != None && Hat_PlayerCamera(c.PlayerCamera).IgnorePlayerMovement()) return true;
+	if (c.MyHUD != None && Hat_HUD(c.MyHUD) != None && Hat_HUD(c.MyHUD).CacheElementsDisableMovement)
+	{
+		if (Hat_HUD(c.MyHUD).GetHUD(class'Hat_HUDMenu_ItemWheel', true) == None)
+			return true;
+	}
+	
+	return false;
+}
+
 event OnHookedActorSpawn(Object newActor, Name identifier)
 {
 	local int i;
 	local Hat_SaveGame save;
+	local Hat_PlayerController ctr;
 	
 	if (identifier == 'Player')
 	{
@@ -159,6 +221,13 @@ event OnHookedActorSpawn(Object newActor, Name identifier)
 						SlotData.TakenContracts.AddItem(SlotData.ObtainedContracts[i]);
 						save.SnatcherContracts.RemoveItem(SlotData.ObtainedContracts[i]);
 						save.CompletedSnatcherContracts.RemoveItem(SlotData.ObtainedContracts[i]);
+					}
+					
+					foreach DynamicActors(class'Hat_PlayerController', ctr)
+					{
+						// Dying while signing a contract may cause the check to not send and become permanently unavailable.
+						// This can primarily happen with traps. So we need to enable god mode temporarily.
+						ctr.bGodMode = true;
 					}
 					
 					SetTimer(0.5, true, NameOf(WaitForContractEvent));
@@ -196,7 +265,7 @@ function CreateClient(optional float delay=0.0)
 		SetTimer(delay, false, NameOf(CreateClient));
 		return;
 	}
-
+	
 	if (client != None)
 		return;
 	
@@ -206,9 +275,10 @@ function CreateClient(optional float delay=0.0)
 event PreBeginPlay()
 {
 	local Hat_ChapterActInfo act;
+	local Hat_CollectibleBackpackItem relic;
 	local Hat_SaveGame save;
 	local string path;
-	local int i, pos;
+	local int i, pos, a;
 	
 	Super.PreBeginPlay();
 	
@@ -305,20 +375,6 @@ event PreBeginPlay()
 		}
 		
 		SetAPBits("AlpineFinale", 0);
-		
-		if (SlotData.ActRando)
-		{
-			// If we're going to Alps, make sure we go to the intro if we should
-			if (`GameManager.GetChapterInfo().ChapterID == 4 && `GameManager.GetCurrentAct() == 1 
-				&& !class'Hat_SaveBitHelper'.static.HasActBit("ForceAlpineFinale", 1))
-			{
-				if (!class'Hat_SaveBitHelper'.static.HasLevelBit("Actless_FreeRoam_Intro_Complete", 1, "AlpsAndSails"))
-				{
-					`GameManager.SetCurrentAct(99);
-					`GameManager.SetCurrentCheckpoint(-1, false);
-				}
-			}
-		}
 	}
 	else
 	{
@@ -329,6 +385,12 @@ event PreBeginPlay()
 		{
 			if (save.HUBDecorations[i].Complete)
 			{
+				for (a = 0; a < save.HUBDecorations[i].Decorations.Length; a++)
+				{
+					relic = class'Hat_Loadout'.static.MakeCollectibleBackpackItem(save.HUBDecorations[i].Decorations[a]);
+					save.MyBackpack2017.Collectibles.RemoveItem(relic);
+				}
+				
 				save.HUBDecorations.RemoveItem(save.HUBDecorations[i]);
 				i--;
 			}
@@ -357,6 +419,7 @@ event PostBeginPlay()
 function OnPostInitGame()
 {
 	local int i, saveCount;
+	local string mapName;
 	local Hat_BackpackItem item;
 	local Hat_TreasureChest_Base chest;
 	local Hat_TimeRiftPortal portal;
@@ -366,7 +429,6 @@ function OnPostInitGame()
 	local Hat_PlayerController ctr;
 	local Hat_NPC mu;
 	local Actor a;
-	local Emitter emitter;
 	
 	// If on titlescreen, find any Archipelago-enabled save files and do this stuff 
 	// to prevent the game from forcing the player into Mafia Town.
@@ -381,22 +443,34 @@ function OnPostInitGame()
 				continue;
 			
 			if (HasAPBit("ArchipelagoEnabled", 1, save))
-			{
-				//class'Hat_SaveBitHelper'.static.SetLevelBits("hub_cinematics", 0, "hub_spaceship", save);
 				save.AllowSaving = false;
-			}
 		}
+
+		ResetEverything();
 	}
 	
 	if (!IsArchipelagoEnabled())
 		return;
 	
 	if (bool(DebugMode))
-	{
 		SetTimer(1.0, true, NameOf(PrintItemsNearPlayer));
-	}
 	
-	SetTimer(60.0, true, NameOf(KeepConnectionAlive));
+	HideItems();
+	
+	// Some maps like Arctic Cruise need this for some stupid reason otherwise not all of them get hidden
+	SetTimer(0.5, false, NameOf(HideItems));
+	
+	foreach DynamicActors(class'Actor', a)
+	{
+		if (a.IsA('Hat_NPC_BadgeSalesman') && !a.IsA('Archipelago_NPC_BadgeSalesman'))
+		{
+			if (a.bHidden)
+				continue;
+			
+			Spawn(class'Archipelago_NPC_BadgeSalesman', , , a.Location, a.Rotation);
+			a.Destroy();
+		}
+	}
 	
 	if (IsInSpaceship())
 	{
@@ -428,67 +502,56 @@ function OnPostInitGame()
 			}
 		}
 		
+		if (SlotData.DLC1 && IsDLC1Installed())
+		{
+			// In vanilla, Tour requires ALL but 1 time pieces, which changes depending on the DLC the player has.
+			// This may change in the future, but for now, it's always available (once the player unlocks Chapter 5).
+			foreach DynamicActors(class'Hat_TimeRiftPortal', portal)
+			{
+				if (portal.Name == 'Hat_TimeRiftPortal_2')
+				{
+					portal.Enabled = true;
+					portal.SetIdleSound(true);
+					portal.SetHidden(false);
+					break;
+				}
+			}
+		}
+		
 		OpenBedroomDoor();
 	}
 	else
 	{
-		foreach DynamicActors(class'Actor', a)
-		{
-			if (a.IsA('Hat_NPC_BadgeSalesman') && !a.IsA('Archipelago_NPC_BadgeSalesman'))
-			{
-				if (a.bHidden)
-					continue;
-				
-				Spawn(class'Archipelago_NPC_BadgeSalesman', , , a.Location, a.Rotation);
-				a.Destroy();
-			}
-			else if (a.IsA('Hat_Collectible_Important'))
-			{
-				if (a.IsA('Hat_Collectible_VaultCode_Base') || a.IsA('Hat_Collectible_Sticker'))
-					continue;
-				
-				if (a.IsA('Hat_Collectible_InstantCamera'))
-				{
-					a.Destroy();
-					continue;
-				}
-				
-				// Hide all regular collectibles, just in case
-				a.ShutDown();
-			}
-		}
-		
 		// We need to do this early, before connecting, otherwise the game
 		// might empty the chest on us if it has an important item in vanilla.
 		// Example of this happening is the Hookshot Badge chest in the Subcon Well.
 		// This will also prevent the player from possibly nabbing vanilla chest contents as well.
 		foreach DynamicActors(class'Hat_TreasureChest_Base', chest)
 		{
-			if (chest.Opened || class<Hat_Collectible_Important>(chest.Content) == None)
+			if (chest.Opened || class<Hat_Collectible_Important>(chest.Content) == None
+				&& class<Hat_Collectible_StoryBookPage>(chest.Content) == None)
 				continue;
 			
 			if (chest.IsA('Hat_TreasureChest_GiftBox'))
 				continue;
 			
 			ChestArray.AddItem(chest);
-			chest.Content = class'Hat_Collectible_EnergyBit';
-		}
-
-		if (`GameManager.GetChapterInfo().ChapterID == 1)
-		{
-			foreach AllActors(class'Emitter', emitter)
+			
+			if (class<Hat_Collectible_StoryBookPage>(chest.Content) == None)
 			{
-				if (emitter.ParticleSystemComponent.Template == ParticleSystem'HatInTime_Items.ParticleSystems.ImportantItem')
-				{
-					emitter.ParticleSystemComponent.KillParticlesForced();
-					emitter.Destroy();
-				}
+				chest.Content = class'Hat_Collectible_EnergyBit';
 			}
 		}
 		
+		mapName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename();
+	
+		// Fix for Rock the Boat
+		if (`GameManager.GetCurrentMapFilename() ~= "ship_sinking")
+			mapName = "ship_sinking";
+		
 		// Shuffle items from cache?
-		if (IsMapScouted(class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename()))
-			ShuffleCollectibles();
+		if (IsMapScouted(mapName))
+			ShuffleCollectibles(true);
 		
 		// If act rando or contracts are shuffled, remove these act transitions for the well/manor if we don't enter from the proper act.
 		// This forces the player to find the act/contracts in order to enter them.
@@ -519,12 +582,22 @@ function OnPostInitGame()
 				}
 			}
 		}
+
+		if (mapName ~= "mafia_town")
+		{
+			DeleteCameraParticle();
+		}
+	}
+	
+	if (SlotData.UmbrellaLogic)
+	{
+		ReplaceUnarmedWeapon();
 	}
 	
 	ctr = Hat_PlayerController(GetALocalPlayerController());
-	
-	// If we load a new save file with at least 1 time piece, the game will force the umbrella into our inventory.
 	save = `SaveManager.GetCurrentSaveData();
+
+	// If we load a new save file with at least 1 time piece, the game will force the umbrella into our inventory.
 	for (i = 0; i < save.MyBackpack2017.Weapons.Length; i++)
 	{
 		item = save.MyBackpack2017.Weapons[i];
@@ -534,13 +607,6 @@ function OnPostInitGame()
 			&& class<Archipelago_Weapon_Umbrella>(item.BackpackClass) == None)
 			{
 				ctr.MyLoadout.RemoveBackpack(item);
-			}
-			
-			if (SlotData.UmbrellaLogic && class<Hat_Weapon_Unarmed>(item.BackpackClass) != None)
-			{
-				ctr.MyLoadout.RemoveBackpack(item);
-				item.BackpackClass = class'Archipelago_Weapon_Unarmed';
-				ctr.MyLoadout.AddBackpack(item, true, true, Hat_Player(ctr.Pawn));
 			}
 		}
 	}
@@ -586,6 +652,26 @@ function OnPostInitGame()
 	
 	if (Client == None)
 		CreateClient();
+}
+
+function HideItems()
+{
+	local Hat_Collectible_Important a;
+	foreach DynamicActors(class'Hat_Collectible_Important', a)
+	{
+		if (a.IsA('Hat_Collectible_VaultCode_Base') || a.IsA('Hat_Collectible_Sticker'))
+			continue;
+		
+		if (a.IsA('Hat_Collectible_InstantCamera'))
+		{
+			a.Destroy();
+			continue;
+		}
+		
+		// Hide all regular collectibles, just in case
+		DebugMessage("Removing " $a.Name);
+		a.ShutDown();
+	}
 }
 
 function bool DoesPlayerReallyHaveContract(class<Hat_SnatcherContract_Act> contract)
@@ -766,6 +852,7 @@ function LoadSlotData(JsonObject json)
 	SlotData.ShuffleZiplines = json.GetBoolValue("ShuffleAlpineZiplines");
 	SlotData.UmbrellaLogic = json.GetBoolValue("UmbrellaLogic");
 	SlotData.DeathLink = json.GetBoolValue("death_link");
+	SlotData.Seed = json.GetIntValue("SeedNumber");
 	
 	SlotData.CompassBadgeMode = json.GetIntValue("CompassBadgeMode");
 	
@@ -775,6 +862,13 @@ function LoadSlotData(JsonObject json)
 	SlotData.Chapter4Cost = json.GetIntValue("Chapter4Cost");
 	SlotData.Chapter5Cost = json.GetIntValue("Chapter5Cost");
 
+	SlotData.DLC1 = json.GetBoolValue("EnableDLC1");
+	
+	if (SlotData.DLC1)
+	{
+		SlotData.Chapter6Cost = json.GetIntValue("Chapter6Cost");
+	}
+	
 	SlotData.SprintYarnCost = json.GetIntValue("SprintYarnCost");
 	SlotData.BrewingYarnCost = json.GetIntValue("BrewingYarnCost");
 	SlotData.IceYarnCost = json.GetIntValue("IceYarnCost");
@@ -834,6 +928,11 @@ function LoadSlotData(JsonObject json)
 		actShuffle.IsDeadBirdBasementOriginalAct = true;
 		SlotData.ShuffledActList.AddItem(actShuffle);
 		DebugMessage("FOUND act pair:" $"DeadBirdBasement" $"REPLACED WITH: " $n);
+	}
+	
+	if (SlotData.UmbrellaLogic)
+	{
+		ReplaceUnarmedWeapon();
 	}
 	
 	SlotData.Initialized = true;
@@ -961,7 +1060,7 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 	
 	if (shuffled == None && basement == 0)
 	{
-		DebugMessage("[ERROR] Failed to find shuffled act for " $act);
+		DebugMessage("[ERROR] Failed to find shuffled act for " $act, , true);
 		ScriptTrace();
 		return;
 	}
@@ -999,10 +1098,19 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 
 function OnPreOpenHUD(HUD InHUD, out class<Object> InHUDElement)
 {
+	// These get extremely annoying as they pop up every time a new save file is present when going into the save select screen
+	if (InHUDElement == class'Hat_HUDMenuDLCSplash')
+		InHUDElement = None;
+	
 	if (!IsArchipelagoEnabled())
 		return;
 	
-	if (InHUDElement == class'Hat_HUDMenuShop')
+	if (InHUDElement == class'Hat_HUDElementGhostPartyJoinAct')
+	{
+		if (SlotData == None || SlotData.ActRando)
+			InHUDElement = None;
+	}
+	else if (InHUDElement == class'Hat_HUDMenuShop')
 	{
 		SetTimer(0.0001, false, NameOf(CheckShopOverride), self, Hat_HUD(InHUD));
 	}
@@ -1035,13 +1143,15 @@ function CheckShopOverride(Hat_HUD hud)
 		{
 			GetShopItemInfo(class<Archipelago_ShopItem_Base>(mShop.ItemsForSale[i].CollectibleClass), shopInfo);
 			mShop.ItemsForSale[0].ItemCost = shopInfo.PonCost;
-
+			
 			if (!shopInfo.Hinted)
 			{
 				if (shopInfo.ItemFlags == ItemFlag_Important || shopInfo.ItemFlags == ItemFlag_ImportantSkipBalancing)
 				{
 					SendLocationCheck(shopInfo.ID, true, true);
 				}
+				
+				SetShopInfoAsHinted(shopInfo);
 			}
 		}
 		
@@ -1120,14 +1230,6 @@ function DisableAlpineFinale()
 {
 	SetAPBits("AlpineFinale", 0);
 	class'Hat_SaveBitHelper'.static.SetActBits("ForceAlpineFinale", 0);
-	
-	// If we possibly have all 4 peak time pieces, remove one so we don't go to Alpine finale
-	if (`SaveManager.HasTimePiece("AlpineSkyline_WeddingCake"))
-	{
-		`SaveManager.GetCurrentSaveData().RemoveTimePiece("AlpineSkyline_WeddingCake");
-		SlotData.TakenTimePieces.AddItem("AlpineSkyline_WeddingCake");
-		SaveGame();
-	}
 }
 
 function OnTimePieceCollected(string Identifier)
@@ -1203,7 +1305,7 @@ function OnTimePieceCollected(string Identifier)
 	
 	if (hourglass == "")
 	{
-		DebugMessage("FAILED to find ChapterActInfo: "$Identifier);
+		DebugMessage("FAILED to find ChapterActInfo: "$Identifier, , true);
 		ScriptTrace();
 	}
 	
@@ -1271,6 +1373,15 @@ function UpdateChapterInfo()
 	SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo.maingame.Sand_and_Sails', SlotData.Chapter4Cost);
 	SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo.maingame.Mu_Finale', SlotData.Chapter5Cost);
 	
+	if (SlotData.DLC1)
+	{
+		SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo_DLC1.ChapterInfos.ChapterInfo_Cruise', SlotData.Chapter6Cost);
+	}
+	else
+	{
+		SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo_DLC1.ChapterInfos.ChapterInfo_Cruise', 99);
+	}
+	
 	UpdateActUnlocks();
 	if (IsInSpaceship())
 	{
@@ -1279,6 +1390,80 @@ function UpdateChapterInfo()
 	}
 	
 	SaveGame();
+}
+
+function ResetEverything()
+{
+	local array<Hat_ChapterInfo> chapterInfoArray;
+	local Hat_ChapterInfo chapter;
+	local Hat_ChapterActInfo act;
+	
+	chapterInfoArray = class'Hat_ChapterInfo'.static.GetAllChapterInfo();
+	foreach chapterInfoArray(chapter)
+	{
+		chapter.ConditionalUpdateActList();
+		foreach chapter.ChapterActInfo(act)
+		{
+			if (act.IsBonus && !IsPurpleRift(act))
+			{
+				act.RequiredActID.Length = 0;
+
+				switch (act.MapName)
+				{
+					case "TimeRift_Water_Mafia_Easy": // Sewers
+						act.RequiredActID.AddItem(4);
+						break;
+
+					case "TimeRift_Water_Mafia_Hard": // Bazaar
+						act.RequiredActID.AddItem(6);
+						break;
+
+					case "TimeRift_Water_TWreck_Panels": // The Owl Express
+						act.RequiredActID.AddItem(2);
+						act.RequiredActID.AddItem(3);
+						break;
+					
+					case "TimeRift_Water_TWreck_Parade": // The Moon
+						act.RequiredActID.AddItem(4);
+						act.RequiredActID.AddItem(5);
+						break;
+					
+					case "TimeRift_Water_Subcon_Hookshot": // Pipe
+						act.RequiredActID.AddItem(2);
+						break;
+					
+					case "TimeRift_Water_Subcon_Dwellers": // Village
+						act.RequiredActID.AddItem(4);
+						break;
+					
+					case "TimeRift_Water_Alp_Cats": // Curly Tail Trail
+						act.RequiredActID.AddItem(13);
+						break;
+					
+					case "TimeRift_Water_Alp_Goats": // The Twilight Bell
+						act.RequiredActID.AddItem(15);
+						break;
+
+					case "TimeRift_Water_Cruise_Slide": // Balcony
+						act.RequiredActID.AddItem(3);
+						break;
+					
+					default:
+						break;
+				}
+				
+			}
+			
+			act.InDevelopment = false;
+		}
+	}
+	
+	SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo.maingame.MafiaTown', 1);
+	SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo.maingame.trainwreck_of_science', 4);
+	SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo.maingame.subconforest', 7);
+	SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo.maingame.Sand_and_Sails', 14);
+	SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo.maingame.Mu_Finale', 25);
+	SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo_DLC1.ChapterInfos.ChapterInfo_Cruise', 35);
 }
 
 function OpenBedroomDoor()
@@ -1339,12 +1524,14 @@ function UpdatePowerPanels()
 	foreach DynamicActors(class'Hat_SpaceshipPowerPanel', panel)
 	{
 		if (!IsPowerPanelActivated2(panel) && panel.CanBeUnlocked() 
-		&& panel.InteractPoint == None && (!panel.RuntimeMat.GetScalarParameterValue('Unlocked', val) || val == 0))
+		&& panel.InteractPoint == None && (panel.RuntimeMat == None || !panel.RuntimeMat.GetScalarParameterValue('Unlocked', val) || val == 0))
 		{
 			panel.InteractPoint = Spawn(class'Hat_InteractPoint',panel,,panel.Location + Vector(panel.Rotation)*10 + vect(0,0,1)*20,panel.Rotation,,true);
 			panel.InteractPoint.PushDelegate(panel.OnInteractDelegate);
 			
-			panel.RuntimeMat.SetScalarParameterValue('Unlockable', 1);
+			if (panel.RuntimeMat != None)
+				panel.RuntimeMat.SetScalarParameterValue('Unlockable', 1);
+
 			panel.ElectricityParticle[0].SetActive(true);
 			panel.ElectricityParticle[1].SetActive(true);
 			panel.ReadyToActivateParticle.SetActive(true);
@@ -1372,7 +1559,7 @@ function SetChapterTimePieceRequirement(Hat_ChapterInfo chapter, int amount)
 	local Hat_SpaceshipPowerPanel panel;
 	chapter.RequiredHourglassCount = amount;
 	
-	if (IsInSpaceship())
+	if (IsInSpaceship() && amount <= 50)
 	{
 		foreach DynamicActors(class'Hat_SpaceshipPowerPanel', panel)
 		{
@@ -1459,22 +1646,28 @@ function bool IsPurpleRift(Hat_ChapterActInfo act)
 	return (act.IsBonus && InStr(act.hourglass, "_cave", false, true) != -1);
 }
 
-function ShuffleCollectibles()
+function ShuffleCollectibles(optional bool cache)
 {
 	local Hat_Collectible_Important collectible;
 	local Hat_NPC npc;
 	local int locId, i;
 	local Actor a;
-	local array<int> locationArray, shopLocationArray;
+	local array<int> locationArray, shopLocationArray, forceSendArray;
 	local array<class<Object>> shopItemClasses;
 	local LocationInfo locInfo;
 	local class<Object> shopItem;
 	local string mapName;
+	local bool forceSend;
 	
-	if (CollectiblesShuffled)
+	if (CollectiblesShuffled || IsInSpaceship())
 		return;
 	
 	mapName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename();
+	
+	// Fix for Rock the Boat
+	DebugMessage("Map Name: "$mapName);
+	if (`GameManager.GetCurrentMapFilename() ~= "ship_sinking")
+		mapName = "ship_sinking";
 	
 	foreach DynamicActors(class'Hat_Collectible_Important', collectible)
 	{
@@ -1482,18 +1675,36 @@ function ShuffleCollectibles()
 		|| collectible.IsA('Hat_Collectible_Sticker'))
 			continue;
 		
-		locationArray.AddItem(ObjectToLocationId(collectible));
+		// Some items only appear in certain acts
+		locId = ObjectToLocationId(collectible);
+		if (IsMapScouted(mapName) && !IsLocationCached(locId))
+		{
+			// We are trying to load from cache. This means we aren't connected. Wait until we are.
+			if (cache)
+				return;
+			
+			forceSendArray.AddItem(locId);
+			forceSend = true;
+		}
+		
+		locationArray.AddItem(locId);
 		if (bool(DebugMode))
 		{
 			DebugMessage("[ShuffleCollectibles] Found item: " $collectible.GetLevelName() $"."$collectible.Name $ObjectToLocationId(collectible));
 		}
 	}
 	
-	if (InStr(`GameManager.GetCurrentMapFilename(), "mafia_town", false, true) != -1)
+	if (mapName ~= "mafia_town")
 	{
 		DebugMessage("[ShuffleCollectibles] Adding camera badge locations");
 		locationArray.AddItem(CameraBadgeCheck1);
 		locationArray.AddItem(CameraBadgeCheck2);
+	}
+	else if (mapName ~= "subconforest")
+	{
+		DebugMessage("[ShuffleCollectibles] Adding subcon bush locations");
+		locationArray.AddItem(SubconBushCheck1);
+		locationArray.AddItem(SubconBushCheck2);
 	}
 	
 	for (i = 0; i < ChestArray.Length; i++)
@@ -1511,6 +1722,17 @@ function ShuffleCollectibles()
 			if (a.Name == 'Hat_Goodie_Vault_1') // golden vault
 				continue;
 			
+			// Vaults don't appear in HUMT
+			if (IsMapScouted(mapName) && !IsLocationCached(locId))
+			{
+				// We are trying to load from cache. This means we aren't connected. Wait until we are.
+				if (cache)
+					return;
+				
+				forceSendArray.AddItem(locId);
+				forceSend = true;
+			}
+
 			locationArray.AddItem(ObjectToLocationId(a));
 		}
 		else if (a.IsA('Hat_ImpactInteract_Breakable_ChemicalBadge'))
@@ -1538,7 +1760,18 @@ function ShuffleCollectibles()
 		locId = ObjectToLocationId(npc);
 		if (locId != 303832 && locId != 303833)
 			continue;
+		
+		// Old guys don't appear in SCFOS/HUMT
+		if (IsMapScouted(mapName) && !IsLocationCached(locId))
+		{
+			// We are trying to load from cache. This means we aren't connected. Wait until we are.
+			if (cache)
+				return;
 			
+			forceSendArray.AddItem(locId);
+			forceSend = true;
+		}
+		
 		BulliedNPCArray.AddItem(npc);
 		locationArray.AddItem(locId);
 	}
@@ -1586,16 +1819,18 @@ function ShuffleCollectibles()
 				if (collectible.IsA('Hat_Collectible_VaultCode_Base') || collectible.IsA('Hat_Collectible_Sticker'))
 					continue;
 				
+				if (forceSendArray.Find(ObjectToLocationId(collectible)) != -1)
+					continue;
+				
 				collectible.Destroy();
 			}
-			
-			//if (shopLocationArray.Length > 0)
-			//	SendMultipleLocationChecks(shopLocationArray, true);
+		}
+		
+		if (forceSend)
+		{
+			SendMultipleLocationChecks(forceSendArray, true);
 		}
 	}
-	
-	if (ChestArray.Length > 0 || BulliedNPCArray.Length > 0)
-		SetTimer(0.5, true, NameOf(IterateChestArray));
 	
 	CollectiblesShuffled = true;
 }
@@ -1627,6 +1862,19 @@ function bool IsShopItemCached(class<Archipelago_ShopItem_Base> shopClass)
 	}
 	
 	return false;
+}
+
+function SetShopInfoAsHinted(ShopItemInfo shopInfo)
+{
+	local int i;
+	for (i = 0; i < SlotData.ShopItemList.Length; i++)
+	{
+		if (SlotData.ShopItemList[i].ItemClass == shopInfo.ItemClass)
+		{
+			SlotData.ShopItemList[i].Hinted = true;
+			break;
+		}
+	}
 }
 
 function bool IsLocationCached(int id)
@@ -1810,7 +2058,11 @@ function ShopItemInfo CreateShopItemInfo(class<Archipelago_ShopItem_Base> itemCl
 	shopInfo.ItemClass = itemClass;
 	shopInfo.ItemID = itemId;
 	shopInfo.ItemFlags = flags;
-	shopInfo.PonCost = RandRange(SlotData.MinPonCost, SlotData.MaxPonCost);
+	
+	shopInfo.PonCost = SlotData.MinPonCost + 
+		class'Hat_Math'.static.SeededRandWithSeed(SlotData.MaxPonCost-SlotData.MinPonCost+1, SlotData.Seed+SlotData.ShopItemRandStep);
+	
+	SlotData.ShopItemRandStep++;
 	SlotData.ShopItemList.AddItem(shopInfo);
 	InitShopItemDisplayName(itemClass);
 	
@@ -1852,7 +2104,7 @@ function InitShopItemDisplayName(class<Archipelago_ShopItem_Base> itemClass)
 		}
 	}
 	
-	displayName $= " (" $itemClass.default.DisplayName $")";
+	displayName $= " (" $itemClass.default.ItemNumberName $")";
 	itemClass.static.SetDisplayName(displayName);
 }
 
@@ -1890,10 +2142,7 @@ function IterateChestArray()
 	local array<int> locationArray;
 	
 	if (ChestArray.Length <= 0 && BulliedNPCArray.Length <= 0)
-	{
-		ClearTimer(NameOf(IterateChestArray));
 		return;
-	}
 	
 	for (i = 0; i < ChestArray.Length; i++)
 	{
@@ -1944,7 +2193,19 @@ function bool IsLocationIDContainer(int id, optional out Actor container)
 	
 	foreach DynamicActors(class'Actor', a)
 	{
-		if (a.IsA('Hat_TreasureChest_Base') || a.IsA('Hat_Goodie_Vault_Base') || a.IsA('Hat_NPC_Bullied')
+		if (id == SubconBushCheck1 || id == SubconBushCheck2)
+		{
+			if (a.IsA('Hat_InteractiveFoliage_HarborBush'))
+			{
+				if (id == SubconBushCheck1 && a.Name == 'Hat_InteractiveFoliage_HarborBush_2'
+				|| id == SubconBushCheck2 && a.Name == 'Hat_InteractiveFoliage_HarborBush_3')
+				{
+					container = a;
+					return true;
+				}
+			}
+		}
+		else if (a.IsA('Hat_TreasureChest_Base') || a.IsA('Hat_Goodie_Vault_Base') || a.IsA('Hat_NPC_Bullied')
 		|| a.IsA('Hat_ImpactInteract_Breakable_ChemicalBadge'))
 		{
 			if (ObjectToLocationId(a) == id)
@@ -2011,6 +2272,7 @@ function OnPreBreakableBreak(Actor Breakable, Pawn Breaker)
 			item.LocationId = locInfo.ID;
 			item.ItemDisplayName = locInfo.ItemName;
 			item.ItemFlags = locInfo.Flags;
+			item.ItemOwner = locInfo.Player;
 			item.Init();
 			
 			rangeMin = 65536 / 16;
@@ -2030,7 +2292,7 @@ function OnPlayerDeath(Pawn Player)
 		return;
 	
 	// commit myurder
-	message = "[{\"cmd\":\"Bounce\",\"tags\":[\"DeathLink\"],\"data\":{\"time\":" $float(TimeStamp()) $",\"source\:" $SlotData.SlotName $",\"cause\":\"\"}}]";
+	message = "[{\"cmd\":\"Bounce\",\"tags\":[\"DeathLink\"],\"data\":{\"time\":" $float(TimeStamp()) $",\"source\":" $"\"" $SlotData.SlotName $"\"" $"}}]";
 	client.SendBinaryMessage(message);
 }
 
@@ -2044,17 +2306,6 @@ function OnLoadoutChanged(PlayerController controller, Object loadout, Object ba
 	item = Hat_BackpackItem(backpackItem);
 	if (item == None)
 		return;
-	
-	if (SlotData.Initialized && SlotData.UmbrellaLogic)
-	{
-		if (class<Hat_Weapon_Unarmed>(item.BackpackClass) != None
-		&& class<Archipelago_Weapon_Unarmed>(item.BackpackClass) == None)
-		{
-			Hat_Loadout(loadout).RemoveBackpack(item);
-			item.BackpackClass = class'Archipelago_Weapon_Unarmed';
-			Hat_Loadout(loadout).AddBackpack(item, true, true, Hat_Player(Hat_PlayerController(controller).Pawn));
-		}
-	}
 	
 	// remove base game umbrella in favor of our own. This is the umbrella check in Mafia Town.
 	if (class<Hat_Weapon_Umbrella>(item.BackpackClass) != None 
@@ -2101,9 +2352,8 @@ function OnCollectibleSpawned(Object collectible)
 	local Rotator rot;
 	local float range;
 	local LocationInfo locInfo;
-
-	if (!IsArchipelagoEnabled() || collectible.IsA('Archipelago_RandomizedItem_Base')
-	|| collectible.IsA('Archipelago_ShopItem_Base'))
+	
+	if (!IsArchipelagoEnabled() || collectible.IsA('Archipelago_RandomizedItem_Base') || collectible.IsA('Archipelago_ShopItem_Base'))
 		return;
 	
 	if (IsInSpaceship())
@@ -2145,6 +2395,7 @@ function OnCollectibleSpawned(Object collectible)
 				item.LocationId = locInfo.ID;
 				item.ItemDisplayName = locInfo.ItemName;
 				item.ItemFlags = locInfo.Flags;
+				item.ItemOwner = locInfo.Player;
 				item.Init();
 				
 				rot = item.Rotation;
@@ -2156,9 +2407,25 @@ function OnCollectibleSpawned(Object collectible)
 				Actor(collectible).Destroy();
 			}
 		}
+		
+		if (`GameManager.GetCurrentMapFilename() ~= "subconforest")
+		{
+			DebugMessage("Checking for Subcon bush location");
+			
+			// Subcon bushes
+			if (collectible.IsA('Hat_Collectible_BadgePart_FoxMask'))
+			{
+				SendLocationCheck(SubconBushCheck1);
+			}
+			else if (collectible.IsA('Hat_Collectible_BadgePart_SuckInOrbs'))
+			{
+				SendLocationCheck(SubconBushCheck2);
+			}
+			
+			Actor(collectible).Destroy();
+		}
 		else if (collectible.IsA('Hat_Collectible_HatPart'))
 		{
-			// probably a yarn spawned by one of the old guys in Mafia Town. Remove it.
 			Actor(collectible).Destroy();
 		}
 	}
@@ -2182,7 +2449,9 @@ function OnCollectedCollectible(Object collectible)
 		return;
 	
 	// If this is an Archipelago item or a storybook page, send it
-	if (SlotData.ShuffleStorybookPages && collectible.IsA('Hat_Collectible_StoryBookPage'))
+	// CreationTime > 0 means it was from a chest, in which case we would send the chest instead
+	if (SlotData.ShuffleStorybookPages && collectible.IsA('Hat_Collectible_StoryBookPage')
+		&& Actor(collectible).CreationTime <= 0)
 	{
 		SendLocationCheck(ObjectToLocationId(collectible));
 		SetAPBits(class'Hat_SaveBitHelper'.static.GetBitID(collectible), 1);
@@ -2328,7 +2597,7 @@ function SendLocationCheck(int id, optional bool scout, optional bool hint)
 	{
 		if (scout)
 		{
-			DebugMessage("[WARNING] Tried to scout a location while not connected!");
+			DebugMessage("[WARNING] Tried to scout a location while not connected!", , true);
 			return;
 		}
 		
@@ -2340,6 +2609,8 @@ function SendLocationCheck(int id, optional bool scout, optional bool hint)
 	if (!scout)
 	{
 		jsonMessage = "[{\"cmd\":\"LocationChecks\",\"locations\":[" $id $"]}]";
+		DebugMessage("Sending location ID: " $id);
+		
 		for (i = 0; i < SlotData.LocationInfoArray.Length; i++)
 		{
 			if (SlotData.LocationInfoArray[i].ID == id)
@@ -2382,7 +2653,7 @@ function SendMultipleLocationChecks(array<int> locationArray, optional bool scou
 	{
 		if (scout || hint)
 		{
-			DebugMessage("[WARNING] Tried to scout locations while not connected!");
+			DebugMessage("[WARNING] Tried to scout locations while not connected!", , true);
 			return;
 		}
 		
@@ -2397,6 +2668,8 @@ function SendMultipleLocationChecks(array<int> locationArray, optional bool scou
 		for (i = 0; i < locationArray.Length; i++)
 		{
 			jsonMessage $= locationArray[i];
+			DebugMessage("Sending location ID: " $locationArray[i]);
+			
 			if (i+1 < locationArray.Length)
 			{
 				jsonMessage $= ",";
@@ -2465,9 +2738,15 @@ function OnContractEventEnd()
 {
 	local int i;
 	local Hat_SaveGame save;
-
+	local Hat_PlayerController ctr;
+	
 	ContractEventActive = false;
 	
+	foreach DynamicActors(class'Hat_PlayerController', ctr)
+	{
+		ctr.bGodMode = false;
+	}
+
 	if (SlotData.TakenContracts.Length == 0)
 		return;
 	
@@ -2542,7 +2821,6 @@ function BabyTrapTimer()
 		}
 		
 		stack = Spawn(stackClass, , , player.Location);
-		stack.StartDelivery();
 		if (!player.BeginCarry(stack, true))
 		{
 			stack.Destroy();
@@ -2552,12 +2830,24 @@ function BabyTrapTimer()
 	
 	BabyCount--;
 	if (BabyCount <= 0)
+	{
 		ClearTimer(NameOf(BabyTrapTimer));
+		SetTimer(60.0, false, NameOf(OnBabyTrapEnd));
+	}
 }
 
 function OnPlayerEnterCannon(Pawn Player, Actor Cannon)
 {
 	DropAllBabies(Player);
+}
+
+function OnBabyTrapEnd()
+{
+	local Hat_Player player;
+	foreach DynamicActors(class'Hat_Player', player)
+	{
+		DropAllBabies(player);
+	}
 }
 
 function DropAllBabies(Pawn Player)
@@ -2568,18 +2858,12 @@ function DropAllBabies(Pawn Player)
 		if (stack.Carrier != Player)
 			continue;
 		
-		if (stack.StackEffect.Stack.Length == 1)
-		{
-			Hat_PawnCarryable(Player).DropCarry();
-		}
-		else
-		{
-			stack.OnDrop(Player);
-		}
-		
-		stack.CanBeCarried = false;
-		stack.SetTimer(1.0, false, NameOf(Destroy));
+		stack.ForceDrop();
+		stack.Destroy();
 	}
+	
+	Hat_PawnCarryable(Player).SetAnimCarryMode(ECarryMode_None);
+	Hat_HUD(PlayerController(player.Controller).MyHUD).CloseHUD(class'Hat_HUDElementCarryHelp');
 }
 
 function LaserTrapTimer()
@@ -2670,6 +2954,11 @@ function ActivateParade()
 	}
 }
 
+function ItemSoundTimer()
+{
+	ItemSoundCooldown = false;
+}
+
 function SpawnDecorationStands()
 {
 	local Actor stand;
@@ -2714,12 +3003,59 @@ function string GetHatName(class<Hat_Ability> abilityClass)
 	}
 }
 
+function ReplaceUnarmedWeapon()
+{
+	local Hat_SaveGame save;
+	local int i;
+	local Hat_BackpackItem item;
+	local Hat_PlayerController ctr;
+	
+	ctr = Hat_PlayerController(GetALocalPlayerController());
+	if (ctr.MyLoadout.BackpackHasInventory(class'Archipelago_Weapon_Umbrella', true))
+		return;
+	
+	save = `SaveManager.GetCurrentSaveData();
+	
+	for (i = 0; i < save.MyBackpack2017.Weapons.Length; i++)
+	{
+		item = save.MyBackpack2017.Weapons[i];
+		if (item != None)
+		{
+			if (class<Hat_Weapon_Umbrella>(item.BackpackClass) != None 
+			&& class<Archipelago_Weapon_Umbrella>(item.BackpackClass) == None)
+			{
+				ctr.MyLoadout.RemoveBackpack(item);
+			}
+			
+			if (SlotData.UmbrellaLogic && class<Hat_Weapon_Unarmed>(item.BackpackClass) != None)
+			{
+				ctr.MyLoadout.RemoveBackpack(item);
+				item.BackpackClass = class'Archipelago_Weapon_Unarmed';
+				ctr.MyLoadout.AddBackpack(item, true, true, Hat_Player(ctr.Pawn));
+			}
+		}
+	}
+}
+
+function DeleteCameraParticle()
+{
+	local Emitter e;
+	foreach AllActors(class'Emitter', e)
+	{
+		if (e.Name == 'Emitter_265' || e.Name == 'Emitter_267')
+		{
+			e.ParticleSystemComponent.KillParticlesForced();
+			e.ShutDown();
+		}
+	}
+}
+
 // For recording location IDs
 function PrintItemsNearPlayer()
 {
 	local Hat_Player player;
 	local Hat_Collectible_Important collectible;
-	local Hat_Collectible page;
+	local Hat_Collectible_StoryBookPage page;
 	
 	if (!bool(DebugMode))
 		return;
@@ -2736,11 +3072,8 @@ function PrintItemsNearPlayer()
 		}
 	}
 	
-	foreach DynamicActors(class'Hat_Collectible', page)
+	foreach DynamicActors(class'Hat_Collectible_StoryBookPage', page)
 	{
-		if (!page.IsA('Hat_Collectible_StoryBookPage'))
-			continue;
-		
 		if (GetVectorDistance(player.Location, page.Location) <= 1000.0)
 		{
 			ScreenMessage("[PrintItemsNearPlayer] Found collectible: " $page.Name $"("$ObjectToLocationId(page)$")");
@@ -2761,6 +3094,16 @@ function BeatGame()
 	json.SetIntValue("status", 30);
 	client.SendBinaryMessage(EncodeJson2(json));
 	json = None;
+}
+
+function bool IsDLC1Installed()
+{
+	return class'Hat_GameDLCInfo'.static.IsGameDLCInfoInstalled(class'Hat_GameDLCInfo_DLC1');
+}
+
+function bool IsDLC2Installed()
+{
+	return class'Hat_GameDLCInfo'.static.IsGameDLCInfoInstalled(class'Hat_GameDLCInfo_DLC2');
 }
 
 function bool IsArchipelagoEnabled()
@@ -2786,7 +3129,7 @@ function bool IsFullyConnected()
 
 function bool IsDeathLinkEnabled()
 {
-	return SlotData.DeathLink;
+	return SlotData.DeathLink && !ContractEventActive;
 }
 
 function bool IsInSpaceship()
@@ -2800,6 +3143,7 @@ function bool IsInSpaceship()
 function bool IsActReallyCompleted(Hat_ChapterActInfo act)
 {
 	local Hat_ChapterActInfo shuffled;
+	//local int basement;
 	
 	if (SlotData != None && SlotData.Initialized)
 	{
@@ -2808,6 +3152,7 @@ function bool IsActReallyCompleted(Hat_ChapterActInfo act)
 			if (IsChapterActInfoUnlocked(act))
 			{
 				shuffled = GetShuffledAct(act);
+				
 				if (shuffled != None && shuffled.hourglass == "") // Free Roam
 				{
 					SetAPBits("ActComplete_"$act.hourglass, 1);
@@ -2856,7 +3201,7 @@ function Hat_ChapterActInfo GetDeadBirdBasementShuffledAct(optional out int vani
 			{
 				vanilla = 1;
 			}
-
+			
 			return SlotData.ShuffledActList[i].NewAct;
 		}
 	}
@@ -2902,11 +3247,11 @@ function ScreenMessage(String message, optional Name type)
     pc.ClientMessage(message, type, 8);
 }
 
-function DebugMessage(String message, optional Name type)
+function DebugMessage(String message, optional Name type, optional bool forceLog)
 {
 	local PlayerController pc;
 	
-	if (bool(VerboseLogging))
+	if (bool(VerboseLogging) || forceLog)
 	{
 		DebugMsg = message;
 		ConsoleCommand("getall Archipelago_GameMod DebugMsg");
@@ -2929,7 +3274,7 @@ function int ObjectToLocationId(Object obj)
 	
 	if (obj == None)
 	{
-		DebugMessage("[ObjectToLocationId] obj is None");
+		DebugMessage("[ObjectToLocationId] obj is None", , true);
 		ScriptTrace();
 	}
 	
@@ -2944,6 +3289,10 @@ function int ObjectToLocationId(Object obj)
 	if (obj.IsA('Hat_Collectible_StoryBookPage'))
 	{
 		id += StoryBookPageIDRange;
+		if (`GameManager.GetChapterInfo().ChapterID == 6)
+		{
+			id += 1000;
+		}
 	}
 	else
 	{

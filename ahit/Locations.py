@@ -25,14 +25,7 @@ def get_total_locations(world: World) -> int:
     total: int = 0
 
     for (name) in location_table.keys():
-        if not location_dlc_enabled(world, name):
-            continue
-
-        if name in storybook_pages.keys() \
-           and world.multiworld.ShuffleStorybookPages[world.player].value == 0:
-            continue
-
-        if name in contract_locations.keys() and world.multiworld.ShuffleActContracts[world.player].value == 0:
+        if not is_location_valid(world, name):
             continue
 
         total += 1
@@ -55,60 +48,76 @@ def location_dlc_enabled(world: World, location: str) -> bool:
     return False
 
 
+def is_location_valid(world: World, location: str) -> bool:
+    if not location_dlc_enabled(world, location):
+        return False
+
+    if location in storybook_pages.keys() \
+       and world.multiworld.ShuffleStorybookPages[world.player].value == 0:
+        return False
+
+    # if location in contract_locations.keys() and world.multiworld.ShuffleActContracts[world.player].value == 0:
+    #    return False
+
+    return True
+
+
 ahit_locations = {
     "Spaceship - Rumbi": LocData(301000, "Spaceship", required_tps=4, dweller_bell=1),  # same hit requirements, yes
     "Spaceship - Cooking Cat": LocData(301001, "Spaceship", required_tps=5),
 
     # 300000 range - Mafia Town/Batle of the Birds
-    "Mafia Town - Umbrella": LocData(301002, "Welcome to Mafia Town"),
-    "Mafia Town - Red Vault": LocData(302848, "Mafia Town Area"),
-    "Mafia Town - Dweller Boxes": LocData(304462, "Mafia Town Area"),
-    "Mafia Town - Old Man (Steel Beams)": LocData(303832, "Mafia Town Area"),
-    "Mafia Town - Ledge Chest": LocData(303530, "Mafia Town Area"),
-    "Mafia Town - Yellow Sphere Building Chest": LocData(303535, "Mafia Town Area"),
-    "Mafia Town - Beneath Scaffolding": LocData(304456, "Mafia Town Area"),
-    "Mafia Town - On Scaffolding": LocData(304457, "Mafia Town Area"),
-    "Mafia Town - Plaza Under Boxes": LocData(304458, "Mafia Town Area"),
-    "Mafia Town - Blue Vault Brewing Crate": LocData(305572, "Mafia Town Area", required_hats=[HatType.BREWING]),
-    "Mafia Town - Small Boat": LocData(304460, "Mafia Town Area"),
-    "Mafia Town - Cargo Ship": LocData(304459, "Mafia Town Area"),
-    "Mafia Town - Beach Alcove": LocData(304463, "Mafia Town Area"),
-    "Mafia Town - Wood Cage": LocData(304606, "Mafia Town Area"),
-    "Mafia Town - Staircase Pon Cluster": LocData(304611, "Mafia Town Area"),
-    "Mafia Town - Blue Vault": LocData(302850, "Mafia Town Area"),
+    "Welcome to Mafia Town - Umbrella": LocData(301002, "Welcome to Mafia Town"),
     "Mafia Town - Old Man (Seaside Spaghetti)": LocData(303833, "Mafia Town Area"),
+    "Mafia Town - Old Man (Steel Beams)": LocData(303832, "Mafia Town Area"),
+    "Mafia Town - Blue Vault": LocData(302850, "Mafia Town Area"),
+    "Mafia Town - Green Vault": LocData(302851, "Mafia Town Area"),
+    "Mafia Town - Red Vault": LocData(302848, "Mafia Town Area"),
+    "Mafia Town - Blue Vault Brewing Crate": LocData(305572, "Mafia Town Area",required_hats=[HatType.BREWING]),
+    "Mafia Town - Plaza Under Boxes": LocData(304458, "Mafia Town Area"),
+    "Mafia Town - Small Boat": LocData(304460, "Mafia Town Area"),
+    "Mafia Town - Staircase Pon Cluster": LocData(304611, "Mafia Town Area"),
     "Mafia Town - Palm Tree": LocData(304609, "Mafia Town Area"),
-    "Mafia Town - Beach Patio": LocData(304610, "Mafia Town Area"),
-    "Mafia Town - Steel Beam Nest": LocData(304608, "Mafia Town Area"),
-    "Mafia Town - Top of Ruined Tower": LocData(304607, "Mafia Town Area", required_hats=[HatType.ICE]),
-    "Mafia Town - Ice Hat Cage": LocData(304831, "Mafia Town Area", required_hats=[HatType.ICE]),
-    "Mafia Town - Hot Air Balloon": LocData(304829, "Mafia Town Area", required_hats=[HatType.ICE]),
-    "Mafia Town - Camera Badge 1": LocData(302003, "Mafia Town Area"),
-    "Mafia Town - Camera Badge 2": LocData(302004, "Mafia Town Area"),
-    "Mafia Town - Chest Beneath Aqueduct": LocData(303489, "Mafia Town Area"),
-    "Mafia Town - Secret Cave": LocData(305220, "Mafia Town Area", required_hats=[HatType.BREWING]),
-    "Mafia Town - Crow Chest": LocData(303532, "Mafia Town Area"),
     "Mafia Town - Port": LocData(305219, "Mafia Town Area"),
     "Mafia Town - Docks Chest": LocData(303534, "Mafia Town Area"),
-    "Mafia Town - Above Boats": LocData(305218, "Mafia Town Area", hookshot=True),
-    "Mafia Town - Slip Slide Chest": LocData(303529, "Mafia Town Area"),
-    "Mafia Town - Green Vault": LocData(302851, "Mafia Town Area"),
-    "Mafia Town - Behind Faucet": LocData(304214, "Mafia Town Area"),
+    "Mafia Town - Ice Hat Cage": LocData(304831, "Mafia Town Area", required_hats=[HatType.ICE]),
     "Mafia Town - Hidden Buttons Chest": LocData(303483, "Mafia Town Area"),
-    "Mafia Town - Clock Tower Chest": LocData(303481, "Mafia Town Area", hookshot=True),
-    "Mafia Town - Top of Lighthouse": LocData(304213, "Mafia Town Area", hookshot=True),
-    "Mafia Town - Mafia Geek Platform": LocData(304212, "Mafia Town Area"),
-    "Mafia Town - Behind HQ Chest": LocData(303486, "Mafia Town Area"),
+
+    # These can be accessed from HUMT, the above locations can't be
+    "Mafia Town - Dweller Boxes": LocData(304462, "Mafia Town Area (HUMT)"),
+    "Mafia Town - Ledge Chest": LocData(303530, "Mafia Town Area (HUMT)"),
+    "Mafia Town - Yellow Sphere Building Chest": LocData(303535, "Mafia Town Area (HUMT)"),
+    "Mafia Town - Beneath Scaffolding": LocData(304456, "Mafia Town Area (HUMT)"),
+    "Mafia Town - On Scaffolding": LocData(304457, "Mafia Town Area (HUMT)"),
+    "Mafia Town - Cargo Ship": LocData(304459, "Mafia Town Area (HUMT)"),
+    "Mafia Town - Beach Alcove": LocData(304463, "Mafia Town Area (HUMT)"),
+    "Mafia Town - Wood Cage": LocData(304606, "Mafia Town Area (HUMT)"),
+    "Mafia Town - Beach Patio": LocData(304610, "Mafia Town Area (HUMT)"),
+    "Mafia Town - Steel Beam Nest": LocData(304608, "Mafia Town Area (HUMT)"),
+    "Mafia Town - Top of Ruined Tower": LocData(304607, "Mafia Town Area (HUMT)", required_hats=[HatType.ICE]),
+    "Mafia Town - Hot Air Balloon": LocData(304829, "Mafia Town Area (HUMT)", required_hats=[HatType.ICE]),
+    "Mafia Town - Camera Badge 1": LocData(302003, "Mafia Town Area (HUMT)"),
+    "Mafia Town - Camera Badge 2": LocData(302004, "Mafia Town Area (HUMT)"),
+    "Mafia Town - Chest Beneath Aqueduct": LocData(303489, "Mafia Town Area (HUMT)"),
+    "Mafia Town - Secret Cave": LocData(305220, "Mafia Town Area (HUMT)", required_hats=[HatType.BREWING]),
+    "Mafia Town - Crow Chest": LocData(303532, "Mafia Town Area (HUMT)"),
+    "Mafia Town - Above Boats": LocData(305218, "Mafia Town Area (HUMT)", hookshot=True),
+    "Mafia Town - Slip Slide Chest": LocData(303529, "Mafia Town Area (HUMT)"),
+    "Mafia Town - Behind Faucet": LocData(304214, "Mafia Town Area (HUMT)"),
+    "Mafia Town - Clock Tower Chest": LocData(303481, "Mafia Town Area (HUMT)", hookshot=True),
+    "Mafia Town - Top of Lighthouse": LocData(304213, "Mafia Town Area (HUMT)", hookshot=True),
+    "Mafia Town - Mafia Geek Platform": LocData(304212, "Mafia Town Area (HUMT)"),
+    "Mafia Town - Behind HQ Chest": LocData(303486, "Mafia Town Area (HUMT)"),
 
     "Mafia HQ - Hallway Brewing Crate": LocData(305387, "Down with the Mafia!", required_hats=[HatType.BREWING]),
     "Mafia HQ - Freezer Chest": LocData(303241, "Down with the Mafia!"),
     "Mafia HQ - Secret Room": LocData(304979, "Down with the Mafia!", required_hats=[HatType.ICE]),
     "Mafia HQ - Bathroom Stall Chest": LocData(303243, "Down with the Mafia!"),
 
-    "Dead Bird Studio - Up the Ladder": LocData(304874, "Dead Bird Studio"),  # Can be reached from basement
-    "Dead Bird Studio - Red Building Top": LocData(305024, "Dead Bird Studio"),  # Can be reached from basement
-    "Dead Bird Studio - Behind Water Tower": LocData(305248, "Dead Bird Studio"),  # Can be reached from basement
-    "Dead Bird Studio - Side of House": LocData(305247, "Dead Bird Studio"),  # Can be reached from basement
+    "Dead Bird Studio - Up the Ladder": LocData(304874, "Dead Bird Studio - Elevator Area"),
+    "Dead Bird Studio - Red Building Top": LocData(305024, "Dead Bird Studio - Elevator Area"),
+    "Dead Bird Studio - Behind Water Tower": LocData(305248, "Dead Bird Studio - Elevator Area"),
+    "Dead Bird Studio - Side of House": LocData(305247, "Dead Bird Studio - Elevator Area"),
     "Dead Bird Studio - DJ Grooves Sign Chest": LocData(303901, "Dead Bird Studio", umbrella=True),
     "Dead Bird Studio - Tightrope Chest": LocData(303898, "Dead Bird Studio", umbrella=True),
     "Dead Bird Studio - Tepee Chest": LocData(303899, "Dead Bird Studio", umbrella=True),
@@ -137,7 +146,7 @@ ahit_locations = {
     "Dead Bird Studio Basement - Locked Room": LocData(305819, "Dead Bird Studio Basement", hookshot=True),
 
     # 320000 range - Subcon Forest
-    "Subcon Forest - Cherry Bomb Bone Cage": LocData(324761, "Contractual Obligations"),
+    "Contractual Obligations - Cherry Bomb Bone Cage": LocData(324761, "Contractual Obligations"),
     "Subcon Village - Tree Top Ice Cube": LocData(325078, "Subcon Forest Area"),
     "Subcon Village - Graveyard Ice Cube": LocData(325077, "Subcon Forest Area"),
     "Subcon Village - House Top": LocData(325471, "Subcon Forest Area"),
@@ -174,6 +183,8 @@ ahit_locations = {
     "Subcon Forest - Long Tree Climb Chest": LocData(323734, "Subcon Forest Area", required_hats=[HatType.DWELLER]),
     "Subcon Forest - Boss Arena Chest": LocData(323735, "Subcon Forest Area"),
     "Subcon Forest - Manor Rooftop": LocData(325466, "Subcon Forest Area", dweller_bell=2),
+    "Subcon Forest - Infinite Yarn Bush": LocData(325478, "Subcon Forest Area", required_hats=[HatType.BREWING]),
+    "Subcon Forest - Magnet Badge Bush": LocData(325479, "Subcon Forest Area", required_hats=[HatType.BREWING]),
     "Subcon Well - Hookshot Badge Chest": LocData(324114, "The Subcon Well", dweller_bell=1),
     "Subcon Well - Above Chest": LocData(324612, "The Subcon Well", dweller_bell=1),
     "Subcon Well - On Pipe": LocData(324311, "The Subcon Well", hookshot=True, dweller_bell=1),
@@ -186,11 +197,11 @@ ahit_locations = {
     # 330000 range - Alpine Skyline
     "Alpine Skyline - Goat Village: Below Hookpoint": LocData(334856, "Goat Village"),
     "Alpine Skyline - Goat Village: Hidden Branch": LocData(334855, "Goat Village"),
-    "Alpine Skyline - Goat Refinery": LocData(333635, "Alpine Free Roam"),
-    "Alpine Skyline - Bird Pass Fork": LocData(335911, "Alpine Free Roam"),
-    "Alpine Skyline - Yellow Band Hills": LocData(335756, "Alpine Free Roam", required_hats=[HatType.BREWING]),
-    "Alpine Skyline - The Purrloined Village: Horned Stone": LocData(335561, "Alpine Free Roam"),
-    "Alpine Skyline - The Purrloined Village: Chest Reward": LocData(334831, "Alpine Free Roam"),
+    "Alpine Skyline - Goat Refinery": LocData(333635, "Alpine Skyline Area"),
+    "Alpine Skyline - Bird Pass Fork": LocData(335911, "Alpine Skyline Area"),
+    "Alpine Skyline - Yellow Band Hills": LocData(335756, "Alpine Skyline Area", required_hats=[HatType.BREWING]),
+    "Alpine Skyline - The Purrloined Village: Horned Stone": LocData(335561, "Alpine Skyline Area"),
+    "Alpine Skyline - The Purrloined Village: Chest Reward": LocData(334831, "Alpine Skyline Area"),
     "Alpine Skyline - The Birdhouse: Triple Crow Chest": LocData(334758, "The Birdhouse"),
     "Alpine Skyline - The Birdhouse: Dweller Platforms Relic": LocData(336497, "The Birdhouse",
                                                                        required_hats=[HatType.DWELLER]),
@@ -199,24 +210,41 @@ ahit_locations = {
     "Alpine Skyline - The Birdhouse: Alpine Crow Mini-Gauntlet": LocData(335886, "The Birdhouse"),
     "Alpine Skyline - The Birdhouse: Outer Edge": LocData(335492, "The Birdhouse"),
 
-    "Alpine Skyline - Mystifying Time Mesa: Zipline": LocData(337058, "Alpine Free Roam"),
-    "Alpine Skyline - Mystifying Time Mesa: Gate Puzzle": LocData(336052, "Alpine Free Roam"),
-    "Alpine Skyline - Ember Summit": LocData(336311, "Alpine Free Roam"),
+    "Alpine Skyline - Mystifying Time Mesa: Zipline": LocData(337058, "Alpine Skyline Area"),
+    "Alpine Skyline - Mystifying Time Mesa: Gate Puzzle": LocData(336052, "Alpine Skyline Area"),
+    "Alpine Skyline - Ember Summit": LocData(336311, "Alpine Skyline Area"),
     "Alpine Skyline - The Lava Cake: Center Fence Cage": LocData(335448, "The Lava Cake"),
     "Alpine Skyline - The Lava Cake: Outer Island Chest": LocData(334291, "The Lava Cake"),
     "Alpine Skyline - The Lava Cake: Dweller Pillars": LocData(335417, "The Lava Cake"),
     "Alpine Skyline - The Lava Cake: Top Cake": LocData(335418, "The Lava Cake"),
-    "Alpine Skyline - The Twilight Path": LocData(334434, "Alpine Free Roam", required_hats=[HatType.DWELLER]),
+    "Alpine Skyline - The Twilight Path": LocData(334434, "Alpine Skyline Area", required_hats=[HatType.DWELLER]),
     "Alpine Skyline - The Twilight Bell: Wide Purple Platform": LocData(336478, "The Twilight Bell"),
     "Alpine Skyline - The Twilight Bell: Ice Platform": LocData(335826, "The Twilight Bell"),
-    "Alpine Skyline - Goat Outpost Horn": LocData(334760, "Alpine Free Roam"),
-    "Alpine Skyline - Windy Passage": LocData(334776, "Alpine Free Roam"),
+    "Alpine Skyline - Goat Outpost Horn": LocData(334760, "Alpine Skyline Area"),
+    "Alpine Skyline - Windy Passage": LocData(334776, "Alpine Skyline Area"),
     "Alpine Skyline - The Windmill: Inside Pon Cluster": LocData(336395, "The Windmill"),
     "Alpine Skyline - The Windmill: Entrance": LocData(335783, "The Windmill"),
     "Alpine Skyline - The Windmill: Dropdown": LocData(335815, "The Windmill"),
     "Alpine Skyline - The Windmill: House Window": LocData(335389, "The Windmill"),
 
-    "Time's End - Frozen Item": LocData(304108, "Time's End"),
+    "The Finale - Frozen Item": LocData(304108, "The Finale"),
+
+    "Bon Voyage! - Lamp Post Top": LocData(305321, "Bon Voyage!", dlc_flags=HatDLC.dlc1),
+    "Bon Voyage! - Mafia Cargo Ship": LocData(304313, "Bon Voyage!", dlc_flags=HatDLC.dlc1),
+    "The Arctic Cruise - Toilet": LocData(305109, "Cruise Ship", dlc_flags=HatDLC.dlc1),
+    "The Arctic Cruise - Bar": LocData(304251, "Cruise Ship", dlc_flags=HatDLC.dlc1),
+    "The Arctic Cruise - Dive Board Ledge": LocData(304254, "Cruise Ship", dlc_flags=HatDLC.dlc1),
+    "The Arctic Cruise - Top Balcony": LocData(304255, "Cruise Ship", dlc_flags=HatDLC.dlc1),
+    "The Arctic Cruise - Octopus Room": LocData(305253, "Cruise Ship", dlc_flags=HatDLC.dlc1),
+    "The Arctic Cruise - Octopus Room Top": LocData(304249, "Cruise Ship", dlc_flags=HatDLC.dlc1),
+    "The Arctic Cruise - Laundry Room": LocData(304250, "Cruise Ship", dlc_flags=HatDLC.dlc1),
+    "The Arctic Cruise - Ship Side": LocData(304247, "Cruise Ship", dlc_flags=HatDLC.dlc1),
+    "The Arctic Cruise - Silver Ring": LocData(305252, "Cruise Ship", dlc_flags=HatDLC.dlc1),
+    "Rock the Boat - Reception Room - Suitcase": LocData(304045, "Rock the Boat", dlc_flags=HatDLC.dlc1),
+    "Rock the Boat - Reception Room - Under Desk": LocData(304047, "Rock the Boat", dlc_flags=HatDLC.dlc1),
+    "Rock the Boat - Lamp Post": LocData(304048, "Rock the Boat", dlc_flags=HatDLC.dlc1),
+    "Rock the Boat - Iceberg Top": LocData(304046, "Rock the Boat", dlc_flags=HatDLC.dlc1),
+    "Rock the Boat - Post Captain Rescue": LocData(304049, "Rock the Boat", dlc_flags=HatDLC.dlc1),
 }
 
 act_completions = {
@@ -267,7 +295,14 @@ act_completions = {
                                                              required_hats=[HatType.ICE]),
     "Act Completion (Time Rift - Alpine Skyline)": LocData(311777, "Time Rift - Alpine Skyline"),
 
-    "Act Completion (Time's End - The Finale)": LocData(311872, "Time's End"),
+    "Act Completion (The Finale)": LocData(311872, "The Finale", hookshot=True, required_hats=[HatType.DWELLER]),
+    "Act Completion (Time Rift - Tour)": LocData(311803, "Time Rift - Tour"),
+
+    "Act Completion (Bon Voyage!)": LocData(311520, "Bon Voyage!", dlc_flags=HatDLC.dlc1, hookshot=True),
+    "Act Completion (Ship Shape)": LocData(311451, "Ship Shape", dlc_flags=HatDLC.dlc1),
+    "Act Completion (Rock the Boat)": LocData(311437, "Rock the Boat", dlc_flags=HatDLC.dlc1),
+    "Act Completion (Time Rift - Balcony)": LocData(312226, "Time Rift - Balcony", dlc_flags=HatDLC.dlc1, hookshot=True),
+    "Act Completion (Time Rift - Deep Sea)": LocData(312434, "Time Rift - Deep Sea", dlc_flags=HatDLC.dlc1, hookshot=True),
 }
 
 storybook_pages = {
@@ -302,6 +337,26 @@ storybook_pages = {
     "Alpine Skyline (Rift) - Page: Waterfall Wooden Pillar": LocData(345015, "Time Rift - Alpine Skyline"),
     "Alpine Skyline (Rift) - Page: Lonely Birdhouse Top": LocData(345014, "Time Rift - Alpine Skyline"),
     "Alpine Skyline (Rift) - Page: Below Aqueduct": LocData(345013, "Time Rift - Alpine Skyline"),
+
+    "Deep Sea - Page: Starfish": LocData(346454, "Time Rift - Deep Sea", dlc_flags=HatDLC.dlc1),
+    "Deep Sea - Page: Mini Castle": LocData(346452, "Time Rift - Deep Sea", dlc_flags=HatDLC.dlc1),
+    "Deep Sea - Page: Urchins": LocData(346449, "Time Rift - Deep Sea", dlc_flags=HatDLC.dlc1),
+    "Deep Sea - Page: Big Castle": LocData(346450, "Time Rift - Deep Sea", dlc_flags=HatDLC.dlc1, hookshot=True),
+    "Deep Sea - Page: Castle Top Chest": LocData(304850, "Time Rift - Deep Sea", dlc_flags=HatDLC.dlc1, hookshot=True),
+    "Deep Sea - Page: Urchin Ledge": LocData(346451, "Time Rift - Deep Sea", dlc_flags=HatDLC.dlc1, hookshot=True),
+    "Deep Sea - Page: Hidden Castle Chest": LocData(304849, "Time Rift - Deep Sea", dlc_flags=HatDLC.dlc1, hookshot=True),
+    "Deep Sea - Page: Falling Platform": LocData(346456, "Time Rift - Deep Sea", dlc_flags=HatDLC.dlc1, hookshot=True),
+    "Deep Sea - Page: Lava Starfish": LocData(346453, "Time Rift - Deep Sea", dlc_flags=HatDLC.dlc1, hookshot=True),
+
+    "Tour - Page: Mafia Town - Ledge": LocData(345038, "Time Rift - Tour", dlc_flags=HatDLC.dlc1),
+    "Tour - Page: Mafia Town - Beach": LocData(345039, "Time Rift - Tour", dlc_flags=HatDLC.dlc1),
+    "Tour - Page: Dead Bird Studio - C.A.W. Agents": LocData(345040, "Time Rift - Tour", dlc_flags=HatDLC.dlc1),
+    "Tour - Page: Dead Bird Studio - Fragile Box": LocData(345041, "Time Rift - Tour", dlc_flags=HatDLC.dlc1),
+    "Tour - Page: Subcon Forest - Giant Frozen Tree": LocData(345042, "Time Rift - Tour", dlc_flags=HatDLC.dlc1),
+    "Tour - Page: Subcon Forest - Top of Pillar": LocData(345043, "Time Rift - Tour", dlc_flags=HatDLC.dlc1),
+    "Tour - Page: Alpine Skyline - Birdhouse": LocData(345044, "Time Rift - Tour", dlc_flags=HatDLC.dlc1),
+    "Tour - Page: Alpine Skyline - Behind Lava Isle": LocData(345047, "Time Rift - Tour", dlc_flags=HatDLC.dlc1),
+    "Tour - Page: The Finale - Near Entrance": LocData(345087, "Time Rift - Tour", dlc_flags=HatDLC.dlc1),
 }
 
 contract_locations = {
@@ -309,23 +364,6 @@ contract_locations = {
     "Snatcher's Contract - Toilet of Doom": LocData(300201, "Subcon Forest Area"),
     "Snatcher's Contract - Queen Vanessa's Manor": LocData(300202, "Subcon Forest Area"),
     "Snatcher's Contract - Mail Delivery Service": LocData(300203, "Subcon Forest Area"),
-}
-
-# Don't put any of the items from peaks here, the rules for those entrances are set already
-zipline_unlocks = {
-    "Alpine Skyline - Bird Pass Fork":                          "Zipline Unlock - The Birdhouse Path",
-    "Alpine Skyline - Yellow Band Hills":                       "Zipline Unlock - The Birdhouse Path",
-    "Alpine Skyline - The Purrloined Village: Horned Stone":    "Zipline Unlock - The Birdhouse Path",
-    "Alpine Skyline - The Purrloined Village: Chest Reward":    "Zipline Unlock - The Birdhouse Path",
-
-    "Alpine Skyline - Mystifying Time Mesa: Zipline":       "Zipline Unlock - The Lava Cake Path",
-    "Alpine Skyline - Mystifying Time Mesa: Gate Puzzle":   "Zipline Unlock - The Lava Cake Path",
-    "Alpine Skyline - Ember Summit":                        "Zipline Unlock - The Lava Cake Path",
-
-    "Alpine Skyline - Goat Outpost Horn":   "Zipline Unlock - The Windmill Path",
-    "Alpine Skyline - Windy Passage":       "Zipline Unlock - The Windmill Path",
-
-    "Alpine Skyline - The Twilight Path":   "Zipline Unlock - The Twilight Bell Path",
 }
 
 shop_locations = {
@@ -342,30 +380,23 @@ shop_locations = {
     "Mafia Boss Shop Item": LocData(301013, "Spaceship", required_tps=12),
 }
 
-# These are the only locations in Heating Up Mafia Town that are available
-humt_locations = [
-    "Mafia Town - Crow Chest",
-    "Mafia Town - Behind Faucet",
-    "Mafia Town - Slip Slide Chest",
-    "Mafia Town - Beach Patio",
-    "Mafia Town - Yellow Sphere Building Chest",
-    "Mafia Town - Cargo Ship",
-    "Mafia Town - Top of Lighthouse",
-    "Mafia Town - Steel Beam Nest",
-    "Mafia Town - Dweller Boxes",
-    "Mafia Town - Chest Beneath Aqueduct",
-    "Mafia Town - Ledge Chest",
-    "Mafia Town - Beneath Scaffolding",
-    "Mafia Town - On Scaffolding",
-    "Mafia Town - Wood Cage",
-    "Mafia Town - Clock Tower Chest",
-    "Mafia Town - Secret Cave",
-    "Mafia Town - Top of Ruined Tower",
-    "Mafia Town - Mafia Geek Platform",
-    "Mafia Town - Behind HQ Chest",
-    "Mafia Town - Camera Badge 1",
-    "Mafia Town - Camera Badge 2",
-]
+# Don't put any of the locations from peaks here, the rules for their entrances are set already
+zipline_unlocks = {
+    "Alpine Skyline - Bird Pass Fork":                          "Zipline Unlock - The Birdhouse Path",
+    "Alpine Skyline - Yellow Band Hills":                       "Zipline Unlock - The Birdhouse Path",
+    "Alpine Skyline - The Purrloined Village: Horned Stone":    "Zipline Unlock - The Birdhouse Path",
+    "Alpine Skyline - The Purrloined Village: Chest Reward":    "Zipline Unlock - The Birdhouse Path",
+
+    "Alpine Skyline - Mystifying Time Mesa: Zipline":       "Zipline Unlock - The Lava Cake Path",
+    "Alpine Skyline - Mystifying Time Mesa: Gate Puzzle":   "Zipline Unlock - The Lava Cake Path",
+    "Alpine Skyline - Ember Summit":                        "Zipline Unlock - The Lava Cake Path",
+
+    "Alpine Skyline - Goat Outpost Horn":   "Zipline Unlock - The Windmill Path",
+    "Alpine Skyline - Windy Passage":       "Zipline Unlock - The Windmill Path",
+
+    "Alpine Skyline - The Twilight Path":   "Zipline Unlock - The Twilight Bell Path",
+}
+
 
 # Locations in Alpine that are available in The Illness has Spread
 # Goat Village locations don't need to be put here
@@ -380,6 +411,7 @@ tihs_locations = [
 event_locs = {
     "Windmill Cleared": LocData(0, "The Windmill"),
     "Twilight Bell Cleared": LocData(0, "The Twilight Bell"),
+    "Time Piece Cluster": LocData(0, "The Finale"),
 }
 
 location_table = {

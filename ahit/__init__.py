@@ -6,9 +6,9 @@ from .Items import HatInTimeItem, item_table, time_pieces, item_frequencies, ite
 from .Regions import create_region, create_regions, connect_regions, randomize_act_entrances, chapter_act_info, \
     create_events, chapter_regions, act_chapters
 
-from .Locations import HatInTimeLocation, location_table, get_total_locations, contract_locations
+from .Locations import HatInTimeLocation, location_table, get_total_locations, contract_locations, is_location_valid
 from .Types import HatDLC, HatType, ChapterIndex
-from .Options import ahit_options
+from .Options import ahit_options, slot_data_options
 from worlds.AutoWorld import World
 from .Rules import set_rules
 import typing
@@ -52,6 +52,19 @@ class HatInTimeWorld(World):
         if self.multiworld.StartWithCompassBadge[self.player].value > 0:
             self.multiworld.push_precollected(self.create_item("Compass Badge"))
 
+    def create_regions(self):
+        create_regions(self)
+
+        # place default contract locations if contract shuffle is off so logic can still utilize them
+        if self.multiworld.ShuffleActContracts[self.player].value == 0:
+            for name in contract_locations.keys():
+                self.multiworld.get_location(name, self.player).place_locked_item(create_item(self, name))
+        else:
+            # The bag trap contract check needs to be excluded, because if the player has the Subcon Well contract,
+            # the trap will not activate, locking the player out of the check permanently
+            self.multiworld.get_location("Snatcher's Contract - The Subcon Well",
+                                         self.player).progress_type = LocationProgressType.EXCLUDED
+
     def create_items(self):
         self.hat_yarn_costs = {HatType.SPRINT: -1, HatType.BREWING: -1, HatType.ICE: -1,
                                HatType.DWELLER: -1, HatType.TIME_STOP: -1}
@@ -70,6 +83,7 @@ class HatInTimeWorld(World):
         if self.multiworld.RandomizeHatOrder[self.player].value > 0:
             self.multiworld.random.shuffle(self.hat_craft_order)
 
+        tp_count: int = 0
         for name in item_table.keys():
             if name == "Yarn":
                 continue
@@ -87,25 +101,17 @@ class HatInTimeWorld(World):
             if name in alps_hooks.keys() and self.multiworld.ShuffleAlpineZiplines[self.player].value == 0:
                 continue
 
+            if name in time_pieces.keys():
+                tp_count += 1
+                if tp_count > 40 + self.multiworld.MaxExtraTimePieces[self.player].value:
+                    continue
+
             itempool += create_multiple_items(self, name, item_frequencies.get(name, 1))
 
         create_events(self)
         total_locations: int = get_total_locations(self)
         itempool += create_junk_items(self, total_locations-len(itempool))
         self.multiworld.itempool += itempool
-
-    def create_regions(self):
-        create_regions(self)
-
-        # place default contract locations if contract shuffle is off so logic can still utilize them
-        if self.multiworld.ShuffleActContracts[self.player].value == 0:
-            for name in contract_locations.keys():
-                self.multiworld.get_location(name, self.player).place_locked_item(create_item(self, name))
-        else:
-            # The bag trap contract check needs to be excluded, because if the player has the Subcon Well contract,
-            # the trap will not activate, locking the player out of the check permanently
-            self.multiworld.get_location("Snatcher's Contract - The Subcon Well",
-                                         self.player).progress_type = LocationProgressType.EXCLUDED
 
     def set_rules(self):
         self.act_connections = {}
@@ -125,13 +131,6 @@ class HatInTimeWorld(World):
     def create_item(self, name: str) -> Item:
         return create_item(self, name)
 
-    def write_spoiler_header(self, spoiler_handle: typing.TextIO):
-        for i in self.chapter_timepiece_costs.keys():
-            spoiler_handle.write("Chapter %i Cost: %i\n" % (i, self.chapter_timepiece_costs[ChapterIndex(i)]))
-
-        for hat in self.hat_craft_order:
-            spoiler_handle.write("Hat Cost: %s: %i\n" % (hat, self.hat_yarn_costs[hat]))
-
     def fill_slot_data(self) -> dict:
         slot_data: dict = {"SprintYarnCost": self.hat_yarn_costs[HatType.SPRINT],
                            "BrewingYarnCost": self.hat_yarn_costs[HatType.BREWING],
@@ -143,17 +142,19 @@ class HatInTimeWorld(World):
                            "Chapter3Cost": self.chapter_timepiece_costs[ChapterIndex.SUBCON],
                            "Chapter4Cost": self.chapter_timepiece_costs[ChapterIndex.ALPINE],
                            "Chapter5Cost": self.chapter_timepiece_costs[ChapterIndex.FINALE],
+                           "Chapter6Cost": self.chapter_timepiece_costs[ChapterIndex.CRUISE],
                            "Hat1": int(self.hat_craft_order[0]),
                            "Hat2": int(self.hat_craft_order[1]),
                            "Hat3": int(self.hat_craft_order[2]),
                            "Hat4": int(self.hat_craft_order[3]),
-                           "Hat5": int(self.hat_craft_order[4])}
+                           "Hat5": int(self.hat_craft_order[4]),
+                           "SeedNumber": self.multiworld.seed}  # For shop prices
 
         if self.multiworld.ActRandomizer[self.player].value > 0:
             for name in self.act_connections.keys():
                 slot_data[name] = self.act_connections[name]
 
-        for option_name in ahit_options:
+        for option_name in slot_data_options:
             option = getattr(self.multiworld, option_name)[self.player]
             slot_data[option_name] = option.value
 
@@ -162,13 +163,20 @@ class HatInTimeWorld(World):
     def extend_hint_information(self, hint_data: typing.Dict[int, typing.Dict[int, str]]):
         new_hint_data = {}
         for key, data in location_table.items():
-            if data.region not in act_chapters.keys():
+            if data.region not in chapter_act_info.keys() or not is_location_valid(self, key):
                 continue
 
             location = self.multiworld.get_location(key, self.player)
             new_hint_data[location.address] = self.get_shuffled_region(location.parent_region.name)
 
         hint_data[self.player] = new_hint_data
+
+    def write_spoiler_header(self, spoiler_handle: typing.TextIO):
+        for i in self.chapter_timepiece_costs.keys():
+            spoiler_handle.write("Chapter %i Cost: %i\n" % (i, self.chapter_timepiece_costs[ChapterIndex(i)]))
+
+        for hat in self.hat_craft_order:
+            spoiler_handle.write("Hat Cost: %s: %i\n" % (hat, self.hat_yarn_costs[hat]))
 
     def calculate_yarn_costs(self):
         mw = self.multiworld
@@ -204,14 +212,9 @@ class HatInTimeWorld(World):
         self.act_connections[original_act_info] = new_act_info
 
     def get_shuffled_region(self, region: str) -> str:
-        if region not in chapter_act_info.keys():
-            return region
-
         ci: str = chapter_act_info[region]
-        for name in self.act_connections.keys():
-            if ci == name:
-                for key in chapter_act_info.keys():
-                    if chapter_act_info[key] == self.act_connections[ci]:
-                        return key
-
-        return ""
+        for key, val in self.act_connections.items():
+            if val == ci:
+                for name in chapter_act_info.keys():
+                    if chapter_act_info[name] == key:
+                        return name

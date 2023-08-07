@@ -3,12 +3,13 @@ class Archipelago_TcpLink extends TcpLink
 
 `include(APRandomizer\Classes\Globals.uci);
 
-var transient string CurrentMessage;
-var transient int BracketCounter;
+var transient array<string> CurrentMessage;
 var transient bool ParsingMessage;
 var transient bool ConnectingToAP;
 var transient bool FullyConnected;
 var transient bool Refused;
+var transient int EmptyCount;
+var transient bool FirstReceivedItems;
 
 const MaxSentMessageLength = 246;
 
@@ -16,6 +17,9 @@ event PostBeginPlay()
 {
 	Super.PostBeginPlay();
 	
+	if (bool(`AP.DisableAutoConnect))
+		return;
+
 	if (`AP.SlotData.ConnectedOnce)
 	{
 		Connect();
@@ -113,7 +117,7 @@ function ConnectToAP()
 	local string message;
 	
 	ConnectingToAP = true;
-	CurrentMessage = "";
+	CurrentMessage.Length = 0;
 	
 	json = new class'JsonObject';
 	json.SetStringValue("cmd", "Connect");
@@ -154,9 +158,10 @@ function ConnectToAP()
 event Tick(float d)
 {
 	local byte byteMessage[255];
-	local int count, i;
-	local string character, pong, msg;
+	local int count, i, a, k;
+	local string character, pong, msg, nullChar, cmd;
 	local Archipelago_GameMod m;
+	local bool b;
 	
 	Super.Tick(d);
 	
@@ -168,75 +173,141 @@ event Tick(float d)
 	// Also Unrealscript doesn't like [] in JSON.
 	if (IsDataPending())
 	{
+		// IsDataPending seems to almost always return true even if no data is pending after a msg is sent, 
+		// so to check for the end of a message, 
+		// we simply count how many times we've read 0 bytes of data
 		count = ReadBinary(255, byteMessage);
 		if (count <= 0)
-			return;
-		
-		// Check for a ping first
-		if (!ParsingMessage && count <= 10)
 		{
+			if (ParsingMessage)
+				EmptyCount++;
+		}
+		else
+		{
+			EmptyCount = 0;
+			
+			// Check for a ping
+			if (!ParsingMessage && count <= 10)
+			{
+				for (i = 0; i < count; i++)
+				{
+					// UnrealScript doesn't allow null characters in strings, so we need to do this crap
+					if (byteMessage[i] == byte(0))
+					{
+						`AP.DebugMessage("Null character in pong");
+						if (nullChar != "")
+						{
+							msg $= nullChar;
+							continue;
+						}
+
+						for (a = 33; a <= 255; a++)
+						{
+							b = false;
+							
+							for (k = 0; k < count; k++)
+							{
+								if (byteMessage[k] == byte(a))
+								{
+									b = true;
+									break;
+								}
+							}
+							
+							if (!b)
+							{
+								nullChar = Chr(a);
+								msg $= nullChar;
+								break;
+							}
+						}
+						
+						continue;
+					}
+					
+					msg $= Chr(byteMessage[i]);
+				}
+				
+				for (i = 0; i < Len(msg); i++)
+				{
+					if (Asc(Mid("a"$msg, i, 1)) == `CODE_PING)
+					{
+						// Need to send the same data back as a pong
+						// This is a dumb way to do it, but whatever works.
+						pong = Mid(msg, InStr(msg, Chr(`CODE_PING), false, true));
+						pong = Mid(pong, 2);
+						SendBinaryMessage(pong, false, true, nullChar);
+						break;
+					}
+				}
+				
+				if (pong != "")
+					return;
+			}
+			
 			for (i = 0; i < count; i++)
 			{
-				CurrentMessage $= Chr(byteMessage[i]);
-			}
-			
-			for (i = 0; i < Len(CurrentMessage); i++)
-			{
-				if (Asc(Mid("a"$CurrentMessage, i, 1)) == `CODE_PING)
+				character = Chr(byteMessage[i]);
+				CurrentMessage.AddItem(character);
+				
+				if (character == "[")
 				{
-					// Need to send the same data back as a pong
-					// This is a dumb way to do it, but whatever works.
-					pong = Mid(CurrentMessage, InStr(CurrentMessage, Chr(`CODE_PING), false, true));
-					pong = Mid(pong, 2);
-					SendBinaryMessage(pong, false, true);
-					break;
-				}
-			}
-			
-			CurrentMessage = "";
-			if (pong != "")
-				return;
-		}
-		
-		for (i = 0; i < count; i++)
-		{
-			character = Chr(byteMessage[i]);
-			CurrentMessage $= character;
-			
-			if (character == "[")
-			{
-				if (ParsingMessage)
-				{
-					BracketCounter--;
-				}
-				else // This is the beginning of a JSON message
-				{
-					CurrentMessage = "";
-					ParsingMessage = true;
-				}
-			}
-			else if (ParsingMessage && character == "]")
-			{
-				BracketCounter++;
-				if (BracketCounter > 0)
-				{
-					// We've got a JSON message, parse it
-					ParseJSON(CurrentMessage);
-					
-					CurrentMessage = "";
-					BracketCounter = 0;
-					ParsingMessage = false;
+					if (!ParsingMessage)
+					{
+						CurrentMessage.Length = 0;
+						ParsingMessage = true;
+					}
 				}
 			}
 		}
 	}
-	else if (!ParsingMessage)
+	
+	if (ParsingMessage)
+	{
+		if (EmptyCount >= 15)
+		{
+			// We've got a JSON message, parse it
+			msg = "";
+
+			for (i = 0; i < CurrentMessage.Length; i++)
+			{
+				if (CurrentMessage[i] == "}")
+				{
+					cmd = "";
+					for (a = i+1; a < CurrentMessage.Length; a++)
+					{
+						cmd $= CurrentMessage[a];
+						if (Len(cmd) >= 15)
+							break;
+					}
+					
+					if (a >= CurrentMessage.Length || InStr(cmd, "}") == -1 
+					&& (FullyConnected && InStr(cmd, "{\"cmd\"") != -1 
+					|| InStr(cmd, "{\"cmd\"") != -1 && InStr(msg, "{\"cmd\":\"Connected\"") != -1))
+					{
+						ParseJSON(msg$"}");
+						msg = "";
+					}
+				}
+				
+				msg $= CurrentMessage[i];
+			}
+			
+			//if (Len(msg) > 0)
+			//	ParseJSON(msg);
+			
+			CurrentMessage.Length = 0;
+			ParsingMessage = false;
+			EmptyCount = 0;
+		}
+	}
+	else if (FullyConnected)
 	{
 		m = `AP;
 		for (i = 0; i < m.SlotData.PendingMessages.Length; i++)
 		{
 			msg = m.SlotData.PendingMessages[i];
-			SendBinaryMessage(msg, false, len(msg) <= 10 && InStr(msg, Chr(`CODE_PONG), false, true) != -1);
+			SendBinaryMessage(msg);
 		}
 	}
 }
@@ -246,14 +317,25 @@ event Tick(float d)
 function ParseJSON(string json)
 {
 	local bool b;
-	local int i, count, split;
-	local string s, text;
+	local int i, a, count, split, pos, locId;
+	local array<int> missingLocs;
+	local string s, text, num;
 	local JsonObject jsonObj, jsonChild;
 	local Archipelago_GameMod m;
 	
 	m = `AP;
 	if (Len(json) <= 10) // this is probably garbage that we thought was a json
 		return;
+	
+	// remove garbage at start of string
+	for (i = 0; i < Len(json); i++)
+	{
+		if (Mid(json, i, 2) == "{\"")
+		{
+			json = Mid(json, i);
+			break;
+		}
+	}
 	
 	m.DebugMessage("[ParseJSON] Received command: " $json);
 	
@@ -263,17 +345,29 @@ function ParseJSON(string json)
 	
 	// Dumb, but fixes the incorrect player slot being assigned
 	if (InStr(json, "Connected") != -1)
+	{
 		m.ReplOnce(json, "slot", "my_slot", json);
+		
+		// Also dumb, but seems to fix crashing problems, hopefully.
+		split = InStr(json, ",{\"cmd\":\"ReceivedItems\"");
+		if (split != -1)
+		{
+			json = Repl(json, Mid(json, split), "", false);
+		}
+	}
 	
 	m.DebugMessage("[ParseJSON] Reformatted command: " $json);
+	m.DebugMessage("a");
 	
 	jsonObj = new class'JsonObject';
 	jsonObj = class'JsonObject'.static.DecodeJson(json);
 	if (jsonObj == None)
 	{
-		m.DebugMessage("[ParseJSON] Failed to parse JSON: " $json);
+		m.DebugMessage("[ParseJSON] Failed to parse JSON: " $json, , true);
 		return;
 	}
+	
+	m.DebugMessage("b");
 	
 	switch (jsonObj.GetStringValue("cmd"))
 	{
@@ -289,18 +383,58 @@ function ParseJSON(string json)
 				jsonChild = jsonObj.GetObject("slot_data");
 				m.LoadSlotData(jsonChild);
 			}
-			
-			// sometimes this command will be paired with ReceivedItems
-			split = InStr(json, "{\"cmd\":\"ReceivedItems\"");
-			if (split != -1)
-			{
-				OnReceivedItemsCommand(Mid(json, split), true);
-			}
+
+			m.DebugMessage("c");
 			
 			// Initialize our player's names
 			m.ReplOnce(json, "players", "players_0", json, true);
 			b = true;
 			count = 0;
+			
+			// If we have checked locations that haven't been sent for some reason, send them now
+			pos = InStr(json, "\"missing_locations\":[");
+			pos += len("\"missing_locations\":[");
+			
+			if (pos != -1)
+			{
+				num = "";
+				
+				for (i = pos; i < len(json); i++)
+				{
+					s = Mid(json, i, 1);
+					if (s == "]")
+						break;
+					
+					if (len(num) > 0 && s == ",")
+					{
+						locId = int(num);
+						for (a = 0; a < m.SlotData.LocationInfoArray.Length; a++)
+						{
+							if (m.SlotData.LocationInfoArray[a].ID == locId)
+							{
+								if (m.SlotData.LocationInfoArray[a].Checked)
+								{
+									missingLocs.AddItem(locId);
+								}
+								
+								break;
+							}
+						}
+						
+						num = "";
+					}
+					else if (s != "," && s != "[")
+					{
+						num $= s;
+					}
+				}
+			}
+			
+			if (missingLocs.Length > 0)
+			{
+				m.DebugMessage("Sending missing locations");
+				m.SendMultipleLocationChecks(missingLocs);
+			}
 			
 			while (b)
 			{
@@ -324,6 +458,8 @@ function ParseJSON(string json)
 					
 				m.SlotData.PlayerNames[jsonChild.GetIntValue("slot")] = jsonChild.GetStringValue("alias");
 			}
+			
+			m.DebugMessage("d");
 			
 			// Fully connected
 			m.OnFullyConnected();
@@ -357,7 +493,8 @@ function ParseJSON(string json)
 		
 		
 		case "ReceivedItems":
-			OnReceivedItemsCommand(json);
+			OnReceivedItemsCommand(json, !FirstReceivedItems);
+			FirstReceivedItems = true;
 			break;
 		
 		
@@ -387,7 +524,7 @@ function bool IsValidMessageType(string msgType)
 function OnLocationInfoCommand(string json)
 {
 	local LocationInfo locInfo;
-	local bool b, isItem;
+	local bool isItem;
 	local int i, locId, count, itemId, flags;
 	local string s, mapName;
 	local JsonObject jsonObj, jsonChild;
@@ -399,22 +536,18 @@ function OnLocationInfoCommand(string json)
 	
 	mapName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename();
 	
+	// Fix for Rock the Boat
+	if (`GameManager.GetCurrentMapFilename() ~= "ship_sinking")
+		mapName = "ship_sinking";
+	
 	m = `AP;
 	m.ReplOnce(json, "locations", "locations_0", json, true);
-	b = true;
 	count = 0;
 	
-	while (b)
+	while (m.ReplOnce(json, ",{", ",\"locations_" $count+1 $"\":{", s, false))
 	{
-		if (m.ReplOnce(json, ",{", ",\"locations_" $count+1 $"\":{", s, false))
-		{
-			json = s;
-			count++;
-		}
-		else
-		{
-			b = false;
-		}
+		json = s;
+		count++;
 	}
 	
 	jsonObj = class'JsonObject'.static.DecodeJson(json);
@@ -444,6 +577,9 @@ function OnLocationInfoCommand(string json)
 					continue;
 				
 				locId = m.ObjectToLocationId(collectible);
+				if (m.IsLocationCached(locId))
+					continue;
+
 				if (locId == jsonChild.GetIntValue("location"))
 				{
 					m.DebugMessage("Replacing item: "$collectible $", Location ID: "$locId);
@@ -800,7 +936,6 @@ function DoTrapItemEffects(ETrapType trap)
 			{
 				m.BabyCount = 10;
 				m.SetTimer(0.5, true, NameOf(m.BabyTrapTimer));
-				m.SetTimer(60.0, false, NameOf(m.DropAllBabies), m, GetALocalPlayerController().Pawn);
 			}
 			break;
 			
@@ -839,7 +974,7 @@ function OnBouncedCommand(string json)
 	if (jsonChild != None && `AP.IsDeathLinkEnabled())
 	{
 		source = jsonChild.GetStringValue("source");
-		if (source != "")
+		if (source != "" && source != `AP.SlotData.SlotName)
 		{
 			// commit myurder
 			foreach DynamicActors(class'Hat_Player', player)
@@ -859,7 +994,7 @@ function OnBouncedCommand(string json)
 }
 
 // the optional boolean is for recursion, do not use it
-function SendBinaryMessage(string message, optional bool continuation, optional bool pong)
+function SendBinaryMessage(string message, optional bool continuation, optional bool pong, optional string nullChar="")
 {
 	local Archipelago_GameMod m;
 	local byte byteMessage[255];
@@ -868,9 +1003,10 @@ function SendBinaryMessage(string message, optional bool continuation, optional 
 	local int maskKey[4];
 	local bool found;
 	
-	if (!continuation)
+	m = `AP;
+	
+	if (!continuation && !pong)
 	{
-		m = `AP;
 		// wait until this is finished
 		if (ParsingMessage)
 		{
@@ -958,7 +1094,16 @@ function SendBinaryMessage(string message, optional bool continuation, optional 
 	offset = offset+6;
 	for (i = offset; i < totalSent+offset; i++)
 	{
-		byteMessage[i] = Asc(Mid(buffer, i-offset, 1)) ^ maskKey[keyIndex];
+		// null character
+		if (pong && nullChar != "" && Mid(buffer, i-offset, 1) == nullChar)
+		{
+			m.DebugMessage("Adding null byte");
+			byteMessage[i] = byte(0) ^ maskKey[keyIndex];
+		}
+		else
+		{
+			byteMessage[i] = Asc(Mid(buffer, i-offset, 1)) ^ maskKey[keyIndex];
+		}
 		
 		keyIndex++;
 		if (keyIndex > 3)
@@ -980,11 +1125,12 @@ event Closed()
 		`AP.ScreenMessage("Connection was closed. Reconnecting in 5 seconds...");
 	}
 	
-	CurrentMessage = "";
-	BracketCounter = 0;
+	CurrentMessage.Length = 0;
+	EmptyCount = 0;
 	ParsingMessage = false;
 	FullyConnected = false;
 	ConnectingToAP = false;
+	FirstReceivedItems = false;
 	
 	if (`AP.SlotData.ConnectedOnce)
 	{

@@ -69,36 +69,42 @@ simulated function bool OnCollected(Actor Collector)
 	if (ImportantItemParticle != None)
 		ImportantItemParticle.SetActive(false);
 	
+	if (ShouldDoSpinEffect())
+	{
+		if (`AP.ItemSoundCooldown)
+		{
+			CollectSound = None;
+		}
+		else
+		{
+			`AP.ItemSoundCooldown = true;
+			`AP.SetTimer(0.7, false, NameOf(`AP.ItemSoundTimer));
+		}
+	}
+	
 	if (WasFromServer())
 	{
 		if (InventoryClass != None)
 		{
 			pc = Hat_PlayerController(Pawn(Collector).controller);
 			item = class'Hat_Loadout'.static.MakeLoadoutItem(InventoryClass);
-			
-			if (item != None)
+			loadout = pc.GetLoadout();
+			autoEquip = true;
+
+			if (class'Hat_Loadout'.static.IsClassBadge(InventoryClass))
 			{
-				loadout = pc.GetLoadout();
-				autoEquip = true;
-				if (class'Hat_Loadout'.static.IsClassBadge(InventoryClass))
+				for (i = 0; i < loadout.MyLoadout.Badges.Length; i++)
 				{
-					for (i = 0; i < loadout.MyLoadout.Badges.Length; i++)
+					if (loadout.MyLoadout.Badges[i] != None)
 					{
-						if (loadout.MyLoadout.Badges[i] != None)
-						{
-							count += 1;
-						}
+						count += 1;
 					}
-					
-					autoEquip = (count < `SaveManager.GetNumberOfBadgeSlots());
 				}
 				
-				if (!loadout.AddBackpack(item, autoEquip, true, Hat_Player(Collector)))
-				{
-					loadout.AddCollectible(InventoryClass);
-				}
+				autoEquip = (count < `SaveManager.GetNumberOfBadgeSlots());
 			}
-			else
+			
+			if (!loadout.AddBackpack(item, autoEquip, true, Hat_Player(Collector)) && !loadout.AddCollectible(InventoryClass))
 			{
 				`AP.ScreenMessage("Failed to create inventory item for " $InventoryClass $", please report");
 			}

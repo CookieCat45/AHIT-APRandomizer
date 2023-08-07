@@ -194,6 +194,30 @@ optional out class<Actor> inventoryOverride) // Item inventory class override. M
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_CrayonGreen';
 			return true;
+		
+		case 300018:
+			itemName = "Relic (Cake Stand)";
+			worldClass = class'Archipelago_RandomizedItem_Decoration';
+			inventoryOverride = class'Hat_Collectible_Decoration_CakeTower';
+			return true;
+
+		case 300019:
+			itemName = "Relic (Cake)";
+			worldClass = class'Archipelago_RandomizedItem_Decoration';
+			inventoryOverride = class'Hat_Collectible_Decoration_CakeA';
+			return true;
+		
+		case 300020:
+			itemName = "Relic (Cake Slice)";
+			worldClass = class'Archipelago_RandomizedItem_Decoration';
+			inventoryOverride = class'Hat_Collectible_Decoration_CakeB';
+			return true;
+		
+		case 300021:
+			itemName = "Relic (Shortcake)";
+			worldClass = class'Archipelago_RandomizedItem_Decoration';
+			inventoryOverride = class'Hat_Collectible_Decoration_CakeC';
+			return true;
 			
 			
 		// -------- BADGES ----------------------------------------------------------------------------------------------- \\	
@@ -528,6 +552,29 @@ static function string GetTimePieceFromItemID(int id, optional out int IsAct, op
 		case 300087:
 			displayName = "Time Piece - The Finale";
 			return "TheFinale_FinalBoss";
+		
+		// -------------------------------------------------- ARCTIC CRUISE ----------------------------------------------------- \\
+		case 300088:
+			displayName = "Time Piece - Bon Voyage!";
+			return "Cruise_Boarding";
+		
+		case 300089:
+			displayName = "Time Piece - Ship Shape";
+			return "Cruise_Working";
+		
+		case 300090:
+			displayName = "Time Piece - Rock the Boat";
+			return "Cruise_Sinking";
+		
+		case 300091:
+			displayName = "Time Piece - Time Rift - Balcony";
+			IsAct = 0;
+			return "Cruise_WaterRift_Slide";
+		
+		case 300092:
+			displayName = "Time Piece - Time Rift - Deep Sea";
+			IsAct = 0;
+			return "Cruise_CaveRift_Aquarium";
 		
 		default:
 			return "";

@@ -122,7 +122,7 @@ function OpenShop(Controller c)
 		if (shopInfo.ItemFlags != ItemFlag_Important && shopInfo.ItemFlags != ItemFlag_ImportantSkipBalancing || shopInfo.Hinted)
 			continue;
 		
-		shopInfo.Hinted = true;
+		`AP.SetShopInfoAsHinted(shopInfo);
 		shopLocationList.AddItem(shopInfo.ItemClass.default.LocationID);
 	}
 	

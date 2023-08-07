@@ -3,9 +3,14 @@ from Options import Option, Range, Toggle, DeathLink, Choice
 
 
 # General
-class ActRandomizer(Toggle):
-    """If enabled, shuffle the game's Acts between each other."""
+class ActRandomizer(Choice):
+    """If enabled, shuffle the game's Acts between each other.
+    Separate Rifts will cause Time Rifts to only be shuffled amongst each other,
+    and Blue Time Rifts and Purple Time Rifts are shuffled separately."""
     display_name = "Shuffle Acts"
+    option_false = 0
+    option_light = 1
+    option_insanity = 2
     default = 1
 
 
@@ -18,8 +23,8 @@ class ShuffleAlpineZiplines(Toggle):
 class VanillaAlpine(Choice):
     """If enabled, force Alpine (and optionally its finale) onto their vanilla locations in act shuffle."""
     display_name = "Vanilla Alpine Skyline"
-    option_no = 0
-    option_yes = 1
+    option_false = 0
+    option_true = 1
     option_finale = 2
     default = 0
 
@@ -57,10 +62,10 @@ class CompassBadgeMode(Choice):
     important_only - Compass Badge points to progression/useful items only
     important_first - Compass Badge points to progression/useful items first, then it will point to junk items"""
     display_name = "Compass Badge Mode"
-    default = 1
     option_closest = 1
     option_important_only = 2
     option_important_first = 3
+    default = 1
 
 
 class ShuffleStorybookPages(Toggle):
@@ -101,7 +106,7 @@ class CTRWithSprint(Toggle):
 
 # DLC
 class EnableDLC1(Toggle):
-    """NOT IMPLEMENTED Shuffle content from The Arctic Cruise (Chapter 6) into the game.
+    """Shuffle content from The Arctic Cruise (Chapter 6) into the game. This also includes the Tour time rift.
     DO NOT ENABLE THIS OPTION IF YOU DO NOT HAVE THE DLC INSTALLED!!!"""
     display_name = "Shuffle Chapter 6"
 
@@ -160,6 +165,15 @@ class Chapter5MaxCost(Range):
     range_start = 0
     range_end = 40
     default = 35
+
+
+class MaxExtraTimePieces(Range):
+    """Maximum amount of extra Time Pieces that will be factored in chapter costs and the item pool from the DLCs.
+    Arctic Cruise will add up to 6. Nyakuza Metro will add up to 10. The absolute maximum is 56."""
+    display_name = "Max Extra Time Piece Cost"
+    range_start = 0
+    range_end = 16
+    default = 0
 
 
 # Death Wish
@@ -291,7 +305,8 @@ ahit_options: typing.Dict[str, type(Option)] = {
     "LowestChapterCost":        LowestChapterCost,
     "HighestChapterCost":       HighestChapterCost,
     "ChapterCostIncrement":     ChapterCostIncrement,
-    "ChapterCostMinDifference":  ChapterCostMinDifference,
+    "ChapterCostMinDifference": ChapterCostMinDifference,
+    "MaxExtraTimePieces":       MaxExtraTimePieces,
 
     "Chapter5MinCost":          Chapter5MinCost,
     "Chapter5MaxCost":          Chapter5MaxCost,
@@ -309,4 +324,48 @@ ahit_options: typing.Dict[str, type(Option)] = {
     "ParadeTrapWeight":         ParadeTrapWeight,
 
     "death_link":               DeathLink,
+}
+
+slot_data_options: typing.Dict[str, type(Option)] = {
+
+    "ActRandomizer": ActRandomizer,
+    "ShuffleAlpineZiplines": ShuffleAlpineZiplines,
+    # "VanillaAlpine": VanillaAlpine,
+    "LogicDifficulty": LogicDifficulty,
+    "RandomizeHatOrder": RandomizeHatOrder,
+    "UmbrellaLogic": UmbrellaLogic,
+    # "StartWithCompassBadge": StartWithCompassBadge,
+    "CompassBadgeMode": CompassBadgeMode,
+    "ShuffleStorybookPages": ShuffleStorybookPages,
+    "ShuffleActContracts": ShuffleActContracts,
+    # "StartingChapter": StartingChapter,
+    "SDJLogic": SDJLogic,
+    # "CTRWithSprint": CTRWithSprint,
+
+    "EnableDLC1": EnableDLC1,
+    "EnableDeathWish": EnableDeathWish,
+    "EnableDLC2": EnableDLC2,
+
+    # "LowestChapterCost": LowestChapterCost,
+    # "HighestChapterCost": HighestChapterCost,
+    # "ChapterCostIncrement": ChapterCostIncrement,
+    # "ChapterCostMinDifference": ChapterCostMinDifference,
+    # "MaxExtraTimePieces": MaxExtraTimePieces,
+
+    # "Chapter5MinCost": Chapter5MinCost,
+    # "Chapter5MaxCost": Chapter5MaxCost,
+
+    # "YarnCostMin": YarnCostMin,
+    # "YarnCostMax": YarnCostMax,
+    # "YarnAvailable": YarnAvailable,
+
+    "MinPonCost": MinPonCost,
+    "MaxPonCost": MaxPonCost,
+
+    # "TrapChance": TrapChance,
+    # "BabyTrapWeight": BabyTrapWeight,
+    # "LaserTrapWeight": LaserTrapWeight,
+    # "ParadeTrapWeight": ParadeTrapWeight,
+
+    "death_link": DeathLink,
 }

@@ -5,6 +5,7 @@ class Archipelago_ShopItem_Base extends Hat_Collectible_Important
 
 var const editconst int LocationID;
 var string DisplayName;
+var string ItemNumberName;
 
 simulated static function string GetLocalizedItemName()
 {
@@ -26,6 +27,7 @@ defaultproperties
 {
     CollectSound = None;
     DisplayName = "Item";
+    ItemNumberName = "Item 0";
     SaveGameOnCollect = true;
     IsBackpackItem = false;
     ShouldShowInBackpack = false;

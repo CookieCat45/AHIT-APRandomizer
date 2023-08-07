@@ -15,13 +15,20 @@ function UpdateClosestMarker(HUD H)
 	local Hat_Collectible_DeathWishLevelToken dwlt;
 	local float closest_distance;
 	local int bestindx, i, mode, locId;
-	local bool HasAnyDeathWishLevelTokens, onlyImportant;
+	local bool HasAnyDeathWishLevelTokens, onlyImportant, hasBrewing, valid;
+	local string mapName;
 	local Hat_ImpactInteract_Breakable_ChemicalBadge b;
 	local Archipelago_GameMod m;
 	local LocationInfo locInfo;
 	local Actor a;
 	
+	if (`GameManager.IsMidMapTransition || `SaveManager == None || `SaveManager.GetCurrentSaveData() == None)
+		return;
+	
 	m = `AP;
+	if (m == None || m.SlotData == None || m.IsInSpaceship())
+		return;
+	
 	bestindx = INDEX_NONE;
 	MarkerPositions.Length = 0;
 	MarkerClasses.Length = 0;
@@ -51,7 +58,9 @@ function UpdateClosestMarker(HUD H)
 		if (!CanReachLocation(locId) || m.IsLocationChecked(locId)) continue;
 		
 		locInfo = m.GetLocationInfoFromID(locId);
-		if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
+		
+		if (class<Hat_Collectible_StoryBookPage>(chest.Content) == None)
+			if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
 		
 		UpdateClosestMarker_Actor(H, chest, closest_distance, bestindx);
 	}
@@ -60,34 +69,56 @@ function UpdateClosestMarker(HUD H)
 	foreach H.PlayerOwner.DynamicActors(class'Hat_Collectible_StoryBookPage', page)
 	{
 		locId = m.ObjectToLocationId(page);
-		if (!CanReachLocation(locId) || m.HasAPBit(class'Hat_SaveBitHelper'.static.GetBitID(page), 1)) continue;
+		if (!CanReachLocation(locId)) continue;
 		UpdateClosestMarker_Actor(H, page, closest_distance, bestindx);
 	}
 	
-	if (class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Chemical'))
+	hasBrewing = class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Chemical');
+	if (hasBrewing)
 	{
 		foreach H.PlayerOwner.DynamicActors(class'Hat_ImpactInteract_Breakable_ChemicalBadge', b)
 		{
-			locId = m.ObjectToLocationId(b);
-			if (!CanReachLocation(locId) || m.IsLocationChecked(locId)) continue;
-			
-			locInfo = m.GetLocationInfoFromID(locId);
-			if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
-			
+			valid = false;
+
 			for (i = 0; i < b.Rewards.Length; i++)
 			{
 				if (class<Hat_Collectible_Important>(b.Rewards[i]) != None)	
 				{
-					UpdateClosestMarker_Actor(H, b, closest_distance, bestindx);
+					valid = true;
 					break;
 				}
+			}
+			
+			if (valid)
+			{
+				locId = m.ObjectToLocationId(b);
+				if (!CanReachLocation(locId) || m.IsLocationChecked(locId)) continue;
+				
+				locInfo = m.GetLocationInfoFromID(locId);
+				if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
+				
+				UpdateClosestMarker_Actor(H, b, closest_distance, bestindx);
 			}
 		}
 	}
 	
+	mapName = `GameManager.GetCurrentMapFilename();
+	
 	foreach H.PlayerOwner.DynamicActors(class'Actor', a)
 	{
-		if (a.IsA('Hat_Goodie_Vault_Base') || a.IsA('Hat_NPC_Bullied'))
+		if (mapName ~= "subconforest" && a.IsA('Hat_InteractiveFoliage_HarborBush') && hasBrewing)
+		{
+			if (a.Name == 'Hat_InteractiveFoliage_HarborBush_2' || a.Name == 'Hat_InteractiveFoliage_HarborBush_3')
+			{
+				locId = a.Name == 'Hat_InteractiveFoliage_HarborBush_2' ? m.SubconBushCheck1 : m.SubconBushCheck2;
+				if (!CanReachLocation(locId) || m.IsLocationChecked(locId)) continue;
+				
+				locInfo = m.GetLocationInfoFromID(locId);
+				if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
+				UpdateClosestMarker_Actor(H, a, closest_distance, bestindx);
+			}
+		}
+		else if (a.IsA('Hat_Goodie_Vault_Base') || a.IsA('Hat_NPC_Bullied'))
 		{
 			if (a.Name == 'Hat_Goodie_Vault_1') // golden vault
 				continue;
@@ -128,7 +159,7 @@ function UpdateClosestMarker(HUD H)
 	
 	if (ArrowMaterialInstance != None)
 	{
-		ArrowMaterialInstance.SetScalarParameterValue('PurpleAlpha', HasAnyDeathWishLevelTokens ? 1 : 0);
+		ArrowMaterialInstance.SetScalarParameterValue('PurpleAlpha', closest_distance >= 12000 ? 1 : 0);
 	}
 }
 
@@ -162,8 +193,17 @@ function bool UpdateClosestMarker_Actor(HUD H, Actor item, out float closest_dis
 {
 	local float distance;
 	local Vector itemloc;
+
+	// Mafia Town secret cave location
+	if (Archipelago_RandomizedItem_Base(item) != None && Archipelago_RandomizedItem_Base(item).LocationId == 305220)
+	{
+		itemloc = vect(-3810, 460, 660);
+	}
+	else
+	{
+		itemloc = item.Location;
+	}
 	
-	itemloc = item.Location;
 	distance = VSize((H.PlayerOwner.Pawn.Location - itemloc)*vect(1,1,4));
 	
 	if (bestindx >= 0 && distance >= closest_distance) return false;
@@ -178,21 +218,28 @@ function bool UpdateClosestMarker_Actor(HUD H, Actor item, out float closest_dis
 
 function bool CanReachLocation(int id)
 {
-	// Mafia Town secret cave location, just points to bottom of map.
+	// Mafia Town secret cave item
 	if (id == 305220)
-		return false;
+	{
+		return (`GameManager.IsCurrentAct(6) || class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Chemical'));
+	}
 	
 	// Chest behind Mafia HQ
 	if (id == 303486)
 	{
-		return (`GameManager.IsCurrentAct(4) || `GameManager.IsCurrentAct(6));
+		return (`GameManager.IsCurrentAct(4) || `GameManager.IsCurrentAct(5) || `GameManager.IsCurrentAct(6) || `GameManager.IsCurrentAct(7));
 	}
 	
 	// Subcon boss arena chest
 	if (id == 323735)
 	{
-		return `GameManager.IsCurrentAct(3) && class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Hookshot')
-		|| `GameManager.IsCurrentAct(6);
+		return `GameManager.IsCurrentAct(3) && class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Hookshot') || `GameManager.IsCurrentAct(6);
+	}
+	
+	// Manor rooftop item
+	if (id == 325466 && `AP.SlotData.UmbrellaLogic)
+	{
+		return CanHitDwellerBells(true);
 	}
 	
 	if (`GameManager.IsCurrentChapter(4))
@@ -219,7 +266,7 @@ function bool CanReachLocation(int id)
 		id == 304457 ||
 		id == 304606 ||
 		id == 303481 && class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Hookshot') ||
-		id == 304607 && !class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_StatueFall') ||
+		id == 304607 && class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_StatueFall') ||
 		id == 304212 ||
 		id == 302003 ||
 		id == 302004 ||
@@ -239,6 +286,13 @@ function bool CanReachLocation(int id)
 		return false;
 	
 	return true;
+}
+
+function bool CanHitDwellerBells(optional bool MaskBypass)
+{
+	return class'Hat_Loadout'.static.BackpackHasInventory(class'Archipelago_Weapon_Umbrella', true)
+	|| class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Chemical')
+	|| MaskBypass && class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_FoxMask');
 }
 
 defaultproperties
@@ -265,7 +319,7 @@ defaultproperties
 	
 	DwellerMaskRequiredLocs[0] = 324767;
 	DwellerMaskRequiredLocs[1] = 324464;
-	DwellerMaskRequiredLocs[2] = 324709;
+	//DwellerMaskRequiredLocs[2] = 324709;
 	DwellerMaskRequiredLocs[3] = 324855;
 	DwellerMaskRequiredLocs[4] = 325082;
 	DwellerMaskRequiredLocs[5] = 324463;
