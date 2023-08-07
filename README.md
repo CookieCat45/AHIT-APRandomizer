@@ -45,14 +45,18 @@ Forces the client to attempt a connection to the server. You shouldn't have to u
 Q: **I followed all of the instructions correctly, but when I launch the game the mod doesn't work. What gives?**  
 A: Sometimes after installing the mod, it will disable itself in the mod menu in-game for an unknown reason. To fix this, go into the Mods (rocket icon) menu in-game, click on the Archipelago icon and make sure the mod is enabled. If the mod isn't in the menu, try making sure you followed the instructions correctly or let me know in the Archipelago Discord thread for A Hat in Time if you can't get the mod to work.
 
+
 Q: **When I complete a relic combo, the relics disappear from the relic stand once I load into the Spaceship again. Why?**  
 A: This is intended behaviour. The reason for it being that if this weren't the case, you would potentially be able to lock yourself out of a seed by placing relics in an order that the logic did not expect you to. The Time Rift will still be unlocked.
+
 
 Q: **Will other mods that I have cause issues or conflicts with the Archipelago mod?**  
 A: Not that I know of in particular. However, any of your newer (2021 and later) workshop mods may not load due to their package version being newer. That said, most mods shouldn't cause problems (again, from what I know).
 
+
 Q: **Why is there a lack of options for adjusting the amount of Time Pieces in the pool?**  
 A: The reason for this is mostly because the game enforces a hard-limit on the amount of Time Pieces you can have based on the DLC you have installed. Without any DLC, the limit is 40. With Seal the Deal, the limit is increased by 6, and with Nyakuza Metro, the limit is increased by 10, with a grand total of 56. There is an option to shuffle extra Time Pieces into the pool based on DLC options being enabled (MaxExtraTimePieces), but going above these limits is not possible. As for there being no option to lower the amount of Time Pieces in the pool below 40, I personally don't see any purpose in going below 40. If you want to change how long it takes to unlock chapters, there are plenty of options to customize how chapter costs are calculated.
+
 
 Q: **How do I hint for Time Pieces without having to type the whole name?**  
 A: `!hint Time Pieces`. It's planned to merge all Time Pieces into a single item, at which point this will no longer be necessary.
