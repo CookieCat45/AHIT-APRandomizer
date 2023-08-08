@@ -117,6 +117,7 @@ ahit_items = {
 
     # Other
     "Rift Token": ItemData(300032, ItemClassification.filler),
+    # "Random Cosmetic": ItemData(300044, ItemClassification.filler),
     "Umbrella": ItemData(300033, ItemClassification.progression),
 
     # Garbage items

@@ -572,7 +572,7 @@ simulated function BuildBonusHourglassesSide(HUD H, Array<Hat_ChapterActInfo> Ho
 			{
 				shuffledAct = `AP.GetShuffledAct(s.ChapterActInfo, basement);
 			}
-
+			
 			if (shuffledAct == None)
 				shuffledAct = s.ChapterActInfo;
 		}

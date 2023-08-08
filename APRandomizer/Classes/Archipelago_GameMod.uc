@@ -1076,7 +1076,7 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 		MapName = shuffled.MapName;
 	}
 	
-	if (Hat_ChapterInfo(ChapterInfo).ChapterID == 4)
+	if (shuffled.ChapterInfo.ChapterID == 4)
 	{
 		// Free Roam
 		if (ActID == 99)

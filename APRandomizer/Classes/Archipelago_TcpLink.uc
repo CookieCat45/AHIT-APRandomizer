@@ -158,10 +158,10 @@ function ConnectToAP()
 event Tick(float d)
 {
 	local byte byteMessage[255];
-	local int count, i, a, k;
-	local string character, pong, msg, nullChar, cmd;
+	local int count, i, a, k, bracket;
+	local string character, pong, msg, nullChar;
 	local Archipelago_GameMod m;
-	local bool b;
+	local bool b, validMsg;
 	
 	Super.Tick(d);
 	
@@ -268,33 +268,34 @@ event Tick(float d)
 		{
 			// We've got a JSON message, parse it
 			msg = "";
-
+			
 			for (i = 0; i < CurrentMessage.Length; i++)
 			{
-				if (CurrentMessage[i] == "}")
+				if (CurrentMessage[i] == "{")
 				{
-					cmd = "";
-					for (a = i+1; a < CurrentMessage.Length; a++)
-					{
-						cmd $= CurrentMessage[a];
-						if (Len(cmd) >= 15)
-							break;
-					}
+					if (!validMsg && CurrentMessage[i+1] == "\"")
+						validMsg = true;
 					
-					if (a >= CurrentMessage.Length || InStr(cmd, "}") == -1 
-					&& (FullyConnected && InStr(cmd, "{\"cmd\"") != -1 
-					|| InStr(cmd, "{\"cmd\"") != -1 && InStr(msg, "{\"cmd\":\"Connected\"") != -1))
-					{
-						ParseJSON(msg$"}");
-						msg = "";
-					}
+					if (validMsg)
+						bracket--;
+				}
+				else if (validMsg && CurrentMessage[i] == "}")
+				{
+					bracket++;
 				}
 				
-				msg $= CurrentMessage[i];
+				if (validMsg)
+				{
+					msg $= CurrentMessage[i];
+					if (bracket >= 0)
+					{
+						ParseJSON(msg);
+						msg = "";
+						validMsg = false;
+						bracket = 0;
+					}
+				}
 			}
-			
-			//if (Len(msg) > 0)
-			//	ParseJSON(msg);
 			
 			CurrentMessage.Length = 0;
 			ParsingMessage = false;
@@ -317,7 +318,7 @@ event Tick(float d)
 function ParseJSON(string json)
 {
 	local bool b;
-	local int i, a, count, split, pos, locId;
+	local int i, a, count, split, pos, locId, count1, count2;
 	local array<int> missingLocs;
 	local string s, text, num;
 	local JsonObject jsonObj, jsonChild;
@@ -327,7 +328,7 @@ function ParseJSON(string json)
 	if (Len(json) <= 10) // this is probably garbage that we thought was a json
 		return;
 	
-	// remove garbage at start of string
+	// remove garbage at start and end of string
 	for (i = 0; i < Len(json); i++)
 	{
 		if (Mid(json, i, 2) == "{\"")
@@ -358,6 +359,21 @@ function ParseJSON(string json)
 	
 	m.DebugMessage("[ParseJSON] Reformatted command: " $json);
 	m.DebugMessage("a");
+	
+	// Security
+	for (i = 0; i < Len(json); i++)
+	{
+		if (Mid(json, i, 1) == "{")
+			count1++;
+		else if (Mid(json, i, 1) == "}")
+			count2++;
+	}
+	
+	if (count1 != count2)
+	{
+		m.DebugMessage("[ParseJSON] [WARNING] Encountered JSON message with mismatching braces. Cancelling to prevent crash!", , true);
+		return;
+	}
 	
 	jsonObj = new class'JsonObject';
 	jsonObj = class'JsonObject'.static.DecodeJson(json);

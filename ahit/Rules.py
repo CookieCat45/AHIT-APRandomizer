@@ -110,10 +110,14 @@ def set_rules(world: World):
     mw.random.shuffle(chapter_list)
 
     if dlc1:
-        index = chapter_list.index(ChapterIndex.ALPINE)
-        chapter_list.remove(ChapterIndex.CRUISE)
-        pos = mw.random.randint(index, len(chapter_list))
-        chapter_list.insert(pos, ChapterIndex.CRUISE)
+        index = chapter_list.index(ChapterIndex.CRUISE)
+        chapter_list.remove(ChapterIndex.ALPINE)
+        if index == 0:
+            pos = 0
+        else:
+            pos = mw.random.randint(0, index)
+
+        chapter_list.insert(pos, ChapterIndex.ALPINE)
 
     lowest_cost: int = mw.LowestChapterCost[p].value
     highest_cost: int = mw.HighestChapterCost[p].value
@@ -242,7 +246,7 @@ def set_rules(world: World):
 
         for act in acts:
             act_entrance: Entrance = mw.get_entrance(act, p)
-            access_rules.append(act_entrance.access_rule)
+
             required_region = act_entrance.connected_region
             name: str = format("%s: Connection %i" % (key, i))
             new_entrance: Entrance = connect_regions(required_region, region, name, p)
@@ -260,6 +264,11 @@ def set_rules(world: World):
         for e in entrances:
             for rules in access_rules:
                 add_rule(e, rules)
+
+    for entrance in mw.get_region("Alpine Free Roam", p).entrances:
+        add_rule(entrance, lambda state: can_use_hookshot(state, w))
+        if mw.UmbrellaLogic[p].value > 0:
+            add_rule(entrance, lambda state: state.has("Umbrella", p))
 
     mw.completion_condition[p] = lambda state: state.has("Time Piece Cluster", p)
 
@@ -396,11 +405,6 @@ def set_specific_rules(world: World):
     add_rule(mw.get_location("Alpine Skyline - Mystifying Time Mesa: Zipline", p),
              lambda state: can_use_hat(state, w, HatType.SPRINT) or can_use_hat(state, w, HatType.TIME_STOP))
 
-    for entrance in mw.get_region("Alpine Free Roam", p).entrances:
-        add_rule(entrance, lambda state: can_use_hookshot(state, w))
-        if mw.UmbrellaLogic[p].value > 0:
-            add_rule(entrance, lambda state: state.has("Umbrella", p))
-
     if mw.EnableDLC1[p].value > 0:
         add_rule(mw.get_entrance("Cruise Ship Entrance BV", p), lambda state: can_use_hookshot(state, w))
 
@@ -434,6 +438,11 @@ def set_alps_zipline_rules(world: World):
 
     add_rule(world.multiworld.get_entrance("-> The Twilight Bell", world.player),
              lambda state: state.has("Zipline Unlock - The Twilight Bell Path", world.player))
+
+    add_rule(world.multiworld.get_location("Act Completion (The Illness has Spread)", world.player),
+             lambda state: state.has("Zipline Unlock - The Birdhouse Path", world.player)
+             and state.has("Zipline Unlock - The Lava Cake Path", world.player)
+             and state.has("Zipline Unlock - The Windmill Path", world.player))
 
     for (loc, zipline) in zipline_unlocks.items():
         add_rule(world.multiworld.get_location(loc, world.player), lambda state: state.has(zipline, world.player))
