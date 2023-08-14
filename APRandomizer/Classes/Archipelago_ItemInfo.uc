@@ -39,6 +39,7 @@ enum ESpecialItemType
 	SpecialType_50Pons,
 	SpecialType_100Pons,
 	SpecialType_HealthPon,
+	SpecialType_Cosmetic,
 };
 
 enum ETrapType
@@ -59,6 +60,7 @@ const HealthPonItem = 300037;
 const BabyTrapItem = 300039;
 const LaserTrapItem = 300040;
 const ParadeTrapItem = 300041;
+const RandomCosmeticItem = 300044;
 
 static function int GetYarnItemID()
 {
@@ -98,6 +100,9 @@ static function ESpecialItemType GetItemSpecialType(int itemId)
 			
 		case HealthPonItem:
 			return SpecialType_HealthPon;
+		
+		case RandomCosmeticItem:
+			return SpecialType_Cosmetic;
 			
 		default:
 			return SpecialType_None;
@@ -300,7 +305,11 @@ optional out class<Actor> inventoryOverride) // Item inventory class override. M
 			itemName = "Parade Trap";
 			worldClass = class'Archipelago_RandomizedItem_Misc';
 			return true;
-			
+
+		case RandomCosmeticItem:
+			itemName = "Random Cosmetic";
+			worldClass = class'Archipelago_RandomizedItem_Misc';
+			return true;
 			
 		// --------- MISC ---------------------------------------------------------------------------------------------- \\
 			

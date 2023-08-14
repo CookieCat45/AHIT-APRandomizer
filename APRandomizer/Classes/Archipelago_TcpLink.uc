@@ -35,7 +35,7 @@ function Connect()
 	if (FullyConnected || ConnectingToAP || LinkState == STATE_Connecting)
 		return;
 	
-	ReceiveMode = RMODE_Event;
+	ReceiveMode = RMODE_Manual;
 	LinkMode = MODE_Line;
 	`AP.ScreenMessage("Connecting to host: " $`AP.SlotData.Host$":"$`AP.SlotData.Port);
     Resolve(`AP.SlotData.Host);
@@ -95,19 +95,9 @@ event Opened()
 	$"Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" $crlf
 	$"Sec-WebSocket-Version: 13" $crlf
 	$"Accept: /" $crlf);
-}
-
-// this should be our HTTP response from the server
-event ReceivedLine(string message)
-{
-	ReceiveMode = RMODE_Manual; // event mode seems to cause problems
-	LinkMode = MODE_Binary;
 	
-	if (!FullyConnected && !ConnectingToAP)
-	{
-		`AP.DebugMessage("Received HTTP response, sending Connect packet...");
-		ConnectToAP();
-	}
+	LinkMode = MODE_Binary;
+	`AP.DebugMessage("Waiting for RoomInfo packet...");
 }
 
 function ConnectToAP()
@@ -115,6 +105,9 @@ function ConnectToAP()
 	local JsonObject json;
 	local JsonObject jsonVersion;
 	local string message;
+	
+	if (FullyConnected)
+		return;
 	
 	ConnectingToAP = true;
 	CurrentMessage.Length = 0;
@@ -160,12 +153,11 @@ event Tick(float d)
 	local byte byteMessage[255];
 	local int count, i, a, k, bracket;
 	local string character, pong, msg, nullChar;
-	local Archipelago_GameMod m;
 	local bool b, validMsg;
 	
 	Super.Tick(d);
 	
-	if (LinkState != STATE_Connected || ReceiveMode == RMODE_Event || LinkMode != MODE_Binary)
+	if (LinkState != STATE_Connected || LinkMode != MODE_Binary)
 		return;
 	
 	// Messages from the AP server are not null-terminated, so it must be done this way.
@@ -302,15 +294,6 @@ event Tick(float d)
 			EmptyCount = 0;
 		}
 	}
-	else if (FullyConnected)
-	{
-		m = `AP;
-		for (i = 0; i < m.SlotData.PendingMessages.Length; i++)
-		{
-			msg = m.SlotData.PendingMessages[i];
-			SendBinaryMessage(msg);
-		}
-	}
 }
 
 // ALL JsonObjects MUST be set to None after use!!!!!!!
@@ -387,6 +370,11 @@ function ParseJSON(string json)
 	
 	switch (jsonObj.GetStringValue("cmd"))
 	{
+		case "RoomInfo":
+			m.DebugMessage("Received RoomInfo packet, sending Connect packet...");
+			ConnectToAP();
+			break;
+		
 		case "Connected":
 			m.OnPreConnected();
 			m.ScreenMessage("Successfully connected to " $m.SlotData.Host $":"$m.SlotData.Port);
@@ -879,35 +867,37 @@ function GrantItem(int itemId, int playerId)
 function UnlockZipline(int id)
 {
 	local string zipline;
-
+	
 	switch (id)
 	{
 		case 300204: // Birdhouse Path
-			zipline = "Hat_HookPoint_Desert_2";
+			zipline = "Hat_SandTravelNode_44";
 			break;
-
+		
 		case 300205: // Lava Cake Path
-			zipline = "Hat_HookPoint_Desert_16";
+			zipline = "Hat_SandTravelNode_15";
 			break;
 		
 		case 300206: // Windmill Path
-			zipline = "Hat_HookPoint_Desert_1";
+			zipline = "Hat_SandTravelNode_17";
 			break;
 		
 		case 300207: // Twilight Bell Path
-			zipline = "Hat_HookPoint_Desert_24";
+			zipline = "Hat_SandTravelNode_43";
 			break;
 		
 		default:
 			return;
 	}
-
+	
 	`AP.SetAPBits("ZiplineUnlock_"$zipline, 1);
 }
 
 function DoSpecialItemEffects(ESpecialItemType special)
 {
 	local Hat_Player player;
+	local array<class< Object > > skins;
+	local array<class< Object > > flairs;
 	
 	switch (special)
 	{
@@ -930,10 +920,84 @@ function DoSpecialItemEffects(ESpecialItemType special)
 					player.HealDamage(1, None, None);
 			}
 			break;
+		
+		case SpecialType_Cosmetic:
+			skins = class'Hat_ClassHelper'.static.GetAllScriptClasses("Hat_Collectible_Skin");
+			flairs = class'Hat_ClassHelper'.static.GetAllScriptClasses("Hat_CosmeticItemQualityInfo");
+			if (Rand(2) == 1 || !GiveRandomFlair(flairs))
+			{
+				GiveRandomSkin(skins);
+			}
+			
+			break;
 			
 		default:
 			return;
 	}
+}
+
+function bool GiveRandomSkin(array<class< Object > > skins)
+{
+	local array<class< Hat_Collectible_Skin > > candidates;
+	local Hat_Loadout lo;
+	local int i;
+	
+	lo = Hat_PlayerController(GetALocalPlayerController()).MyLoadout;
+	for (i = 0; i < skins.Length; i++)
+	{
+		if (!class'Hat_GameDLCInfo'.static.IsGameDLCInfoInstalled(class<Hat_Collectible_Skin>(skins[i]).default.RequiredDLC))
+			continue;
+		
+		if (!lo.BackpackHasInventory(class<Hat_Collectible_Skin>(skins[i]))
+		&& class<Hat_Collectible_Skin>(skins[i]).default.ItemQuality != None)
+			candidates.AddItem(class<Hat_Collectible_Skin>(skins[i]));
+	}
+	
+	if (candidates.Length > 0)
+	{
+		lo.AddBackpack(lo.MakeLoadoutItem(candidates[RandRange(0, candidates.Length-1)]));
+		return true;
+	}
+	
+	return false;
+}
+
+function bool GiveRandomFlair(array<class< Object > > flairs)
+{
+	local array<class< Hat_CosmeticItemQualityInfo > > candidates;
+	local class<Hat_CosmeticItemQualityInfo> chosen;
+	local Hat_Loadout lo;
+	local int i;
+	
+	lo = Hat_PlayerController(GetALocalPlayerController()).MyLoadout;
+	for (i = 0; i < flairs.Length; i++)
+	{
+		if (!class'Hat_GameDLCInfo'.static.IsGameDLCInfoInstalled(class<Hat_CosmeticItemQualityInfo>(flairs[i]).default.RequiredDLC))
+			continue;
+		
+		if (class<Hat_CosmeticItemQualityInfo>(flairs[i]).default.RequiredDLC == class'Hat_GameDLCInfo_KickstarterHat'
+			|| class<Hat_CosmeticItemQualityInfo>(flairs[i]).default.ItemQuality == class'Hat_ItemQuality_Supporter')
+			continue;
+		
+		if (class<Hat_CosmeticItemQualityInfo>(flairs[i]).default.SkinWeApplyTo != None)
+			continue;
+		
+		if (!lo.BackpackHasInventory(class<Hat_CosmeticItemQualityInfo>(flairs[i]).static.GetBaseCosmeticItemWeApplyTo(), true, class<Hat_CosmeticItemQualityInfo>(flairs[i])) 
+			&& class<Hat_CosmeticItemQualityInfo>(flairs[i]).default.CosmeticItemWeApplyTo != None
+			&& lo.BackpackHasInventory(class<Hat_CosmeticItemQualityInfo>(flairs[i]).static.GetBaseCosmeticItemWeApplyTo()))
+		{
+			candidates.AddItem(class<Hat_CosmeticItemQualityInfo>(flairs[i]));
+		}
+	}
+	
+	if (candidates.Length > 0)
+	{
+		chosen = candidates[RandRange(0, candidates.Length-1)];
+		lo.AddBackpack(lo.MakeLoadoutItem(chosen.static.GetBaseCosmeticItemWeApplyTo(), chosen));
+		return true;
+	}
+	
+	return false;
 }
 
 function DoTrapItemEffects(ETrapType trap)
@@ -1017,35 +1081,8 @@ function SendBinaryMessage(string message, optional bool continuation, optional 
 	local string buffer;
 	local int length, offset, keyIndex, i, totalSent;
 	local int maskKey[4];
-	local bool found;
 	
 	m = `AP;
-	
-	if (!continuation && !pong)
-	{
-		// wait until this is finished
-		if (ParsingMessage)
-		{
-			for (i = 0; i < m.SlotData.PendingMessages.Length; i++)
-			{
-				if (m.SlotData.PendingMessages[i] == message)
-				{
-					found = true;
-					break;
-				}
-			}
-			
-			if (!found)
-			{
-				m.SlotData.PendingMessages.AddItem(message);
-			}
-		}
-		else
-		{
-			m.SlotData.PendingMessages.RemoveItem(message);
-			m.DebugMessage("Sending message: "$message);
-		}
-	}
 	
 	for (i = 0; i < 4; i++)
 	{

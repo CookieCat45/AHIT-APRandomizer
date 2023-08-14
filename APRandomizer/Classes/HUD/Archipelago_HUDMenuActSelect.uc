@@ -839,3 +839,209 @@ function int SortChapterActInfoByActID(Hat_ChapterActInfo a, Hat_ChapterActInfo 
 	
 	return AdjustedActIDB-AdjustedActIDA;
 }
+
+function bool OnClick(HUD H, bool release)
+{
+	local int actid;
+	local int i;
+	local Hat_HUDMenuConfirmationBox cb;
+	local string TranslString, identifier;
+	local Hat_ChapterActInfo actInfo;
+	
+	IsHoldingClick = !release;
+
+	if (release) return false;
+	if (IsInputDisabled(H)) return false;
+	if (!CurrentSelectedHourglass.IsValid) return false;
+	if (!CurrentSelectedHourglass.IsUnlocked) return false;
+	
+	if (CurrentSelectedHourglass.PonPayCost > 0 || CurrentSelectedHourglass.DeathWishPayCost > 0)
+	{
+		if (GetWorldInfo().NetMode != NM_Standalone && GetWorldInfo().Role != Role_Authority)
+		{
+			for (i = 0; i < Hourglasses.Length; i++)
+			{
+				if (Hourglasses[i].Hourglass == "") continue;
+				if (Hourglasses[i].Hourglass != CurrentSelectedHourglass.Hourglass) continue;
+				if (Hourglasses[i].PonPayCost > 0 && `GRI.CurrentEnergyBits.Count < Hourglasses[i].PonPayCost) continue;
+				if (Hourglasses[i].DeathWishPayCost > 0 && CompletedDeathWishStamps < Hourglasses[i].DeathWishPayCost) continue;
+				
+				identifier = Hourglasses[i].Hourglass;
+				if (ModChapterPackageName != "")
+					identifier = class'Hat_TimeObject_Base'.static.GetModTimePieceIdentifier(ModChapterPackageName, identifier);
+				
+				`PRI.PlyOwner.ServerClientPayTimePiece(Hourglasses[i].PonPayCost, Hourglasses[i].DeathWishPayCost, identifier);
+				
+				return true;
+			}
+		}
+		else
+		{
+			for (i = 0; i < Hourglasses.Length; i++)
+			{
+				if (Hourglasses[i].Hourglass == "") continue;
+				if (Hourglasses[i].Hourglass != CurrentSelectedHourglass.Hourglass) continue;
+				if (Hourglasses[i].PonPayCost > 0 && `GameManager.GetEnergyBits() < Hourglasses[i].PonPayCost) continue;
+				if (Hourglasses[i].DeathWishPayCost > 0 && CompletedDeathWishStamps < Hourglasses[i].DeathWishPayCost) continue;
+				if (!PayTimePiece(Hourglasses[i].Hourglass)) continue;
+				
+				if (Hourglasses[i].PonPayCost > 0)
+				{
+					`GameManager.AddEnergyBits(-Hourglasses[i].PonPayCost);
+				}
+				`SaveManager.SaveToFile();
+				
+				Hourglasses[i].SpecialAnimation = Hourglasses[i].DeathWishPayCost > 0 ? class'Hat_HUDActSelectAnimation_PayAct_DeathWish' : class'Hat_HUDActSelectAnimation_PayAct';
+				Hourglasses[i].SpecialAnimation.static.OnInit(self, H, Hourglasses[i]);
+				UnlockAnimation.AllAnimationsOver = false;
+				
+				return true;
+			}
+		}
+		if (EnergyBitCounter[1] < 0 || EnergyBitCounter[1] >= 0.7)
+		{
+			EnergyBitCounter[1] = 0;
+			DeathWishCounter[1] = 0;
+			if (NotEnoughMoneySound != None)
+				PlayOwnerSound(H, NotEnoughMoneySound);
+		}
+		return false;
+	}
+	
+	if ((CurrentSelectedHourglass.ID == ActSelectType_TimeRift_Water || CurrentSelectedHourglass.ID == ActSelectType_TimeRift_Cave) && !CurrentSelectedHourglass.IsComplete && CurrentSelectedHourglass.Photo != None)
+	{
+		ToggleViewingPhoto(H);
+		return true;
+	}
+	if ((CurrentSelectedHourglass.ID == ActSelectType_Act || CurrentSelectedHourglass.ID == ActSelectType_Boss) && ChapterInfo.GetActIDFromHourglass(CurrentSelectedHourglass.Hourglass) < 0) return false;
+
+	actid = CurrentSelectedHourglass.ActID;
+	
+	// If the player re-selects Act 1, ask them if they're sure
+	if (actid == 1 && CurrentSelectedHourglass.ID == ActSelectType_Act && CurrentSelectedHourglass.IsComplete && GetCollectedTimePieceCount() == 1)
+	{
+		if (OpenMessageBoxSound != None)
+			PlayOwnerSound(H, OpenMessageBoxSound);
+		
+		cb = Hat_HUDMenuConfirmationBox(Hat_HUD(H).OpenHUD(class'Hat_HUDMenuConfirmationBox', class'Hat_Localizer'.static.GetMenu("ActSelect", "Action_EnterCompletedAct")));
+		cb.PushDelegate(self.OnConfirmationBox);
+		cb.CopyCoopSettings(self);
+		IsConfirmationBoxOpen = ActSelectConfBox_PreEntryWarning;
+		return true;
+	}
+	
+	// If this is the Trainwreck finale, ask if they're sure of their choice
+	if (CurrentSelectedHourglass.ID == ActSelectType_Finale && !CurrentSelectedHourglass.IsComplete && ChapterInfo.IsStandoff && class'Hat_SeqCond_DeadBirdWinner'.static.GetDeadBirdWinner() == 0)
+	{
+		if (OpenMessageBoxSound != None)
+			PlayOwnerSound(H, OpenMessageBoxSound);
+		
+		i = GetStandoffHighscoreWinner();
+		if (i == 1)
+			TranslString = "StandOff_Confirm_Conductor0";
+		else if (i == 2)
+			TranslString = "StandOff_Confirm_DJGrooves0";
+		else
+			TranslString = "StandOff_Confirm_Draw0";
+		
+		cb = Hat_HUDMenuConfirmationBox(Hat_HUD(H).OpenHUD(class'Hat_HUDMenuConfirmationBox', class'Hat_Localizer'.static.GetMenu("ActSelect", TranslString)));
+		cb.PushDelegate(self.OnConfirmationBox);
+		cb.CopyCoopSettings(self);
+		IsConfirmationBoxOpen = ActSelectConfBox_StandoffConfirm;
+		return true;
+	}
+	
+	// If the player is missing an item, ask them if they are sure
+	if (CurrentSelectedHourglass.IsMissingItem)
+	{
+		if (OpenMessageBoxSound != None)
+			PlayOwnerSound(H, OpenMessageBoxSound);
+		
+		cb = Hat_HUDMenuConfirmationBox(Hat_HUD(H).OpenHUD(class'Hat_HUDMenuConfirmationBox', class'Hat_Localizer'.static.GetMenu("ActSelect", "Action_MissingItem")));
+		cb.PushDelegate(self.OnConfirmationBox);
+		cb.CopyCoopSettings(self);
+		IsConfirmationBoxOpen = ActSelectConfBox_PreEntryWarning;
+		return true;
+	}
+	
+	// If its a Time Piece reminder, let them know
+	if (CurrentSelectedHourglass.ID == ActSelectType_TimeRift_Cave_Reminder)
+	{
+		Hat_PlayerController(H.PlayerOwner).TalkManager.PushConversation(Hat_ConversationTree'HatinTime_Conv_Spaceship.Chapters.PurpleTimeRiftReminder');
+		return false;
+	}
+	
+	// If the map doesnt exist...
+	if (CurrentSelectedHourglass.MapName == "")
+	{
+		ErrorMessage = "Act has no map!!";
+		`Broadcast(ErrorMessage);
+		if (ErrorSound != None) PlayOwnerSound(H, ErrorSound);
+		return false;
+	}
+	else if (!class'Hat_ClassHelper'.static.PackageExists(CurrentSelectedHourglass.MapName))
+	{
+		ErrorMessage = "Act map '" $ CurrentSelectedHourglass.MapName $ "' doesn't exist!!";
+		`broadcast(ErrorMessage);
+		if (ErrorSound != None) PlayOwnerSound(H, ErrorSound);
+		return false;
+	}
+	else if (!CurrentSelectedHourglass.SupportsCoop && `GameManager.IsCoop())
+	{
+		ErrorMessage = "This act can not be played in co-op";
+		if (ErrorSound != None) PlayOwnerSound(H, ErrorSound);
+		return false;
+	}
+	
+	// Game crashes when overriding OpenActTitleCard function, for some reason... 
+	// so we do this dumb shit to disable Online Party join act prompt
+	actInfo = CurrentSelectedHourglass.ChapterActInfo;
+	if (`AP.SlotData.ActRando)
+	{
+		CurrentSelectedHourglass.ChapterActInfo = None;
+	}
+	
+	OpenActTitleCard(H);
+	CurrentSelectedHourglass.ChapterActInfo = actInfo;
+	
+    return true;
+}
+
+delegate OnConfirmationBox(HUD H, PlayerController pc, int result)
+{
+	local ActSelectConfBox PrevValue;
+	local Hat_HUDMenuConfirmationBox cb;
+	local Hat_ChapterActInfo actInfo;
+	local int i;
+	local string TranslString;
+	
+	PrevValue = IsConfirmationBoxOpen;
+	
+	IsConfirmationBoxOpen = ActSelectConfBox_None;
+	if (PrevValue == ActSelectConfBox_PreEntryWarning && result == 0)
+	{
+		actInfo = CurrentSelectedHourglass.ChapterActInfo;
+		if (`AP.SlotData.ActRando)
+		{
+			CurrentSelectedHourglass.ChapterActInfo = None;
+		}
+		
+		OpenActTitleCard(H);
+		CurrentSelectedHourglass.ChapterActInfo = actInfo;
+	}
+	if (PrevValue == ActSelectConfBox_StandoffConfirm && result == 0)
+	{
+		i = GetStandoffHighscoreWinner();
+		if (i == 1)
+			TranslString = "StandOff_Confirm_Conductor1";
+		else if (i == 2)
+			TranslString = "StandOff_Confirm_DJGrooves1";
+		else
+			TranslString = "StandOff_Confirm_Draw1";
+		
+		cb = Hat_HUDMenuConfirmationBox(Hat_HUD(H).OpenHUD(class'Hat_HUDMenuConfirmationBox', class'Hat_Localizer'.static.GetMenu("ActSelect", TranslString)));
+		cb.PushDelegate(self.OnConfirmationBox);
+		cb.CopyCoopSettings(self);
+		IsConfirmationBoxOpen = ActSelectConfBox_PreEntryWarning;
+	}
+}

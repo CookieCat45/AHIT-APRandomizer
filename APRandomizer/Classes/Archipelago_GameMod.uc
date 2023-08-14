@@ -69,7 +69,6 @@ const StoryBookPageIDRange = 340000;
 
 // Event checks
 const RumbiYarnCheck = 301000;
-const CookingCatRelicCheck = 301001;
 const UmbrellaCheck = 301002;
 
 // These have to be hardcoded because camera badge item disappears if you have the camera badge
@@ -258,14 +257,8 @@ function EnableConsoleCommands()
 	c.InitInputSystem();
 }
 
-function CreateClient(optional float delay=0.0)
+function CreateClient()
 {
-	if (delay > 0.0)
-	{
-		SetTimer(delay, false, NameOf(CreateClient));
-		return;
-	}
-	
 	if (client != None)
 		return;
 	
@@ -278,7 +271,8 @@ event PreBeginPlay()
 	local Hat_CollectibleBackpackItem relic;
 	local Hat_SaveGame save;
 	local string path;
-	local int i, pos, a;
+	local int i, pos, a, j;
+	local array<SequenceObject> seqObjects;
 	
 	Super.PreBeginPlay();
 	
@@ -357,8 +351,7 @@ event PreBeginPlay()
 			else if (save.SnatcherContracts.Length == 0 && save.CompletedSnatcherContracts.Length == 0
 				&& save.TurnedInSnatcherContracts.Length == 0)
 			{
-				// Give a dummy contract.
-				// The PlayerController hasn't spawned yet, so this will generate an Accessed None warning, but W/E.
+				// Give a dummy contract so Snatcher's contract traps will spawn.
 				save.GiveContract(class'Hat_SnatcherContract_Act', GetALocalPlayerController());
 			}
 		}
@@ -374,28 +367,38 @@ event PreBeginPlay()
 			}
 		}
 		
-		SetAPBits("AlpineFinale", 0);
-	}
-	else
-	{
-		// Hat_DecorationStand is not alwaysloaded, and the alwaysloaded workaround doesn't seem to work with it (crash on boot).
-		// So what we do here is, when a relic stand is completed, tell our save file that it actually HASN'T been
-		// completed on map load so that it doesn't place the decorations on the stand and we can place more.
-		for (i = 0; i < save.HUBDecorations.Length; i++)
+		WorldInfo.GetGameSequence().FindSeqObjectsByClass(class'Hat_SeqAct_ClearContractObjective', true, seqObjects);
+		for (i = 0; i < seqObjects.Length; i++)
 		{
-			if (save.HUBDecorations[i].Complete)
-			{
-				for (a = 0; a < save.HUBDecorations[i].Decorations.Length; a++)
-				{
-					relic = class'Hat_Loadout'.static.MakeCollectibleBackpackItem(save.HUBDecorations[i].Decorations[a]);
-					save.MyBackpack2017.Collectibles.RemoveItem(relic);
-				}
-				
-				save.HUBDecorations.RemoveItem(save.HUBDecorations[i]);
-				i--;
-			}
+			Hat_SeqAct_ClearContractObjective(seqObjects[i]).ContractClass = None;
 		}
 	}
+	
+	// Hat_DecorationStand is not alwaysloaded, and the alwaysloaded workaround doesn't seem to work with it (crash on boot).
+	// So what we do here is, when a relic stand is completed, tell our save file that it actually HASN'T been
+	// completed on map load so that it doesn't place the decorations on the stand and we can place more.
+	// We do this because the player can place relics in an order the logic doesn't expect them to, potentially locking them out of a seed.
+	for (i = 0; i < save.HUBDecorations.Length; i++)
+	{
+		if (save.HUBDecorations[i].Complete)
+		{
+			for (a = 0; a < save.HUBDecorations[i].Decorations.Length; a++)
+			{
+				relic = class'Hat_Loadout'.static.MakeCollectibleBackpackItem(save.HUBDecorations[i].Decorations[a]);
+				
+				for (j = 0; j < save.MyBackpack2017.Collectibles.Length; j++)
+				{
+					if (save.MyBackpack2017.Collectibles[j].BackpackClass == relic.BackpackClass)
+						save.MyBackpack2017.Collectibles[j] = None;
+				}
+			}
+			
+			save.HUBDecorations.RemoveItem(save.HUBDecorations[i]);
+			i--;
+		}
+	}
+	
+	SetAPBits("AlpineFinale", 0);
 }
 
 event PostBeginPlay()
@@ -427,7 +430,7 @@ function OnPostInitGame()
 	local Hat_SaveGame save;
 	local Hat_Player ply;
 	local Hat_PlayerController ctr;
-	local Hat_NPC mu;
+	local Hat_NPC npc;
 	local Actor a;
 	
 	// If on titlescreen, find any Archipelago-enabled save files and do this stuff 
@@ -476,21 +479,23 @@ function OnPostInitGame()
 	{
 		// Stop Mustache Girl tutorial cutscene (it breaks when removing the yarn)
 		// The player can still get the yarn by smacking Rumbi after getting 4 time pieces.
-		foreach DynamicActors(class'Hat_NPC', mu)
+		foreach DynamicActors(class'Hat_NPC', npc)
 		{
-			if (mu.IsA('Hat_NPC_MustacheGirl') && mu.Name == 'Hat_NPC_MustacheGirl_0')
+			if (npc.IsA('Hat_NPC_MustacheGirl') && npc.Name == 'Hat_NPC_MustacheGirl_0')
 			{
 				// Set this level bit to 0 so that Rumbi will drop the yarn
 				class'Hat_SaveBitHelper'.static.SetLevelBits("mu_preawakening_intruder_tutorial", 0);
-				mu.ShutDown();
-				break;
+				npc.ShutDown();
+			}
+			else if (npc.IsA('Hat_NPC_CookingCat'))
+			{
+				npc.ShutDown();
 			}
 		}
 		
 		SetTimer(0.01, false, NameOf(SpawnDecorationStands));
 		
-		// When returning to hub from levels in act rando, the player may get softlocked behind chapter doors
-		// because the game will spawn them at the telescope for that act's chapter. So, always go to the bedroom.
+		// When returning to hub from levels in act rando, the player may get softlocked behind chapter doors, prevent this
 		if (SlotData.ActRando)
 		{
 			foreach DynamicActors(class'Hat_Player', ply)
@@ -519,6 +524,7 @@ function OnPostInitGame()
 		}
 		
 		OpenBedroomDoor();
+		`SetMusicParameterInt('FirstChapterUnlockSilence', 0);
 	}
 	else
 	{
@@ -587,8 +593,12 @@ function OnPostInitGame()
 		{
 			DeleteCameraParticle();
 		}
+		else if (mapName ~= "alpsandsails")
+		{
+			SetTimer(0.8, true, NameOf(UpdateZiplineUnlocks));
+		}
 	}
-	
+
 	if (SlotData.UmbrellaLogic)
 	{
 		ReplaceUnarmedWeapon();
@@ -596,7 +606,7 @@ function OnPostInitGame()
 	
 	ctr = Hat_PlayerController(GetALocalPlayerController());
 	save = `SaveManager.GetCurrentSaveData();
-
+	
 	// If we load a new save file with at least 1 time piece, the game will force the umbrella into our inventory.
 	for (i = 0; i < save.MyBackpack2017.Weapons.Length; i++)
 	{
@@ -1234,10 +1244,10 @@ function DisableAlpineFinale()
 
 function OnTimePieceCollected(string Identifier)
 {
-	local int i, id, basement;
+	local int i, id;
 	local Hat_ChapterActInfo currentAct;
 	local string hourglass;
-	local bool actless;
+	local bool actless, basement;
 	
 	if (!IsArchipelagoEnabled() || IsItemTimePiece)
 		return;
@@ -1273,12 +1283,13 @@ function OnTimePieceCollected(string Identifier)
 		else
 		{
 			// We entered this act from a different act, set the original act's Time Piece instead
-			currentAct = GetActualCurrentAct(basement);
+			currentAct = GetChapterActInfoFromHourglass(Identifier);
+			basement = (Identifier ~= "chapter3_secret_finale");
 			
 			for (i = 0; i < SlotData.ShuffledActList.Length; i++)
 			{
-				if (basement == 0 && SlotData.ShuffledActList[i].NewAct == currentAct 
-				|| basement > 0 && SlotData.ShuffledActList[i].IsDeadBirdBasementShuffledAct)
+				if (!basement && SlotData.ShuffledActList[i].NewAct == currentAct 
+				|| basement && SlotData.ShuffledActList[i].IsDeadBirdBasementShuffledAct)
 				{
 					if (SlotData.ShuffledActList[i].IsDeadBirdBasementOriginalAct)
 					{
@@ -1310,36 +1321,6 @@ function OnTimePieceCollected(string Identifier)
 	}
 	
 	SendLocationCheck(id);
-}
-
-// This is mainly because of Alpine Skyline's finale having an ActID of 1, which causes problems with time rifts -.-
-function Hat_ChapterActInfo GetActualCurrentAct(optional out int basement)
-{
-	local Hat_ChapterInfo chapter;
-	local Hat_ChapterActInfo act;
-	local string map;
-	
-	chapter = `GameManager.GetChapterInfo();
-	map = `GameManager.GetCurrentMapFilename();
-	chapter.ConditionalUpdateActList();
-	
-	if (InStr(map, "timerift_", false, true) == 0)
-	{
-		foreach chapter.ChapterActInfo(act)
-		{
-			DebugMessage(map $" " $act.MapName);
-			if (act.MapName ~= map)
-				return act;
-		}
-	}
-	
-	if (InStr(map, "DJGrooves_Boss", false, true) != -1 ||
-	map ~= "DeadBirdBasement")
-	{
-		basement = 1;
-	}
-	
-	return `GameManager.GetChapterActInfo();
 }
 
 function Hat_ChapterActInfo GetChapterActInfoFromHourglass(string hourglass)
@@ -1383,7 +1364,8 @@ function UpdateChapterInfo()
 	}
 	
 	UpdateActUnlocks();
-	if (IsInSpaceship())
+	if (IsInSpaceship() && !class'Hat_SeqCond_IsMuMission'.static.IsFinaleMuMission() 
+		&& !class'Hat_SaveBitHelper'.static.HasActBit("thefinale_ending", 1))
 	{
 		UpdatePowerPanels();
 		OpenBedroomDoor();
@@ -1657,7 +1639,6 @@ function ShuffleCollectibles(optional bool cache)
 	local LocationInfo locInfo;
 	local class<Object> shopItem;
 	local string mapName;
-	local bool forceSend;
 	
 	if (CollectiblesShuffled || IsInSpaceship())
 		return;
@@ -1684,7 +1665,6 @@ function ShuffleCollectibles(optional bool cache)
 				return;
 			
 			forceSendArray.AddItem(locId);
-			forceSend = true;
 		}
 		
 		locationArray.AddItem(locId);
@@ -1722,6 +1702,7 @@ function ShuffleCollectibles(optional bool cache)
 			if (a.Name == 'Hat_Goodie_Vault_1') // golden vault
 				continue;
 			
+			locId = ObjectToLocationId(a);
 			// Vaults don't appear in HUMT
 			if (IsMapScouted(mapName) && !IsLocationCached(locId))
 			{
@@ -1730,10 +1711,9 @@ function ShuffleCollectibles(optional bool cache)
 					return;
 				
 				forceSendArray.AddItem(locId);
-				forceSend = true;
 			}
-
-			locationArray.AddItem(ObjectToLocationId(a));
+			
+			locationArray.AddItem(locId);
 		}
 		else if (a.IsA('Hat_ImpactInteract_Breakable_ChemicalBadge'))
 		{
@@ -1769,7 +1749,6 @@ function ShuffleCollectibles(optional bool cache)
 				return;
 			
 			forceSendArray.AddItem(locId);
-			forceSend = true;
 		}
 		
 		BulliedNPCArray.AddItem(npc);
@@ -1792,14 +1771,15 @@ function ShuffleCollectibles(optional bool cache)
 		shopLocationArray.AddItem(class<Archipelago_ShopItem_Base>(shopItem).default.LocationID);
 	}
 	
-	if (locationArray.Length > 0 || shopLocationArray.Length > 0)
+	if (locationArray.Length > 0 || shopLocationArray.Length > 0 || forceSendArray.Length > 0)
 	{
 		if (!IsMapScouted(mapName))
 		{
 			for (i = 0; i < shopLocationArray.Length; i++)
 				locationArray.AddItem(shopLocationArray[i]);
 			
-			SendMultipleLocationChecks(locationArray, true);
+			if (locationArray.Length > 0)
+				SendMultipleLocationChecks(locationArray, true);
 		}
 		else
 		{
@@ -1826,7 +1806,7 @@ function ShuffleCollectibles(optional bool cache)
 			}
 		}
 		
-		if (forceSend)
+		if (forceSendArray.Length > 0)
 		{
 			SendMultipleLocationChecks(forceSendArray, true);
 		}
@@ -2317,29 +2297,40 @@ function OnLoadoutChanged(PlayerController controller, Object loadout, Object ba
 	}
 }
 
-function OnAbilityUsed(Pawn Player, Inventory Ability)
+function UpdateZiplineUnlocks()
 {
-	local Actor hookpoint;
-	if (!IsArchipelagoEnabled())
+	local Hat_SandTravelNode node;
+	
+	if (`GameManager.GetChapterInfo().ChapterID != 4)
 		return;
 	
-	if (SlotData.ShuffleZiplines && Hat_Ability_Hookshot(ability) != None)
+	foreach DynamicActors(class'Hat_SandTravelNode', node)
 	{
-		Hat_Ability_Hookshot(ability).UpdateTargetedSwingActor();
-		hookpoint = Hat_Ability_Hookshot(ability).TargetedSwingActor;
-		
-		if (hookpoint.IsA('Hat_HookPoint_Desert'))
+		if (node.Name == 'Hat_SandTravelNode_15' || node.Name == 'Hat_SandTravelNode_17'
+			|| node.Name == 'Hat_SandTravelNode_43' || node.Name == 'Hat_SandTravelNode_44')
 		{
-			if (hookpoint.Name == 'Hat_HookPoint_Desert_2' || hookpoint.Name == 'Hat_HookPoint_Desert_16'
-			|| hookpoint.Name == 'Hat_HookPoint_Desert_1' || hookpoint.Name == 'Hat_HookPoint_Desert_24')
+			if (node.HookPoint == None || node.BlockedInFinale && class'Hat_SeqCond_IsAlpineFinale'.static.IsAlpineFinale())
+				continue;
+			
+			if (node.ActivatorHorn == None || !node.ActivatorHorn.IsActivated)
+				continue;
+			
+			if (!HasAPBit("ZiplineUnlock_"$string(node.Name), 1))
 			{
-				if (!HasAPBit("ZiplineUnlock_"$string(hookpoint.Name), 1))
-				{
-					Hat_Ability_Hookshot(ability).DoDeactivate(false, true);
-					Hat_Ability(ability).Activated = false;
-					ScreenMessage("You don't have the unlock for this zipline");
-				}
+				node.HookPoint.Enabled = false;
+				node.BlockedMesh.SetHidden(false);
+				node.BlockedParticle.SetHidden(false);
+				node.BlockedParticle.SetActive(true);
 			}
+			else
+			{
+				node.HookPoint.Enabled = true;
+				node.BlockedMesh.SetHidden(true);
+				node.BlockedParticle.SetHidden(true);
+				node.BlockedParticle.SetActive(false);
+			}
+			
+			node.SetTickIsDisabled(false);
 		}
 	}
 }
@@ -2363,15 +2354,6 @@ function OnCollectibleSpawned(Object collectible)
 			// Rumbi yarn
 			Actor(collectible).Destroy();
 			SendLocationCheck(RumbiYarnCheck);
-		}
-		else if (collectible.IsA('Hat_Collectible_Decoration_BurgerTop'))
-		{
-			// Cooking Cat relic
-			Actor(collectible).ShutDown();
-			Hat_Collectible_Important(collectible).InventoryClass = None;
-			Hat_Collectible_Important(collectible).CollectSound = None;
-			Hat_Collectible_Important(collectible).SkipFirstTimeMessage = true;
-			SendLocationCheck(CookingCatRelicCheck);
 		}
 	}
 	else if (Hat_Collectible_Important(collectible) != None && Actor(collectible).CreationTime > 0)
@@ -2416,13 +2398,13 @@ function OnCollectibleSpawned(Object collectible)
 			if (collectible.IsA('Hat_Collectible_BadgePart_FoxMask'))
 			{
 				SendLocationCheck(SubconBushCheck1);
+				Actor(collectible).Destroy();
 			}
 			else if (collectible.IsA('Hat_Collectible_BadgePart_SuckInOrbs'))
 			{
 				SendLocationCheck(SubconBushCheck2);
+				Actor(collectible).Destroy();
 			}
-			
-			Actor(collectible).Destroy();
 		}
 		else if (collectible.IsA('Hat_Collectible_HatPart'))
 		{
@@ -2962,6 +2944,8 @@ function ItemSoundTimer()
 function SpawnDecorationStands()
 {
 	local Actor stand;
+	if (class'Hat_SeqCond_IsMuMission'.static.IsFinaleMuMission() || class'Hat_SaveBitHelper'.static.HasActBit("thefinale_ending", 1))
+		return;
 	
 	foreach DynamicActors(class'Actor', stand)
 	{

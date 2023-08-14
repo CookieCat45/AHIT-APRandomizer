@@ -312,16 +312,6 @@ def set_specific_rules(world: World):
         add_rule(mw.get_entrance("-> The Twilight Bell", p),
                  lambda state: can_use_hat(state, w, HatType.DWELLER))
 
-    # Cooking Cat requires the player to either have a full relic set, or have 1 relic missing from a set
-    # AND have the base piece
-    add_rule(mw.get_location("Spaceship - Cooking Cat", p),
-             lambda state: state.has("Relic (Burger Patty)", p)
-             or state.has("Relic (Mountain Set)", p)
-             or (state.count_group("UFO", p) >= 3 and state.has("Relic (UFO)", p))
-             or (state.count_group("Crayon", p) >= 3 and state.has("Relic (Crayon Box)", p))
-             or (state.count_group("Cake", p) >= 3 and state.has("Relic (Cake Stand)", p))
-             or (state.has("Relic (Necklace Bust)", p)))
-
     add_rule(mw.get_location("Mafia Town - Behind HQ Chest", p),
              lambda state: state.can_reach("Act Completion (Heating Up Mafia Town)", "Location", p)
              or state.can_reach("Down with the Mafia!", "Region", p)

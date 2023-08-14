@@ -319,17 +319,16 @@ defaultproperties
 	
 	DwellerMaskRequiredLocs[0] = 324767;
 	DwellerMaskRequiredLocs[1] = 324464;
-	//DwellerMaskRequiredLocs[2] = 324709;
-	DwellerMaskRequiredLocs[3] = 324855;
-	DwellerMaskRequiredLocs[4] = 325082;
-	DwellerMaskRequiredLocs[5] = 324463;
-	DwellerMaskRequiredLocs[6] = 324766;
-	DwellerMaskRequiredLocs[7] = 336497;
-	DwellerMaskRequiredLocs[8] = 336395;
-	DwellerMaskRequiredLocs[9] = 323734;
-	DwellerMaskRequiredLocs[10] = 334434;
-	DwellerMaskRequiredLocs[11] = 336478;
-	DwellerMaskRequiredLocs[12] = 335826;
+	DwellerMaskRequiredLocs[2] = 324855;
+	DwellerMaskRequiredLocs[3] = 325082;
+	DwellerMaskRequiredLocs[4] = 324463;
+	DwellerMaskRequiredLocs[5] = 324766;
+	DwellerMaskRequiredLocs[6] = 336497;
+	DwellerMaskRequiredLocs[7] = 336395;
+	DwellerMaskRequiredLocs[8] = 323734;
+	DwellerMaskRequiredLocs[9] = 334434;
+	DwellerMaskRequiredLocs[10] = 336478;
+	DwellerMaskRequiredLocs[11] = 335826;
 	
 	BrewingHatRequiredLocs[0] = 305701;
 	BrewingHatRequiredLocs[1] = 334758;

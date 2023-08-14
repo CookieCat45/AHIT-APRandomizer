@@ -17,8 +17,6 @@ var int Port;
 var int Seed;
 var int ShopItemRandStep;
 
-var array<string> PendingMessages;
-
 var bool ActRando;
 var bool ShuffleStorybookPages;
 var bool ShuffleActContracts;

@@ -110,6 +110,16 @@ exec function ap_complete_act(string id)
 	`AP.ScreenMessage("Completed act: " $id);
 }
 
+exec function ap_alpine_finale()
+{
+	if (!bool(`AP.DebugMode))
+		return;
+	
+	`AP.SetAPBits("AlpineFinale", 1);
+	`GameManager.LoadNewAct(4, 1);
+	ConsoleCommand("servertravel alpsandsails");
+}
+
 function Hat_PlayerController GetPlayerController()
 {
 	local Hat_PlayerController c;

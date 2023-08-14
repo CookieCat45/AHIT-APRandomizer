@@ -63,8 +63,8 @@ def is_location_valid(world: World, location: str) -> bool:
 
 
 ahit_locations = {
-    "Spaceship - Rumbi": LocData(301000, "Spaceship", required_tps=4, dweller_bell=1),  # same hit requirements, yes
-    "Spaceship - Cooking Cat": LocData(301001, "Spaceship", required_tps=5),
+    "Spaceship - Rumbi": LocData(301000, "Spaceship", required_tps=4, dweller_bell=1),
+    # "Spaceship - Cooking Cat": LocData(301001, "Spaceship", required_tps=5),
 
     # 300000 range - Mafia Town/Batle of the Birds
     "Welcome to Mafia Town - Umbrella": LocData(301002, "Welcome to Mafia Town"),
@@ -73,7 +73,7 @@ ahit_locations = {
     "Mafia Town - Blue Vault": LocData(302850, "Mafia Town Area"),
     "Mafia Town - Green Vault": LocData(302851, "Mafia Town Area"),
     "Mafia Town - Red Vault": LocData(302848, "Mafia Town Area"),
-    "Mafia Town - Blue Vault Brewing Crate": LocData(305572, "Mafia Town Area",required_hats=[HatType.BREWING]),
+    "Mafia Town - Blue Vault Brewing Crate": LocData(305572, "Mafia Town Area", required_hats=[HatType.BREWING]),
     "Mafia Town - Plaza Under Boxes": LocData(304458, "Mafia Town Area"),
     "Mafia Town - Small Boat": LocData(304460, "Mafia Town Area"),
     "Mafia Town - Staircase Pon Cluster": LocData(304611, "Mafia Town Area"),
