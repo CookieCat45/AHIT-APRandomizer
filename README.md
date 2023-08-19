@@ -1,6 +1,5 @@
 # AHIT-APRandomizer
-AHIT Archipelago implementation. Currently only works on DLC 2.2.
-Currently, no DLC content is shuffled. Only the base game chapters (1-5) work.
+AHIT Archipelago implementation. Currently only intended to work on DLC 2.2.
 
 # How to install
 You will need the Steam release of A Hat in Time.
