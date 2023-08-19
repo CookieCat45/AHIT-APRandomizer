@@ -25,10 +25,11 @@ def get_total_locations(world: World) -> int:
     total: int = 0
 
     for (name) in location_table.keys():
-        if not is_location_valid(world, name):
-            continue
+        if is_location_valid(world, name):
+            total += 1
 
-        total += 1
+    if world.multiworld.EnableDLC1[world.player].value > 0 and world.multiworld.Tasksanity[world.player].value > 0:
+        total += world.multiworld.TasksanityCheckCount[world.player].value
 
     return total
 
@@ -63,7 +64,7 @@ def is_location_valid(world: World, location: str) -> bool:
 
 
 ahit_locations = {
-    "Spaceship - Rumbi": LocData(301000, "Spaceship", required_tps=4, dweller_bell=1),
+    "Spaceship - Rumbi Abuse": LocData(301000, "Spaceship", required_tps=4, dweller_bell=1),
     # "Spaceship - Cooking Cat": LocData(301001, "Spaceship", required_tps=5),
 
     # 300000 range - Mafia Town/Batle of the Birds
@@ -153,7 +154,7 @@ ahit_locations = {
     "Subcon Village - Ice Cube House": LocData(325469, "Subcon Forest Area"),
     "Subcon Village - Snatcher Statue Chest": LocData(323730, "Subcon Forest Area"),
     "Subcon Village - Stump Platform Chest": LocData(323729, "Subcon Forest Area"),
-    "Subcon Forest - Giant Mushroom Climb": LocData(325470, "Subcon Forest Area"),
+    "Subcon Forest - Giant Tree Climb": LocData(325470, "Subcon Forest Area"),
     "Subcon Forest - Swamp Gravestone": LocData(326296, "Subcon Forest Area", required_hats=[HatType.BREWING]),
     "Subcon Forest - Swamp Near Well": LocData(324762, "Subcon Forest Area"),
     "Subcon Forest - Swamp Tree A": LocData(324763, "Subcon Forest Area"),
@@ -397,6 +398,54 @@ zipline_unlocks = {
     "Alpine Skyline - The Twilight Path":   "Zipline Unlock - The Twilight Bell Path",
 }
 
+# How many progressive paintings are required for each location
+painting_reqs = {
+    "Subcon Forest - Swamp Gravestone": 1,
+    "Subcon Forest - Swamp Near Well": 1,
+    "Subcon Forest - Swamp Tree A": 1,
+    "Subcon Forest - Swamp Tree B": 1,
+    "Subcon Forest - Swamp Ice Wall": 1,
+    "Subcon Forest - Swamp Treehouse": 1,
+    "Subcon Forest - Swamp Tree Chest": 1,
+    "Subcon Forest - Manor Rooftop": 1,
+    "Subcon Forest - Ice Cube Shack": 1,
+    "Subcon Village - Snatcher Statue Chest": 1,
+    "Subcon Well - Hookshot Badge Chest": 1,
+    "Subcon Well - Above Chest": 1,
+    "Subcon Well - On Pipe": 1,
+    "Subcon Well - Mushroom": 1,
+    "Queen Vanessa's Manor - Cellar": 1,
+    "Queen Vanessa's Manor - Bedroom Chest": 1,
+    "Queen Vanessa's Manor - Hall Chest": 1,
+    "Queen Vanessa's Manor - Chandelier": 1,
+    "Act Completion (Contractual Obligations)": 1,
+    "Act Completion (The Subcon Well)": 1,
+    "Act Completion (Toilet of Doom)": 1,
+    "Act Completion (Queen Vanessa's Manor)": 1,
+
+    "Subcon Forest - Burning House": 2,
+    "Subcon Forest - Burning Tree Climb": 2,
+    "Subcon Forest - Burning Stump Chest": 2,
+    "Subcon Forest - Burning Forest Treehouse": 2,
+    "Subcon Forest - Spider Bone Cage A": 2,
+    "Subcon Forest - Spider Bone Cage B": 2,
+    "Subcon Forest - Triple Spider Bounce": 2,
+    "Subcon Forest - Noose Treehouse": 2,
+    "Subcon Forest - Infinite Yarn Bush": 2,
+    "Subcon Forest - Long Tree Climb Chest": 2,
+
+    "Subcon Forest - Dweller Stump": 3,
+    "Subcon Forest - Dweller Floating Rocks": 3,
+    "Subcon Forest - Dweller Platforming Tree A": 3,
+    "Subcon Forest - Dweller Platforming Tree B": 3,
+    "Subcon Forest - Giant Time Piece": 3,
+    "Subcon Forest - Gallows": 3,
+    "Subcon Forest - Green and Purple Dweller Rocks": 3,
+    "Subcon Forest - Dweller Shack": 3,
+    "Subcon Forest - Tall Tree Hookshot Swing": 3,
+    "Subcon Forest - Magnet Badge Bush": 3,
+}
+
 
 # Locations in Alpine that are available in The Illness has Spread
 # Goat Village locations don't need to be put here
@@ -421,5 +470,3 @@ location_table = {
     **contract_locations,
     **shop_locations,
 }
-
-lookup_id_to_name: Dict[int, str] = {data.id: name for name, data in location_table.items() if data.id}

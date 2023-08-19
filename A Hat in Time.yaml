@@ -150,9 +150,14 @@ A Hat in Time:
     false: 0
     true: 50
 
+  ShuffleSubconPaintings:
+    # If enabled, shuffle items into the pool that unlock Subcon Forest fire spirit paintings.
+    # These items are progressive, with the order of Village-Swamp-Courtyard.
+    false: 50
+    true: 0
+
   StartingChapter:
     # Determines which chapter you will be guaranteed to be able to enter at the beginning of the game.
-    # Please note that in act randomizer, only 1 and 2 are allowed.
     1: 50
     2: 0
     3: 0
@@ -173,6 +178,33 @@ A Hat in Time:
     # DO NOT ENABLE THIS OPTION IF YOU DO NOT HAVE THE DLC INSTALLED!!!
     false: 50
     true: 0
+
+  Tasksanity:
+    # If enabled, Ship Shape tasks will become checks. Requires DLC1 content to be enabled.
+    false: 50
+    true: 0
+
+  TasksanityTaskStep:
+    # How many tasks the player must complete in Tasksanity to send a check.
+    #
+    # You can define additional values between the minimum and maximum values.
+    # Minimum value is 1
+    # Maximum value is 3
+    1: 50
+    random: 0
+    random-low: 0
+    random-high: 0
+
+  TasksanityCheckCount:
+    # How many Tasksanity checks there will be in total.
+    #
+    # You can define additional values between the minimum and maximum values.
+    # Minimum value is 5
+    # Maximum value is 30
+    18: 50
+    random: 0
+    random-low: 0
+    random-high: 0
 
   EnableDeathWish:
     # NOT IMPLEMENTED Shuffle Death Wish contracts into the game.
@@ -205,7 +237,7 @@ A Hat in Time:
     #
     # You can define additional values between the minimum and maximum values.
     # Minimum value is 15
-    # Maximum value is 35
+    # Maximum value is 50
     25: 50
     random: 0
     random-low: 0
@@ -234,7 +266,7 @@ A Hat in Time:
     random-high: 0
 
   MaxExtraTimePieces:
-    # Maximum amount of extra Time Pieces that will be factored in chapter costs and the item pool from the DLCs.
+    # Maximum amount of extra Time Pieces from the DLCs.
     # Arctic Cruise will add up to 6. Nyakuza Metro will add up to 10. The absolute maximum is 56.
     #
     # You can define additional values between the minimum and maximum values.
@@ -250,8 +282,8 @@ A Hat in Time:
     #
     # You can define additional values between the minimum and maximum values.
     # Minimum value is 0
-    # Maximum value is 40
-    25: 50
+    # Maximum value is 50
+    30: 50
     random: 0
     random-low: 0
     random-high: 0
@@ -261,7 +293,7 @@ A Hat in Time:
     #
     # You can define additional values between the minimum and maximum values.
     # Minimum value is 0
-    # Maximum value is 40
+    # Maximum value is 50
     35: 50
     random: 0
     random-low: 0

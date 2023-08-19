@@ -81,9 +81,15 @@ class ShuffleActContracts(Toggle):
     default = 1
 
 
+class ShuffleSubconPaintings(Toggle):
+    """If enabled, shuffle items into the pool that unlock Subcon Forest fire spirit paintings.
+    These items are progressive, with the order of Village-Swamp-Courtyard."""
+    display_name = "Shuffle Subcon Paintings"
+    default = 0
+
+
 class StartingChapter(Choice):
-    """Determines which chapter you will be guaranteed to be able to enter at the beginning of the game.
-    Please note that in act randomizer, only 1 and 2 are allowed."""
+    """Determines which chapter you will be guaranteed to be able to enter at the beginning of the game."""
     display_name = "Starting Chapter"
     option_1 = 1
     option_2 = 2
@@ -109,6 +115,28 @@ class EnableDLC1(Toggle):
     """Shuffle content from The Arctic Cruise (Chapter 6) into the game. This also includes the Tour time rift.
     DO NOT ENABLE THIS OPTION IF YOU DO NOT HAVE THE DLC INSTALLED!!!"""
     display_name = "Shuffle Chapter 6"
+
+
+class Tasksanity(Toggle):
+    """If enabled, Ship Shape tasks will become checks. Requires DLC1 content to be enabled."""
+    display_name = "Tasksanity"
+    default = 0
+
+
+class TasksanityTaskStep(Range):
+    """How many tasks the player must complete in Tasksanity to send a check."""
+    display_name = "Tasksanity Task Step"
+    range_start = 1
+    range_end = 3
+    default = 1
+
+
+class TasksanityCheckCount(Range):
+    """How many Tasksanity checks there will be in total."""
+    display_name = "Tasksanity Check Count"
+    range_start = 5
+    range_end = 30
+    default = 18
 
 
 class EnableDLC2(Toggle):
@@ -147,7 +175,7 @@ class HighestChapterCost(Range):
     Chapter costs will, progressively, be calculated based on this value (except for Chapter 5)."""
     display_name = "Highest Possible Chapter Cost"
     range_start = 15
-    range_end = 35
+    range_end = 50
     default = 25
 
 
@@ -155,20 +183,20 @@ class Chapter5MinCost(Range):
     """Minimum Time Pieces required to enter Chapter 5 (Time's End). This is your goal."""
     display_name = "Chapter 5 Minimum Time Piece Cost"
     range_start = 0
-    range_end = 40
-    default = 25
+    range_end = 50
+    default = 30
 
 
 class Chapter5MaxCost(Range):
     """Maximum Time Pieces required to enter Chapter 5 (Time's End). This is your goal."""
     display_name = "Chapter 5 Maximum Time Piece Cost"
     range_start = 0
-    range_end = 40
+    range_end = 50
     default = 35
 
 
 class MaxExtraTimePieces(Range):
-    """Maximum amount of extra Time Pieces that will be factored in chapter costs and the item pool from the DLCs.
+    """Maximum amount of extra Time Pieces from the DLCs.
     Arctic Cruise will add up to 6. Nyakuza Metro will add up to 10. The absolute maximum is 56."""
     display_name = "Max Extra Time Piece Cost"
     range_start = 0
@@ -294,11 +322,16 @@ ahit_options: typing.Dict[str, type(Option)] = {
     "CompassBadgeMode":         CompassBadgeMode,
     "ShuffleStorybookPages":    ShuffleStorybookPages,
     "ShuffleActContracts":      ShuffleActContracts,
+    "ShuffleSubconPaintings":   ShuffleSubconPaintings,
     "StartingChapter":          StartingChapter,
     "SDJLogic":                 SDJLogic,
     "CTRWithSprint":            CTRWithSprint,
 
     "EnableDLC1":               EnableDLC1,
+    "Tasksanity":               Tasksanity,
+    "TasksanityTaskStep":       TasksanityTaskStep,
+    "TasksanityCheckCount":     TasksanityCheckCount,
+
     "EnableDeathWish":          EnableDeathWish,
     "EnableDLC2":               EnableDLC2,
 
@@ -330,42 +363,25 @@ slot_data_options: typing.Dict[str, type(Option)] = {
 
     "ActRandomizer": ActRandomizer,
     "ShuffleAlpineZiplines": ShuffleAlpineZiplines,
-    # "VanillaAlpine": VanillaAlpine,
     "LogicDifficulty": LogicDifficulty,
     "RandomizeHatOrder": RandomizeHatOrder,
     "UmbrellaLogic": UmbrellaLogic,
-    # "StartWithCompassBadge": StartWithCompassBadge,
     "CompassBadgeMode": CompassBadgeMode,
     "ShuffleStorybookPages": ShuffleStorybookPages,
     "ShuffleActContracts": ShuffleActContracts,
-    # "StartingChapter": StartingChapter,
+    "ShuffleSubconPaintings":   ShuffleSubconPaintings,
     "SDJLogic": SDJLogic,
-    # "CTRWithSprint": CTRWithSprint,
 
     "EnableDLC1": EnableDLC1,
+    "Tasksanity": Tasksanity,
+    "TasksanityTaskStep": TasksanityTaskStep,
+    "TasksanityCheckCount": TasksanityCheckCount,
+
     "EnableDeathWish": EnableDeathWish,
     "EnableDLC2": EnableDLC2,
 
-    # "LowestChapterCost": LowestChapterCost,
-    # "HighestChapterCost": HighestChapterCost,
-    # "ChapterCostIncrement": ChapterCostIncrement,
-    # "ChapterCostMinDifference": ChapterCostMinDifference,
-    # "MaxExtraTimePieces": MaxExtraTimePieces,
-
-    # "Chapter5MinCost": Chapter5MinCost,
-    # "Chapter5MaxCost": Chapter5MaxCost,
-
-    # "YarnCostMin": YarnCostMin,
-    # "YarnCostMax": YarnCostMax,
-    # "YarnAvailable": YarnAvailable,
-
     "MinPonCost": MinPonCost,
     "MaxPonCost": MaxPonCost,
-
-    # "TrapChance": TrapChance,
-    # "BabyTrapWeight": BabyTrapWeight,
-    # "LaserTrapWeight": LaserTrapWeight,
-    # "ParadeTrapWeight": ParadeTrapWeight,
 
     "death_link": DeathLink,
 }

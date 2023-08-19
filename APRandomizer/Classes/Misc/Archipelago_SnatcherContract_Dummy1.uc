@@ -1,0 +1,1 @@
+class Archipelago_SnatcherContract_Dummy1 extends Hat_SnatcherContract_Act;

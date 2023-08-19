@@ -1,7 +1,7 @@
 from BaseClasses import Item, ItemClassification, Region, LocationProgressType
 
-from .Items import HatInTimeItem, item_table, time_pieces, item_frequencies, item_dlc_enabled, junk_weights,\
-    create_item, create_multiple_items, create_junk_items, relic_groups, act_contracts, alps_hooks
+from .Items import HatInTimeItem, item_table, item_frequencies, item_dlc_enabled, junk_weights,\
+    create_item, create_multiple_items, create_junk_items, relic_groups, act_contracts, alps_hooks, get_total_time_pieces
 
 from .Regions import create_region, create_regions, connect_regions, randomize_act_entrances, chapter_act_info, \
     create_events, chapter_regions, act_chapters
@@ -32,22 +32,40 @@ class HatInTimeWorld(World):
     hat_yarn_costs: typing.Dict[HatType, int]
     chapter_timepiece_costs: typing.Dict[ChapterIndex, int]
     act_connections: typing.Dict[str, str] = {}
-
     item_name_groups = relic_groups
-    item_name_groups["Time Pieces"] = set({})
-    for name in time_pieces.keys():
-        item_name_groups["Time Pieces"].add(name)
 
     def generate_early(self):
-        # If our starting chapter is 4, force hookshot into inventory.
-        # Starting chapter 3/4 is banned in act rando, because they don't have enough starting acts
+        # Fix options
+        self.multiworld.HighestChapterCost[self.player].value = max(self.multiworld.HighestChapterCost[self.player].value,
+                                                                    self.multiworld.LowestChapterCost[self.player].value)
+
+        self.multiworld.LowestChapterCost[self.player].value = min(self.multiworld.LowestChapterCost[self.player].value,
+                                                                   self.multiworld.HighestChapterCost[self.player].value)
+
+        self.multiworld.Chapter5MinCost[self.player].value = min(self.multiworld.Chapter5MinCost[self.player].value,
+                                                                 self.multiworld.Chapter5MaxCost[self.player].value)
+
+        self.multiworld.Chapter5MaxCost[self.player].value = max(self.multiworld.Chapter5MaxCost[self.player].value,
+                                                                 self.multiworld.Chapter5MinCost[self.player].value)
+
+        total_tps: int = get_total_time_pieces(self)
+        if self.multiworld.HighestChapterCost[self.player].value > total_tps-5:
+            self.multiworld.HighestChapterCost[self.player].value = min(40, total_tps-5)
+
+        if self.multiworld.Chapter5MaxCost[self.player].value > total_tps:
+            self.multiworld.Chapter5MaxCost[self.player].value = min(50, total_tps)
+
+        # If our starting chapter is 4 and act rando isn't on, force hookshot into inventory
+        # If starting chapter is 3 and painting shuffle is enabled, and act rando isn't, give one free painting unlock
         start_chapter: int = self.multiworld.StartingChapter[self.player].value
+
         if start_chapter == 4 or start_chapter == 3:
             if self.multiworld.ActRandomizer[self.player].value == 0:
                 if start_chapter == 4:
                     self.multiworld.push_precollected(self.create_item("Hookshot Badge"))
-            else:
-                self.multiworld.StartingChapter[self.player].value = self.multiworld.random.randint(1, 2)
+
+                if start_chapter == 3 and self.multiworld.ShuffleSubconPaintings[self.player].value > 0:
+                    self.multiworld.push_precollected(self.create_item("Progressive Painting Unlock"))
 
         if self.multiworld.StartWithCompassBadge[self.player].value > 0:
             self.multiworld.push_precollected(self.create_item("Compass Badge"))
@@ -72,18 +90,22 @@ class HatInTimeWorld(World):
         self.hat_craft_order = [HatType.SPRINT, HatType.BREWING, HatType.ICE,
                                 HatType.DWELLER, HatType.TIME_STOP]
 
+        self.topology_present = self.multiworld.ActRandomizer[self.player].value
+
         # Item Pool
         itempool: typing.List[Item] = []
         self.calculate_yarn_costs()
-
-        self.topology_present = self.multiworld.ActRandomizer[self.player].value
         yarn_pool: typing.List[Item] = create_multiple_items(self, "Yarn", self.multiworld.YarnAvailable[self.player].value)
+
+        # 1/5 is progression balanced
+        for i in range(len(yarn_pool) // 5):
+            yarn_pool[i].classification = ItemClassification.progression
+
         itempool += yarn_pool
 
         if self.multiworld.RandomizeHatOrder[self.player].value > 0:
             self.multiworld.random.shuffle(self.hat_craft_order)
 
-        tp_count: int = 0
         for name in item_table.keys():
             if name == "Yarn":
                 continue
@@ -101,10 +123,25 @@ class HatInTimeWorld(World):
             if name in alps_hooks.keys() and self.multiworld.ShuffleAlpineZiplines[self.player].value == 0:
                 continue
 
-            if name in time_pieces.keys():
-                tp_count += 1
-                if tp_count > 40 + self.multiworld.MaxExtraTimePieces[self.player].value:
-                    continue
+            if name == "Progressive Painting Unlock" \
+               and self.multiworld.ShuffleSubconPaintings[self.player].value == 0:
+                continue
+
+            if name == "Time Piece":
+                tp_count: int = 40
+                max_extra: int = 0
+                if self.multiworld.EnableDLC1[self.player].value > 0:
+                    max_extra += 6
+
+                tp_count += min(max_extra, self.multiworld.MaxExtraTimePieces[self.player].value)
+                tp_list: typing.List[Item] = create_multiple_items(self, name, tp_count)
+
+                # 1/5 is progression balanced
+                for i in range(len(tp_list) // 5):
+                    tp_list[i].classification = ItemClassification.progression
+
+                itempool += tp_list
+                continue
 
             itempool += create_multiple_items(self, name, item_frequencies.get(name, 1))
 

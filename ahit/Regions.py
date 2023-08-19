@@ -122,7 +122,7 @@ rift_access_regions = {
 
     "Time Rift - The Owl Express":      ["Murder on the Owl Express"],
     "Time Rift - The Moon":             ["Picture Perfect", "The Big Parade"],
-    "Time Rift - Dead Bird Studio":     ["Dead Bird Studio"],
+    "Time Rift - Dead Bird Studio":     ["Dead Bird Studio", "Dead Bird Studio Basement"],
 
     "Time Rift - Pipe":          ["Contractual Obligations", "The Subcon Well",
                                   "Toilet of Doom", "Queen Vanessa's Manor",
@@ -208,8 +208,8 @@ guaranteed_first_acts = [
     "Heating Up Mafia Town",  # Removed in umbrella logic
     "The Golden Vault",
 
-    "Contractual Obligations",
-    "Queen Vanessa's Manor",  # Removed in umbrella logic
+    "Contractual Obligations",  # Removed in painting logic
+    "Queen Vanessa's Manor",  # Removed in umbrella/painting logic
 ]
 
 purple_time_rifts = [
@@ -349,6 +349,9 @@ def create_regions(world: World):
         create_rift_connections(w, create_region(w, "Time Rift - Deep Sea"))
         create_rift_connections(w, create_region(w, "Time Rift - Tour"))
 
+        if mw.Tasksanity[p].value > 0:
+            create_tasksanity_locations(w)
+
         # force recache
         mw.get_region("Time Rift - Deep Sea", p)
 
@@ -365,6 +368,15 @@ def create_rift_connections(world: World, region: Region):
         entrance_name = "{name} Portal - Entrance {num}"
         connect_regions(act_region, region, entrance_name.format(name=region.name, num=i), world.player)
         i += 1
+
+
+def create_tasksanity_locations(world: World):
+    ship_shape: Region = world.multiworld.get_region("Ship Shape", world.player)
+    id_start: int = 300204
+    for i in range(world.multiworld.TasksanityCheckCount[world.player].value):
+        location = HatInTimeLocation(world.player, format("Tasksanity Check %i" % (i+1)), id_start+i, ship_shape)
+        ship_shape.locations.append(location)
+        world.location_name_to_id.setdefault(location.name, location.address)
 
 
 def randomize_act_entrances(world: World):
@@ -402,7 +414,8 @@ def randomize_act_entrances(world: World):
             if act_chapters[region.name] != first_chapter.name:
                 continue
 
-            if region.name not in act_entrances.keys() or "Act 1" not in act_entrances[region.name]:
+            if region.name not in act_entrances.keys() or "Act 1" not in act_entrances[region.name] \
+               and "Free Roam" not in act_entrances[region.name]:
                 continue
 
             i = 0
@@ -424,9 +437,17 @@ def randomize_act_entrances(world: World):
 
             # We're mapping something to the first act, make sure it is valid
             if not has_guaranteed:
-                if candidate.name not in guaranteed_first_acts \
-                  or world.multiworld.UmbrellaLogic[world.player].value > 0 \
+                if candidate.name not in guaranteed_first_acts:
+                    continue
+
+                # Not completable without Umbrella
+                if world.multiworld.UmbrellaLogic[world.player].value > 0 \
                    and (candidate.name == "Heating Up Mafia Town" or candidate.name == "Queen Vanessa's Manor"):
+                    continue
+
+                # Subcon sphere 1 is too small without painting unlocks, and no acts are completable either
+                if world.multiworld.ShuffleSubconPaintings[world.player].value > 0 \
+                   and "Subcon Forest" in act_entrances[candidate.name]:
                     continue
 
                 candidate_list.append(candidate)

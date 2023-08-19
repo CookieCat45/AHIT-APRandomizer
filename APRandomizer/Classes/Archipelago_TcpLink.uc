@@ -570,104 +570,141 @@ function OnLocationInfoCommand(string json)
 					jsonChild.GetIntValue("item"),
 					jsonChild.GetIntValue("flags"));
 			}
+			
+			continue;
 		}
-		else
-		{
-			isItem = false;
-			
-			foreach DynamicActors(class'Hat_Collectible_Important', collectible)
-			{
-				if (collectible.IsA('Hat_Collectible_VaultCode_Base') || collectible.IsA('Hat_Collectible_InstantCamera'))
-					continue;
-				
-				locId = m.ObjectToLocationId(collectible);
-				if (m.IsLocationCached(locId))
-					continue;
 
-				if (locId == jsonChild.GetIntValue("location"))
-				{
-					m.DebugMessage("Replacing item: "$collectible $", Location ID: "$locId);
-					
-					m.CreateItem(locId, 
-						jsonChild.GetIntValue("item"),
-						jsonChild.GetIntValue("flags"),
-						jsonChild.GetIntValue("player"),
-						collectible);
-					
-					isItem = true;
-					collectible.Destroy();
-					break;
-				}
-			}
-			
-			locId = jsonChild.GetIntValue("location");
-			if (!isItem && m.IsLocationIDContainer(locId, container))
-			{
-				itemId = jsonChild.GetIntValue("item");
-				flags = jsonChild.GetIntValue("flags");
-				
-				locInfo.ID = locId;
-				locInfo.ItemID = itemId;
-				locInfo.Player = jsonChild.GetIntValue("player");
-				locInfo.Flags = flags;
-				locInfo.MapName = mapName;
-				locInfo.ContainerClass = container.class;
-				
-				if (!class'Archipelago_ItemInfo'.static.GetNativeItemData(itemId, locInfo.ItemName, locInfo.ItemClass))
-				{
-					if (class'Archipelago_ItemInfo'.static.GetTimePieceFromItemID(itemId, , locInfo.ItemName) != "")
-					{
-						locInfo.itemClass = class'Archipelago_RandomizedItem_TimeObject';
-					}
-					else
-					{
-						switch (flags)
-						{
-							case ItemFlag_Important:
-								locInfo.ItemName = "AP Item - Important"; 
-								break;
-								
-							case ItemFlag_ImportantSkipBalancing:
-								locInfo.ItemName = "AP Item - Important"; 
-								break;
-							
-							case ItemFlag_Useful: 
-								locInfo.ItemName = "AP Item - Useful"; 
-								break;
-							
-							default: 
-								locInfo.ItemName = "AP Item"; 
-								break;
-						}
-					}
-				}
-				
-				m.SlotData.LocationInfoArray.AddItem(locInfo);
+		isItem = false;
+		
+		foreach DynamicActors(class'Hat_Collectible_Important', collectible)
+		{
+			if (collectible.IsA('Hat_Collectible_VaultCode_Base') || collectible.IsA('Hat_Collectible_InstantCamera'))
 				continue;
-			}
 			
-			if (locId == m.CameraBadgeCheck1 || locId == m.CameraBadgeCheck2)
+			locId = m.ObjectToLocationId(collectible);
+			if (m.IsLocationCached(locId))
+				continue;
+
+			if (locId == jsonChild.GetIntValue("location"))
 			{
-				item = m.CreateItem(locId, 
+				m.DebugMessage("Replacing item: "$collectible $", Location ID: "$locId);
+				
+				m.CreateItem(locId, 
 					jsonChild.GetIntValue("item"),
 					jsonChild.GetIntValue("flags"),
 					jsonChild.GetIntValue("player"),
-					,
-					locId == m.CameraBadgeCheck1 ? m.Camera1Loc : m.Camera2Loc);
+					collectible);
 				
-				if (item != None)
+				isItem = true;
+				collectible.Destroy();
+				break;
+			}
+		}
+		
+		if (isItem)
+			continue;
+		
+		locId = jsonChild.GetIntValue("location");
+		if (m.IsLocationIDContainer(locId, container))
+		{
+			itemId = jsonChild.GetIntValue("item");
+			flags = jsonChild.GetIntValue("flags");
+			
+			locInfo.ID = locId;
+			locInfo.ItemID = itemId;
+			locInfo.Player = jsonChild.GetIntValue("player");
+			locInfo.Flags = flags;
+			locInfo.MapName = mapName;
+			locInfo.ContainerClass = container.class;
+			locInfo.IsStatic = false;
+			
+			if (!class'Archipelago_ItemInfo'.static.GetNativeItemData(itemId, locInfo.ItemName, locInfo.ItemClass))
+			{
+				switch (flags)
 				{
-					item.Init();
+					case ItemFlag_Important:
+						locInfo.ItemName = "AP Item - Important"; 
+						break;
+						
+					case ItemFlag_ImportantSkipBalancing:
+						locInfo.ItemName = "AP Item - Important"; 
+						break;
+					
+					case ItemFlag_Useful: 
+						locInfo.ItemName = "AP Item - Useful"; 
+						break;
+					
+					default: 
+						locInfo.ItemName = "AP Item"; 
+						break;
 				}
 			}
+			
+			m.SlotData.LocationInfoArray.AddItem(locInfo);
+			continue;
+		}
+		
+		if (locId == m.CameraBadgeCheck1 || locId == m.CameraBadgeCheck2)
+		{
+			item = m.CreateItem(locId, 
+				jsonChild.GetIntValue("item"),
+				jsonChild.GetIntValue("flags"),
+				jsonChild.GetIntValue("player"),
+				,
+				locId == m.CameraBadgeCheck1 ? m.Camera1Loc : m.Camera2Loc);
+			
+			if (item != None)
+			{
+				item.Init();
+			}
+		}
+		else
+		{
+			// Time piece/page/etc
+			itemId = jsonChild.GetIntValue("item");
+			flags = jsonChild.GetIntValue("flags");
+			
+			locInfo.ID = locId;
+			locInfo.ItemID = itemId;
+			locInfo.Player = jsonChild.GetIntValue("player");
+			locInfo.Flags = flags;
+			locInfo.MapName = m.IsLocationIDPage(locId) ? mapName : "";
+			locInfo.ContainerClass = None;
+			locInfo.IsStatic = !m.IsLocationIDPage(locId);
+			
+			if (!class'Archipelago_ItemInfo'.static.GetNativeItemData(itemId, locInfo.ItemName, locInfo.ItemClass))
+			{
+				switch (flags)
+				{
+					case ItemFlag_Important:
+						locInfo.ItemName = "AP Item - Important"; 
+						break;
+						
+					case ItemFlag_ImportantSkipBalancing:
+						locInfo.ItemName = "AP Item - Important"; 
+						break;
+					
+					case ItemFlag_Useful: 
+						locInfo.ItemName = "AP Item - Useful"; 
+						break;
+					
+					default: 
+						locInfo.ItemName = "AP Item"; 
+						break;
+				}
+			}
+			
+			m.SlotData.LocationInfoArray.AddItem(locInfo);
 		}
 	}
 	
 	if (!m.IsMapScouted(mapName))
 	{
 		m.SetAPBits("MapScouted_"$Locs(mapName), 1);
-		m.SaveGame();
 	}
+	
+	m.SlotData.TimePiecesCached = true; // will always be done first time, so just always set to true after this point
+	m.SaveGame();
 	
 	jsonObj = None;
 	jsonChild = None;
@@ -675,8 +712,8 @@ function OnLocationInfoCommand(string json)
 
 function OnReceivedItemsCommand(string json, optional bool connection)
 {
-	local int count, index, total, i, id, isAct, start;
-	local string timePieceId, timePieceName, s;
+	local int count, index, total, i, start;
+	local string s;
 	local JsonObject jsonObj, jsonChild;
 	local bool b;
 	local Archipelago_GameMod m;
@@ -727,19 +764,7 @@ function OnReceivedItemsCommand(string json, optional bool connection)
 		jsonChild = jsonObj.GetObject("items_"$i);
 		if (jsonChild != None)
 		{
-			id = jsonChild.GetIntValue("item");
-			timePieceId = class'Archipelago_ItemInfo'.static.GetTimePieceFromItemID(id, isAct, timePieceName);
-
-			if (timePieceId != "") // Time Piece?
-			{
-				GrantTimePiece(timePieceId, bool(isAct), timePieceName, jsonChild.GetIntValue("player"));
-			}	
-			else
-			{
-				// regular item
-				GrantItem(id, jsonChild.GetIntValue("player"));
-			}
-				
+			GrantItem(jsonChild.GetIntValue("item"), jsonChild.GetIntValue("player"));
 			total++;
 		}
 	}
@@ -748,42 +773,6 @@ function OnReceivedItemsCommand(string json, optional bool connection)
 	jsonChild = None;
 	m.SetAPBits("LastItemIndex", index+total);
 	m.SaveGame();
-}
-
-function GrantTimePiece(string timePieceId, bool IsAct, string itemName, int playerId)
-{
-	local Archipelago_GameMod m;
-	local Archipelago_RandomizedItem_Base item;
-	local Pawn player;
-	
-	m = `AP;
-	player = GetALocalPlayerController().Pawn;
-	
-	item = Spawn(class'Archipelago_RandomizedItem_TimeObject', , , player.Location, , , true);
-	item.PickupActor = player;
-	item.OnCollected(player);
-	
-	if (playerId != m.SlotData.PlayerSlot)
-	{
-		m.ScreenMessage("Got " $itemName $" (from " $m.PlayerIdToName(playerId)$")", 'Warning');
-	}
-	else
-	{
-		m.ScreenMessage("Got " $itemName, 'Warning');
-	}
-	
-	// Tell AP to stop removing this Time Piece in OnTimePieceCollected()
-	m.SetAPBits(timePieceId, 1);
-	
-	m.IsItemTimePiece = true;
-	`SaveManager.GetCurrentSaveData().GiveTimePiece(timePieceId, IsAct);
-	m.IsItemTimePiece = false;
-	
-	if (m.IsInSpaceship() && m.SlotData.Initialized)
-	{
-		m.UpdateActUnlocks();
-		m.UpdatePowerPanels();
-	}
 }
 
 function GrantItem(int itemId, int playerId)
@@ -814,17 +803,27 @@ function GrantItem(int itemId, int playerId)
 			`AP.ScreenMessage("[GrantItem] Failed to create item class: " $worldClass);
 		}
 		
-		// Special items/traps
-		special = class'Archipelago_ItemInfo'.static.GetItemSpecialType(itemId);
-		if (special != SpecialType_None)
+		if (itemId == class'Archipelago_ItemInfo'.static.GetTimePieceItemID())
 		{
-			DoSpecialItemEffects(special);
+			GrantTimePiece(playerId);
+		}
+		else if (itemId == 300003) // Progressive painting
+		{
+			UnlockPaintings();
 		}
 		else
 		{
-			trap = class'Archipelago_ItemInfo'.static.GetItemTrapType(itemId);
-			if (trap != TrapType_None)
-				DoTrapItemEffects(trap);
+			special = class'Archipelago_ItemInfo'.static.GetItemSpecialType(itemId);
+			if (special != SpecialType_None)
+			{
+				DoSpecialItemEffects(special);
+			}
+			else
+			{
+				trap = class'Archipelago_ItemInfo'.static.GetItemTrapType(itemId);
+				if (trap != TrapType_None)
+					DoTrapItemEffects(trap);
+			}
 		}
 		
 		// We already show a different message for yarn
@@ -864,6 +863,22 @@ function GrantItem(int itemId, int playerId)
 	}
 }
 
+function GrantTimePiece(int playerId)
+{
+	local Archipelago_GameMod m;
+	local int tpCount;
+	
+	tpCount = `SaveManager.GetNumberOfTimePieces();
+	`SaveManager.GetCurrentSaveData().GiveTimePiece("ap_timepiece"$tpCount, false);
+	
+	m = `AP;
+	if (m.IsInSpaceship() && m.SlotData.Initialized)
+	{
+		m.UpdateActUnlocks();
+		m.UpdatePowerPanels();
+	}
+}
+
 function UnlockZipline(int id)
 {
 	local string zipline;
@@ -891,6 +906,58 @@ function UnlockZipline(int id)
 	}
 	
 	`AP.SetAPBits("ZiplineUnlock_"$zipline, 1);
+}
+
+function UnlockPaintings()
+{
+	local int count;
+	local Archipelago_GameMod m;
+	local Hat_SubconPainting painting;
+	m = `AP;
+	
+	count = m.GetAPBits("PaintingUnlock", 0) + 1;
+	m.SetAPBits("PaintingUnlock", count);
+	
+	switch (count)
+	{
+		// Village
+		case 1:
+			m.SlotData.UnlockedPaintings.AddItem('Hat_SubconPainting_Yellow_5');
+			m.SlotData.UnlockedPaintings.AddItem('Hat_SubconPainting_Yellow_6');
+			m.SlotData.UnlockedPaintings.AddItem('Hat_SubconPainting_Yellow_7');
+			m.SlotData.UnlockedPaintings.AddItem('Hat_SubconPainting_Yellow_8');
+			break;
+		
+		// Swamp
+		case 2:
+			m.SlotData.UnlockedPaintings.AddItem('Hat_SubconPainting_Blue_2');
+			m.SlotData.UnlockedPaintings.AddItem('Hat_SubconPainting_Blue_6');
+			break;
+		
+		// Courtyard
+		case 3:
+			m.SlotData.UnlockedPaintings.AddItem('Hat_SubconPainting_Green_0');
+			m.SlotData.UnlockedPaintings.AddItem('Hat_SubconPainting_Green_1');
+			m.SlotData.UnlockedPaintings.AddItem('Hat_SubconPainting_Green_2');
+			m.SlotData.UnlockedPaintings.AddItem('Hat_SubconPainting_Green_3');
+			m.SlotData.UnlockedPaintings.AddItem('Hat_SubconPainting_Green_4');
+			break;
+		
+		default:
+			break;
+	}
+	
+	if (`GameManager.GetCurrentMapFilename() ~= "subconforest")
+	{
+		foreach DynamicActors(class'Hat_SubconPainting', painting)
+		{
+			if (m.SlotData.UnlockedPaintings.Find(painting.Name) != -1)
+			{
+				painting.SetHidden(false);
+				painting.SetCollision(true, true);
+			}
+		}
+	}
 }
 
 function DoSpecialItemEffects(ESpecialItemType special)

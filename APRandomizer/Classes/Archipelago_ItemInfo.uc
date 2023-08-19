@@ -50,7 +50,16 @@ enum ETrapType
 	TrapType_Parade,
 };
 
+enum EZiplineType
+{
+	Zipline_Birdhouse,
+	Zipline_LavaCake,
+	Zipline_Windmill,
+	Zipline_Bell,
+};
+
 const YarnItem = 300001;
+const TimePieceItem = 300002;
 
 const Pons25Item = 300034;
 const Pons50Item = 300035;
@@ -65,6 +74,11 @@ const RandomCosmeticItem = 300044;
 static function int GetYarnItemID()
 {
 	return YarnItem;
+}
+
+static function int GetTimePieceItemID()
+{
+	return TimePieceItem;
 }
 
 static function ETrapType GetItemTrapType(int itemId)
@@ -123,6 +137,11 @@ optional out class<Actor> inventoryOverride) // Item inventory class override. M
 		case YarnItem:
 			itemName = "Yarn";
 			worldClass = class'Archipelago_RandomizedItem_Yarn';
+			return true;
+		
+		case TimePieceItem:
+			itemName = "Time Piece";
+			worldClass = class'Archipelago_RandomizedItem_TimeObject';
 			return true;
 		
 		
@@ -367,226 +386,15 @@ optional out class<Actor> inventoryOverride) // Item inventory class override. M
 			itemName = "Zipline Unlock (The Twilight Bell Path)";
 			worldClass = class'Archipelago_RandomizedItem_Misc';
 			return true;
-
+		
+		case 300003:
+			itemName = "Progressive Painting Unlock";
+			worldClass = class'Archipelago_RandomizedItem_Misc';
+			return true;
+		
 		default:
 			worldClass = class'Archipelago_RandomizedItem_Misc';
 			return false;
-	}
-}
-
-static function string GetTimePieceFromItemID(int id, optional out int IsAct, optional out string displayName)
-{
-	IsAct = 1;
-	
-	switch (id)
-	{
-		// -------------------------------------------------- MAFIA TOWN ------------------------------------------------------------- \\
-	
-		case 300048:
-			displayName = "Time Piece - Welcome to Mafia Town";
-			return "chapter1_tutorial";
-			
-		case 300049:
-			displayName = "Time Piece - Barrel Battle";
-			return "chapter1_barrelboss";
-			
-		case 300050:
-			displayName = "Time Piece - She Came from Outer Space";
-			return "chapter1_cannon_repair";
-			
-		case 300051:
-			displayName = "Time Piece - Down with the Mafia!";
-			return "chapter1_boss";
-			
-		case 300052:
-			displayName = "Time Piece - Cheating the Race";
-			return "harbor_impossible_race";
-			
-		case 300053:
-			displayName = "Time Piece - Heating Up Mafia Town";
-			return "mafiatown_lava";
-			
-		case 300054:
-			displayName = "Time Piece - The Golden Vault";
-			return "mafiatown_goldenvault";
-			
-		case 300055:
-			displayName = "Time Piece - Time Rift - Sewers";
-			IsAct = 0;
-			return "TimeRift_Water_Mafia_Easy";
-			
-		case 300056:
-			displayName = "Time Piece - Time Rift - Bazaar";
-			IsAct = 0;
-			return "TimeRift_Water_Mafia_Hard";
-			
-		case 300057:
-			displayName = "Time Piece - Time Rift - Mafia of Cooks";
-			IsAct = 0;
-			return "TimeRift_Cave_Mafia";
-			
-		// -------------------------------------------------- BATTLE OF THE BIRDS ----------------------------------------------------- \\
-			
-		case 300058:
-			displayName = "Time Piece - Dead Bird Studio";
-			return "DeadBirdStudio";
-			
-		case 300059:
-			displayName = "Time Piece - Murder on the Owl Express";
-			return "chapter3_murder";
-			
-		case 300060:
-			displayName = "Time Piece - Train Rush";
-			return "trainwreck_selfdestruct";
-			
-		case 300061:
-			displayName = "Time Piece - Picture Perfect";
-			return "moon_camerasnap";
-			
-		case 300062:
-			displayName = "Time Piece - The Big Parade";
-			return "moon_parade";
-			
-		case 300063:
-			displayName = "Time Piece - Award Ceremony";
-			return "award_ceremony";
-			
-		case 300064:
-			displayName = "Time Piece - Award Ceremony - Boss";
-			return "chapter3_secret_finale";
-			
-		case 300065:
-			displayName = "Time Piece - Time Rift - The Owl Express";
-			IsAct = 0;
-			return "TimeRift_Water_TWreck_Panels";
-			
-		case 300066:
-			displayName = "Time Piece - Time Rift - The Moon";
-			IsAct = 0;
-			return "TimeRift_Water_TWreck_Parade";
-			
-		case 300067:
-			displayName = "Time Piece - Time Rift - Dead Bird Studio";
-			IsAct = 0;
-			return "TimeRift_Cave_BirdBasement";
-			
-		// -------------------------------------------------- SUBCON FOREST ----------------------------------------------------- \\
-		case 300068:
-			displayName = "Time Piece - Contractual Obligations";
-			return "subcon_village_icewall";
-			
-		case 300069:
-			displayName = "Time Piece - The Subcon Well";
-			return "subcon_cave";
-			
-		case 300070:
-			displayName = "Time Piece - Toilet of Doom";
-			return "chapter2_toiletboss";
-			
-		case 300071:
-			displayName = "Time Piece - Queen Vanessa's Manor";
-			return "vanessa_manor_attic";
-			
-		case 300072:
-			displayName = "Time Piece - Mail Delivery Service";
-			return "subcon_maildelivery";
-			
-		case 300073:
-			displayName = "Time Piece - Your Contract Has Expired";
-			return "snatcher_boss";
-			
-		case 300074:
-			displayName = "Time Piece - Time Rift - Pipe";
-			IsAct = 0;
-			return "TimeRift_Water_Subcon_Hookshot";
-			
-		case 300075:
-			displayName = "Time Piece - Time Rift - Village";
-			IsAct = 0;
-			return "TimeRift_Water_Subcon_Dwellers";
-			
-		case 300076:
-			displayName = "Time Piece - Time Rift - Sleepy Subcon";
-			IsAct = 0;
-			return "TimeRift_Cave_Raccoon";
-			
-			
-		// -------------------------------------------------- ALPINE SKYLINE ----------------------------------------------------- \\
-		case 300077:
-			displayName = "Time Piece - The Birdhouse";
-			return "Alps_Birdhouse1";
-			
-		case 300078:
-			displayName = "Time Piece - The Lava Cake";
-			return "AlpineSkyline_WeddingCake";
-			
-		case 300079:
-			displayName = "Time Piece - The Twilight Bell";
-			return "Alpine_Twilight";
-			
-		case 300080:
-			displayName = "Time Piece - The Windmill";
-			return "AlpineSkyline_Windmill";
-			
-		case 300081:
-			displayName = "Time Piece - The Illness Has Spread";
-			return "AlpineSkyline_Finale1";
-			
-		case 300082:
-			displayName = "Time Piece - Time Rift - The Twilight Bell";
-			IsAct = 0;
-			return "TimeRift_Water_Alp_Goats";
-			
-		case 300083:
-			displayName = "Time Piece - Time Rift - Curly Tail Trail";
-			IsAct = 0;
-			return "TimeRift_Water_AlpineSkyline_Cats";
-			
-		case 300084:
-			displayName = "Time Piece - Time Rift - Alpine Skyline";
-			IsAct = 0;
-			return "TimeRift_Cave_Alps";
-			
-		case 300085:
-			displayName = "Time Piece - Time Rift - Gallery";
-			IsAct = 0;
-			return "Spaceship_WaterRift_Gallery";
-			
-		case 300086:
-			displayName = "Time Piece - Time Rift - The Lab";
-			IsAct = 0;
-			return "Spaceship_WaterRift_MailRoom";
-			
-		// Time's End
-		case 300087:
-			displayName = "Time Piece - The Finale";
-			return "TheFinale_FinalBoss";
-		
-		// -------------------------------------------------- ARCTIC CRUISE ----------------------------------------------------- \\
-		case 300088:
-			displayName = "Time Piece - Bon Voyage!";
-			return "Cruise_Boarding";
-		
-		case 300089:
-			displayName = "Time Piece - Ship Shape";
-			return "Cruise_Working";
-		
-		case 300090:
-			displayName = "Time Piece - Rock the Boat";
-			return "Cruise_Sinking";
-		
-		case 300091:
-			displayName = "Time Piece - Time Rift - Balcony";
-			IsAct = 0;
-			return "Cruise_WaterRift_Slide";
-		
-		case 300092:
-			displayName = "Time Piece - Time Rift - Deep Sea";
-			IsAct = 0;
-			return "Cruise_CaveRift_Aquarium";
-		
-		default:
-			return "";
 	}
 }
 

@@ -1,4 +1,5 @@
-class Archipelago_HUDElementItemFinder extends Hat_HUDElementRelicMap;
+class Archipelago_HUDElementItemFinder extends Hat_HUDElementRelicMap
+	dependson(Archipelago_ItemInfo);
 
 `include(APRandomizer\Classes\Globals.uci);
 
@@ -6,6 +7,17 @@ var array<int> HookshotRequiredLocs;
 var array<int> IceHatRequiredLocs;
 var array<int> DwellerMaskRequiredLocs;
 var array<int> BrewingHatRequiredLocs;
+
+// For zipline logic
+var array<int> BirdhousePathLocs;
+var array<int> LavaCakePathLocs;
+var array<int> WindmillPathLocs;
+var array<int> BellPathLocs;
+
+// Subcon painting logic
+var array<int> VillagePaintingLocs;
+var array<int> SwampPaintingLocs;
+var array<int> CourtyardPaintingLocs;
 
 function UpdateClosestMarker(HUD H)
 {
@@ -65,11 +77,14 @@ function UpdateClosestMarker(HUD H)
 		UpdateClosestMarker_Actor(H, chest, closest_distance, bestindx);
 	}
 	
-	// pages ignore onlyImportant, since they're the only items to collect in rifts
 	foreach H.PlayerOwner.DynamicActors(class'Hat_Collectible_StoryBookPage', page)
 	{
 		locId = m.ObjectToLocationId(page);
 		if (!CanReachLocation(locId)) continue;
+		
+		locInfo = m.GetLocationInfoFromID(locId);
+		if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
+		
 		UpdateClosestMarker_Actor(H, page, closest_distance, bestindx);
 	}
 	
@@ -179,7 +194,7 @@ function bool AreImportantItemsLeft(HUD H, optional bool traps=true)
 	
 	for (i = 0; i < locInfoArray.Length; i++)
 	{
-		if (locInfoArray[i].MapName ~= mapName && locInfoArray[i].Flags != ItemFlag_Garbage)
+		if (locInfoArray[i].MapName ~= mapName && locInfoArray[i].Flags != ItemFlag_Garbage && !locInfoArray[i].IsStatic)
 		{
 			if (!locInfoArray[i].Checked)
 				return true;
@@ -218,6 +233,11 @@ function bool UpdateClosestMarker_Actor(HUD H, Actor item, out float closest_dis
 
 function bool CanReachLocation(int id)
 {
+	local bool finale;
+	local int paintingUnlock;
+	local Archipelago_GameMod m;
+	m = `AP;
+
 	// Mafia Town secret cave item
 	if (id == 305220)
 	{
@@ -233,19 +253,69 @@ function bool CanReachLocation(int id)
 	// Subcon boss arena chest
 	if (id == 323735)
 	{
-		return `GameManager.IsCurrentAct(3) && class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Hookshot') || `GameManager.IsCurrentAct(6);
+		if (`GameManager.IsCurrentAct(3))
+		{
+			return class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Hookshot') 
+				&& (!m.SlotData.ShuffleSubconPaintings || m.GetPaintingUnlocks() >= 1);
+		}
+		
+		return `GameManager.IsCurrentAct(6);
+	}
+	
+	if (`GameManager.GetCurrentMapFilename() ~= "DeadBirdStudio")
+	{
+		if (`GameManager.IsCurrentAct(6) || !CanHitDwellerBells(false))
+		{
+			return id == 304874 || id == 305024 || id == 305248 || id == 305247;
+		}
+	}
+	else if (m.SlotData.ShuffleSubconPaintings && `GameManager.GetCurrentMapFilename() ~= "subconforest")
+	{
+		paintingUnlock = m.GetPaintingUnlocks();
+		
+		if (paintingUnlock < 1 && VillagePaintingLocs.Find(id) != -1)
+			return false;
+
+		if (paintingUnlock < 2 && SwampPaintingLocs.Find(id) != -1)
+			return false;
+		
+		if (paintingUnlock < 3 && CourtyardPaintingLocs.Find(id) != -1)
+			return false;
 	}
 	
 	// Manor rooftop item
-	if (id == 325466 && `AP.SlotData.UmbrellaLogic)
+	if (id == 325466)
 	{
 		return CanHitDwellerBells(true);
 	}
 	
 	if (`GameManager.IsCurrentChapter(4))
 	{
+		finale = class'Hat_SeqCond_IsAlpineFinale'.static.IsAlpineFinale();
+		
+		if (!class'Hat_SaveBitHelper'.static.HasLevelBit("Actless_FreeRoam_Intro_Complete", 1, "AlpsAndSails") && !finale)
+			return false;
+		
 		if (!class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Hookshot'))
 			return id == 334855 || id == 334856;
+		
+		if (BirdhousePathLocs.Find(id) != -1 && !m.HasZipline(Zipline_Birdhouse))
+			return false;
+		
+		if (LavaCakePathLocs.Find(id) != -1 && !m.HasZipline(Zipline_LavaCake))
+			return false;
+		
+		if (WindmillPathLocs.Find(id) != -1 && !m.HasZipline(Zipline_Windmill))
+			return false;
+		
+		if (BellPathLocs.Find(id) != -1 && !m.HasZipline(Zipline_Bell))
+			return false;
+		
+		if (finale)
+		{
+			return id == 333635 || id == 334855 || id == 334856 || id == 335911 
+			|| id == 335756 || id == 336311 || id == 334760 || id == 334776;
+		}
 	}
 	
 	// HUMT
@@ -273,6 +343,14 @@ function bool CanReachLocation(int id)
 		id == 305218; 
 	}
 	
+	if (id == 323734
+	|| id == 325082
+	|| id == 336497)
+	{
+		if (CanSDJ())
+			return true;
+	}
+	
 	if (HookshotRequiredLocs.Find(id) != -1 && !class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Hookshot'))
 		return false;
 	
@@ -290,9 +368,17 @@ function bool CanReachLocation(int id)
 
 function bool CanHitDwellerBells(optional bool MaskBypass)
 {
+	if (!`AP.SlotData.UmbrellaLogic)
+		return true;
+	
 	return class'Hat_Loadout'.static.BackpackHasInventory(class'Archipelago_Weapon_Umbrella', true)
 	|| class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Chemical')
 	|| MaskBypass && class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_FoxMask');
+}
+
+function bool CanSDJ()
+{
+	return class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Sprint') && `AP.SlotData.SDJLogic;
 }
 
 defaultproperties
@@ -338,4 +424,67 @@ defaultproperties
 	BrewingHatRequiredLocs[5] = 335885;
 	BrewingHatRequiredLocs[6] = 335886;
 	BrewingHatRequiredLocs[7] = 335492;
+	
+	BirdhousePathLocs[0] = 335911;
+	BirdhousePathLocs[1] = 335756;
+	BirdhousePathLocs[2] = 335561;
+	BirdhousePathLocs[3] = 334831;
+	BirdhousePathLocs[4] = 334758;
+	BirdhousePathLocs[5] = 336497;
+	BirdhousePathLocs[6] = 336496;
+	BirdhousePathLocs[7] = 335885;
+	BirdhousePathLocs[8] = 335886;
+	BirdhousePathLocs[9] = 335492;
+	
+	LavaCakePathLocs[0] = 337058;
+	LavaCakePathLocs[1] = 336052;
+	LavaCakePathLocs[2] = 335448;
+	LavaCakePathLocs[3] = 334291;
+	LavaCakePathLocs[4] = 335417;
+	LavaCakePathLocs[5] = 335418;
+	LavaCakePathLocs[6] = 336311;
+	
+	WindmillPathLocs[0] = 334760;
+	WindmillPathLocs[1] = 334776;
+	WindmillPathLocs[2] = 336395;
+	WindmillPathLocs[3] = 335783;
+	WindmillPathLocs[4] = 335815;
+	WindmillPathLocs[5] = 335389;
+	
+	BellPathLocs[0] = 334434;
+	BellPathLocs[1] = 336478;
+	BellPathLocs[2] = 335826;
+
+	VillagePaintingLocs[0] = 326296;
+	VillagePaintingLocs[1] = 324762;
+	VillagePaintingLocs[2] = 324763;
+	VillagePaintingLocs[3] = 324764;
+	VillagePaintingLocs[4] = 324706;
+	VillagePaintingLocs[5] = 325468;
+	VillagePaintingLocs[6] = 323728;
+	VillagePaintingLocs[7] = 323730;
+	VillagePaintingLocs[8] = 324465;
+	VillagePaintingLocs[9] = 325466;
+
+	SwampPaintingLocs[0] = 324710;
+	SwampPaintingLocs[1] = 325079;
+	SwampPaintingLocs[2] = 323731;
+	SwampPaintingLocs[3] = 325467;
+	SwampPaintingLocs[4] = 324462;
+	SwampPaintingLocs[5] = 325080;
+	SwampPaintingLocs[6] = 324765;
+	SwampPaintingLocs[7] = 324856;
+	SwampPaintingLocs[8] = 325478;
+	SwampPaintingLocs[9] = 323734;
+	
+	CourtyardPaintingLocs[0] = 325479;
+	CourtyardPaintingLocs[1] = 324767;
+	CourtyardPaintingLocs[2] = 324464;
+	CourtyardPaintingLocs[3] = 324709;
+	CourtyardPaintingLocs[4] = 324855;
+	CourtyardPaintingLocs[5] = 325473;
+	CourtyardPaintingLocs[6] = 325472;
+	CourtyardPaintingLocs[7] = 325082;
+	CourtyardPaintingLocs[8] = 324463;
+	CourtyardPaintingLocs[9] = 324766;
 }

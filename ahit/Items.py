@@ -30,16 +30,11 @@ def item_dlc_enabled(world: World, name: str) -> bool:
 
 
 def get_total_time_pieces(world: World) -> int:
-    limit: int = 40 + world.multiworld.MaxExtraTimePieces[world.player].value
-    count: int = 0
-    for key in time_pieces.keys():
-        if item_dlc_enabled(world, key):
-            count += 1
+    count: int = 40
+    if world.multiworld.EnableDLC1[world.player].value > 0:
+        count += 6
 
-        if count >= limit:
-            break
-
-    return count
+    return min(40+world.multiworld.MaxExtraTimePieces[world.player].value, count)
 
 
 def create_item(world: World, name: str) -> Item:
@@ -89,6 +84,8 @@ def create_junk_items(world: World, count: int) -> typing.List[Item]:
 
 ahit_items = {
     "Yarn": ItemData(300001, ItemClassification.progression_skip_balancing),
+    "Time Piece": ItemData(300002, ItemClassification.progression_skip_balancing),
+    "Progressive Painting Unlock": ItemData(300003, ItemClassification.progression),
 
     # Relics
     "Relic (Burger Patty)": ItemData(300006, ItemClassification.progression),
@@ -146,60 +143,6 @@ ahit_items = {
     "Camera Badge": ItemData(300042, ItemClassification.progression, HatDLC.death_wish),
 }
 
-time_pieces = {
-    "Time Piece (Welcome to Mafia Town)": ItemData(300048, ItemClassification.progression),
-    "Time Piece (Barrel Battle)": ItemData(300049, ItemClassification.progression),
-    "Time Piece (She Came from Outer Space)": ItemData(300050, ItemClassification.progression),
-    "Time Piece (Down with the Mafia!)": ItemData(300051, ItemClassification.progression),
-    "Time Piece (Cheating the Race)": ItemData(300052, ItemClassification.progression),
-    "Time Piece (Heating Up Mafia Town)": ItemData(300053, ItemClassification.progression),
-    "Time Piece (The Golden Vault)": ItemData(300054, ItemClassification.progression),
-    "Time Piece (Time Rift - Sewers)": ItemData(300055, ItemClassification.progression),
-    "Time Piece (Time Rift - Bazaar)": ItemData(300056, ItemClassification.progression),
-    "Time Piece (Time Rift - Mafia of Cooks)": ItemData(300057, ItemClassification.progression),
-
-    "Time Piece (Dead Bird Studio)": ItemData(300058, ItemClassification.progression),
-    "Time Piece (Murder on the Owl Express)": ItemData(300059, ItemClassification.progression),
-    "Time Piece (Train Rush)": ItemData(300060, ItemClassification.progression),
-    "Time Piece (Picture Perfect)": ItemData(300061, ItemClassification.progression),
-    "Time Piece (The Big Parade)": ItemData(300062, ItemClassification.progression),
-    "Time Piece (Award Ceremony)": ItemData(300063, ItemClassification.progression),
-    "Time Piece (Award Ceremony Boss)": ItemData(300064, ItemClassification.progression),
-    "Time Piece (Time Rift - The Owl Express)": ItemData(300065, ItemClassification.progression),
-    "Time Piece (Time Rift - The Moon)": ItemData(300066, ItemClassification.progression),
-    "Time Piece (Time Rift - Dead Bird Studio)": ItemData(300067, ItemClassification.progression),
-
-    "Time Piece (Contractual Obligations)": ItemData(300068, ItemClassification.progression),
-    "Time Piece (The Subcon Well)": ItemData(300069, ItemClassification.progression),
-    "Time Piece (Toilet of Doom)": ItemData(300070, ItemClassification.progression),
-    "Time Piece (Queen Vanessa's Manor)": ItemData(300071, ItemClassification.progression),
-    "Time Piece (Mail Delivery Service)": ItemData(300072, ItemClassification.progression),
-    "Time Piece (Your Contract Has Expired)": ItemData(300073, ItemClassification.progression),
-    "Time Piece (Time Rift - Pipe)": ItemData(300074, ItemClassification.progression),
-    "Time Piece (Time Rift - Village)": ItemData(300075, ItemClassification.progression),
-    "Time Piece (Time Rift - Sleepy Subcon)": ItemData(300076, ItemClassification.progression),
-
-    "Time Piece (The Birdhouse)": ItemData(300077, ItemClassification.progression),
-    "Time Piece (The Lava Cake)": ItemData(300078, ItemClassification.progression),
-    "Time Piece (The Twilight Bell)": ItemData(300079, ItemClassification.progression),
-    "Time Piece (The Windmill)": ItemData(300080, ItemClassification.progression),
-    "Time Piece (The Illness has Spread)": ItemData(300081, ItemClassification.progression),
-    "Time Piece (Time Rift - The Twilight Bell)": ItemData(300082, ItemClassification.progression),
-    "Time Piece (Time Rift - Curly Tail Trail)": ItemData(300083, ItemClassification.progression),
-    "Time Piece (Time Rift - Alpine Skyline)": ItemData(300084, ItemClassification.progression),
-
-    "Time Piece (Time Rift - Gallery)": ItemData(300085, ItemClassification.progression),
-    "Time Piece (Time Rift - The Lab)": ItemData(300086, ItemClassification.progression),
-
-    "Time Piece (The Finale)": ItemData(300087, ItemClassification.progression),
-
-    "Time Piece (Bon Voyage!)": ItemData(300088, ItemClassification.progression, HatDLC.dlc1),
-    "Time Piece (Ship Shape)": ItemData(300089, ItemClassification.progression, HatDLC.dlc1),
-    "Time Piece (Rock the Boat)": ItemData(300090, ItemClassification.progression, HatDLC.dlc1),
-    "Time Piece (Time Rift - Balcony)": ItemData(300091, ItemClassification.progression, HatDLC.dlc1),
-    "Time Piece (Time Rift - Deep Sea)": ItemData(300092, ItemClassification.progression, HatDLC.dlc1),
-}
-
 act_contracts = {
     "Snatcher's Contract - The Subcon Well": ItemData(300200, ItemClassification.progression),
     "Snatcher's Contract - Toilet of Doom": ItemData(300201, ItemClassification.progression),
@@ -224,7 +167,8 @@ relic_groups = {
 }
 
 item_frequencies = {
-    "Badge Pin": 2
+    "Badge Pin": 2,
+    "Progressive Painting Unlock": 3,
 }
 
 junk_weights = {
@@ -237,9 +181,6 @@ junk_weights = {
 
 item_table = {
     **ahit_items,
-    **time_pieces,
     **act_contracts,
     **alps_hooks,
 }
-
-lookup_id_to_name: typing.Dict[int, str] = {data.code: item_name for item_name, data in ahit_items.items() if data.code}
