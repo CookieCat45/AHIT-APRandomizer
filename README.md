@@ -45,7 +45,7 @@ Forces the client to attempt a connection to the server. You shouldn't have to u
 Sometimes after installing the mod, it will disable itself in the mod menu in-game for an unknown reason. To fix this, go into the Mods menu in-game (rocket icon), click on the Archipelago icon and make sure the mod is enabled. If the mod isn't in the menu, try making sure you followed the instructions correctly or let me know in the Archipelago Discord thread for A Hat in Time if you can't get the mod to work.
 
 
-**Why does the game disconnect when I enter a loading screen?**
+**Why does the game disconnect when I enter a loading screen?**  
 The script that connects to the Archipelago server has to reinitialize on every map transition. This is an issue with the game's engine that can't be worked around.
 
 
