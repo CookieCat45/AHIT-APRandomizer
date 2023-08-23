@@ -46,7 +46,7 @@ Sometimes after installing the mod, it will disable itself in the mod menu in-ga
 
 
 **Why does the game disconnect when I enter a loading screen?**  
-The script that connects to the Archipelago server has to reinitialize on every map transition. This is an issue with the game's engine that can't be worked around.
+The script that connects to the Archipelago server has to reinitialize on every map transition. This is an issue rooting from the way the game's engine works that can't be fixed.
 
 
 **When I complete a relic combo, the relics disappear from the relic stand once I load into the Spaceship again. Why?**  
