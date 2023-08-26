@@ -557,7 +557,10 @@ function OnPostInitGame()
 			
 			// so the shopkeeper doesn't say "we're sold out" when the player has the ticket
 			foreach DynamicActors(class'Hat_MetroTicketBooth_Base', booth)
+			{
 				booth.WasBought = false;
+				booth.UnlockView = None;
+			}
 			
 			shopInvs = class'Hat_ClassHelper'.static.GetAllObjectsExpensive("Hat_ShopInventory");
 			dummy.CollectibleClass = class'Archipelago_ShopItem_Dummy';
