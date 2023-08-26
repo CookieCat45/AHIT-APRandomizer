@@ -90,9 +90,19 @@ A Hat in Time:
     # Share part of your item pool with other players.
     []
 
+  EndGoal:
+    # The end goal required to beat the game.
+    # Finale: Reach Time's End and beat Mustache Girl. The Finale will be in its vanilla location.
+    # 
+    # Rush Hour: Reach and complete Rush Hour. The level will be in its vanilla location and Chapter 7
+    # will be the final chapter. You also must find Nyakuza Metro itself and complete all of its levels.
+    # Requires DLC2 content to be enabled.
+    finale: 50
+    rush_hour: 0
+
   ActRandomizer:
     # If enabled, shuffle the game's Acts between each other.
-    # Separate Rifts will cause Time Rifts to only be shuffled amongst each other,
+    # Light will cause Time Rifts to only be shuffled amongst each other,
     # and Blue Time Rifts and Purple Time Rifts are shuffled separately.
     false: 0
     light: 50
@@ -175,7 +185,7 @@ A Hat in Time:
 
   EnableDLC1:
     # Shuffle content from The Arctic Cruise (Chapter 6) into the game. This also includes the Tour time rift.
-    # DO NOT ENABLE THIS OPTION IF YOU DO NOT HAVE THE DLC INSTALLED!!!
+    # DO NOT ENABLE THIS OPTION IF YOU DO NOT HAVE SEAL THE DEAL DLC INSTALLED!!!
     false: 50
     true: 0
 
@@ -209,15 +219,71 @@ A Hat in Time:
   EnableDeathWish:
     # NOT IMPLEMENTED Shuffle Death Wish contracts into the game.
     # Each contract by default will have a single check granted upon completion.
-    # DO NOT ENABLE THIS OPTION IF YOU DO NOT HAVE THE DLC INSTALLED!!!
+    # DO NOT ENABLE THIS OPTION IF YOU DO NOT HAVE SEAL THE DEAL DLC INSTALLED!!!
     false: 50
     true: 0
 
   EnableDLC2:
-    # NOT IMPLEMENTED Shuffle content from Nyakuza Metro (Chapter 7) into the game.
-    # DO NOT ENABLE THIS OPTION IF YOU DO NOT HAVE THE DLC INSTALLED!!!
+    # Shuffle content from Nyakuza Metro (Chapter 7) into the game.
+    # DO NOT ENABLE THIS OPTION IF YOU DO NOT HAVE NYAKUZA METRO DLC INSTALLED!!!
     false: 50
     true: 0
+
+  BaseballBat:
+    # Replace the Umbrella with the baseball bat from Nyakuza Metro.
+    # DLC2 content does not have to be shuffled for this option but Nyakuza Metro still needs to be installed.
+    false: 50
+    true: 0
+
+  VanillaMetro:
+    # Force Nyakuza Metro (and optionally its finale) onto their vanilla locations in act shuffle.
+    false: 50
+    true: 0
+    finale: 0
+
+  MetroMinPonCost:
+    # The cheapest an item can be in any Nyakuza Metro shop. Includes ticket booths.
+    #
+    # You can define additional values between the minimum and maximum values.
+    # Minimum value is 10
+    # Maximum value is 800
+    50: 50
+    random: 0
+    random-low: 0
+    random-high: 0
+
+  MetroMaxPonCost:
+    # The most expensive an item can be in any Nyakuza Metro shop. Includes ticket booths.
+    #
+    # You can define additional values between the minimum and maximum values.
+    # Minimum value is 10
+    # Maximum value is 800
+    200: 50
+    random: 0
+    random-low: 0
+    random-high: 0
+
+  NyakuzaThugMinShopItems:
+    # The smallest amount of items that the thugs in Nyakuza Metro can have for sale.
+    #
+    # You can define additional values between the minimum and maximum values.
+    # Minimum value is 0
+    # Maximum value is 5
+    2: 50
+    random: 0
+    random-low: 0
+    random-high: 0
+
+  NyakuzaThugMaxShopItems:
+    # The largest amount of items that the thugs in Nyakuza Metro can have for sale.
+    #
+    # You can define additional values between the minimum and maximum values.
+    # Minimum value is 0
+    # Maximum value is 5
+    4: 50
+    random: 0
+    random-low: 0
+    random-high: 0
 
   LowestChapterCost:
     # Value determining the lowest possible cost for a chapter.
@@ -237,7 +303,7 @@ A Hat in Time:
     #
     # You can define additional values between the minimum and maximum values.
     # Minimum value is 15
-    # Maximum value is 50
+    # Maximum value is 45
     25: 50
     random: 0
     random-low: 0
@@ -249,7 +315,7 @@ A Hat in Time:
     # You can define additional values between the minimum and maximum values.
     # Minimum value is 1
     # Maximum value is 8
-    5: 50
+    4: 50
     random: 0
     random-low: 0
     random-high: 0
@@ -272,13 +338,13 @@ A Hat in Time:
     # You can define additional values between the minimum and maximum values.
     # Minimum value is 0
     # Maximum value is 16
-    0: 50
+    16: 50
     random: 0
     random-low: 0
     random-high: 0
 
-  Chapter5MinCost:
-    # Minimum Time Pieces required to enter Chapter 5 (Time's End). This is your goal.
+  FinalChapterMinCost:
+    # Minimum Time Pieces required to enter the final chapter. This is part of your goal.
     #
     # You can define additional values between the minimum and maximum values.
     # Minimum value is 0
@@ -288,8 +354,8 @@ A Hat in Time:
     random-low: 0
     random-high: 0
 
-  Chapter5MaxCost:
-    # Maximum Time Pieces required to enter Chapter 5 (Time's End). This is your goal.
+  FinalChapterMaxCost:
+    # Maximum Time Pieces required to enter the final chapter. This is part of your goal.
     #
     # You can define additional values between the minimum and maximum values.
     # Minimum value is 0
@@ -350,6 +416,28 @@ A Hat in Time:
     # Minimum value is 10
     # Maximum value is 800
     400: 50
+    random: 0
+    random-low: 0
+    random-high: 0
+
+  BadgeSellerMinItems:
+    # The smallest amount of items that the Badge Seller can have for sale.
+    #
+    # You can define additional values between the minimum and maximum values.
+    # Minimum value is 0
+    # Maximum value is 10
+    4: 50
+    random: 0
+    random-low: 0
+    random-high: 0
+
+  BadgeSellerMaxItems:
+    # The largest amount of items that the Badge Seller can have for sale.
+    #
+    # You can define additional values between the minimum and maximum values.
+    # Minimum value is 0
+    # Maximum value is 10
+    8: 50
     random: 0
     random-low: 0
     random-high: 0
