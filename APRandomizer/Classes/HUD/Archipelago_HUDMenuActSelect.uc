@@ -221,7 +221,9 @@ simulated function BuildSpecialHourglasses(HUD H)
 				s.ChapterActInfo = ChapterInfo.ChapterActInfo[i];
 				break;
 			}
-			
+		
+		// Breaks Rush Hour
+		/*
 		if (s.ChapterActInfo != None && s.ChapterActInfo.ActIDBeforeComplete > 0 && !s.IsComplete)
 		{
 			s.ActID = s.ChapterActInfo.ActIDBeforeComplete;
@@ -232,7 +234,7 @@ simulated function BuildSpecialHourglasses(HUD H)
 					s.ChapterActInfo = ChapterInfo.ChapterActInfo[i];
 					break;
 				}
-		}
+		*/
 		
 		s.IsComplete = `AP.IsActReallyCompleted(s.ChapterActInfo);
 		

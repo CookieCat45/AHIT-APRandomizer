@@ -27,4 +27,6 @@ defaultproperties
 	Mesh=Model2;
 	Components.Add(Model2);
 	RotationComponents.Add(Model2);
+	
+	HUDIcon = Texture2D'HatInTime_HUD_Contracts.Textures.itemicon_contract';
 }

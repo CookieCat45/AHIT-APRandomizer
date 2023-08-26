@@ -1,7 +1,7 @@
 from worlds.AutoWorld import World, CollectionState
 from worlds.generic.Rules import add_rule, set_rule
-from .Locations import location_table, tihs_locations, zipline_unlocks, is_location_valid, \
-    contract_locations, painting_reqs
+from .Locations import location_table, tihs_locations, zipline_unlocks, is_location_valid, contract_locations, \
+    shop_locations
 from .Types import HatType, ChapterIndex
 from BaseClasses import Location, Entrance, Region
 import typing
@@ -82,10 +82,19 @@ def can_clear_act(state: CollectionState, world: World, act_entrance: str) -> bo
 
 
 def can_clear_alpine(state: CollectionState, world: World) -> bool:
-    return (state.can_reach(world.multiworld.get_location("Act Completion (The Birdhouse)", player=world.player))
-            and state.can_reach(world.multiworld.get_location("Act Completion (The Lava Cake)", player=world.player))
-            and state.can_reach(world.multiworld.get_location("Act Completion (The Twilight Bell)", player=world.player))
-            and state.can_reach(world.multiworld.get_location("Act Completion (The Windmill)", player=world.player)))
+    return state.has("Birdhouse Cleared", world.player) and state.has("Lava Cake Cleared", world.player) \
+            and state.has("Windmill Cleared", world.player) and state.has("Twilight Bell Cleared", world.player)
+
+
+def can_clear_metro(state: CollectionState, world: World) -> bool:
+    return state.has("Nyakuza Intro Cleared", world.player) \
+           and state.has("Yellow Overpass Station Cleared", world.player) \
+           and state.has("Yellow Overpass Manhole Cleared", world.player) \
+           and state.has("Green Clean Station Cleared", world.player) \
+           and state.has("Green Clean Manhole Cleared", world.player) \
+           and state.has("Bluefin Tunnel Cleared", world.player) \
+           and state.has("Pink Paw Station Cleared", world.player) \
+           and state.has("Pink Paw Manhole Cleared", world.player)
 
 
 def set_rules(world: World):
@@ -94,6 +103,7 @@ def set_rules(world: World):
     p = world.player
 
     dlc1: bool = bool(mw.EnableDLC1[p].value > 0)
+    dlc2: bool = bool(mw.EnableDLC2[p].value > 0)
 
     # First, chapter access
     starting_chapter = ChapterIndex(mw.StartingChapter[p].value)
@@ -103,19 +113,37 @@ def set_rules(world: World):
     chapter_list: typing.List[ChapterIndex] = [ChapterIndex.MAFIA, ChapterIndex.BIRDS,
                                                ChapterIndex.SUBCON, ChapterIndex.ALPINE]
 
+    final_chapter = ChapterIndex.FINALE
+    if mw.EndGoal[p].value == 2:
+        final_chapter = ChapterIndex.METRO
+        chapter_list.append(ChapterIndex.FINALE)
+
     if dlc1:
         chapter_list.append(ChapterIndex.CRUISE)
+
+    if dlc2 and final_chapter is not ChapterIndex.METRO:
+        chapter_list.append(ChapterIndex.METRO)
 
     chapter_list.remove(starting_chapter)
     mw.random.shuffle(chapter_list)
 
-    if dlc1 and starting_chapter is not ChapterIndex.ALPINE:
+    if starting_chapter is not ChapterIndex.ALPINE and dlc1 or dlc2:
+        index1: int = 69
+        index2: int = 69
+        lowest_index: int
         chapter_list.remove(ChapterIndex.ALPINE)
-        index = chapter_list.index(ChapterIndex.CRUISE)
-        if index == 0:
+
+        if dlc1:
+            index1 = chapter_list.index(ChapterIndex.CRUISE)
+
+        if dlc2 and final_chapter is not ChapterIndex.METRO:
+            index2 = chapter_list.index(ChapterIndex.METRO)
+
+        lowest_index = min(index1, index2)
+        if lowest_index == 0:
             pos = 0
         else:
-            pos = mw.random.randint(0, index)
+            pos = mw.random.randint(0, lowest_index)
 
         chapter_list.insert(pos, ChapterIndex.ALPINE)
 
@@ -145,9 +173,8 @@ def set_rules(world: World):
         last_cost = cost
         loop_count += 1
 
-    minimum: int = mw.Chapter5MinCost[p].value
-    maximum: int = mw.Chapter5MaxCost[p].value
-    w.set_chapter_cost(ChapterIndex.FINALE, mw.random.randint(min(minimum, maximum), max(minimum, maximum)))
+    w.set_chapter_cost(final_chapter, mw.random.randint(mw.FinalChapterMinCost[p].value,
+                                                        mw.FinalChapterMaxCost[p].value))
 
     add_rule(mw.get_entrance("Telescope -> Mafia Town", p),
              lambda state: state.has("Time Piece", p, w.get_chapter_cost(ChapterIndex.MAFIA)))
@@ -170,7 +197,11 @@ def set_rules(world: World):
                  lambda state: state.has("Time Piece", p, w.get_chapter_cost(ChapterIndex.ALPINE))
                  and state.has("Time Piece", p, w.get_chapter_cost(ChapterIndex.CRUISE)))
 
-    set_indirect_connections(w)
+    if dlc2:
+        add_rule(mw.get_entrance("Telescope -> Nyakuza Metro", p),
+                 lambda state: state.has("Time Piece", p, w.get_chapter_cost(ChapterIndex.ALPINE))
+                 and state.has("Time Piece", p, w.get_chapter_cost(ChapterIndex.METRO))
+                 and can_use_hat(state, w, HatType.DWELLER) and can_use_hat(state, w, HatType.ICE))
 
     if mw.ActRandomizer[p].value == 0:
         set_default_rift_rules(w)
@@ -213,10 +244,8 @@ def set_rules(world: World):
             else:  # Can bypass with Dweller Mask
                 add_rule(location, lambda state: can_hit_bells(state, w) or can_use_hat(state, w, HatType.DWELLER))
 
-        if mw.ShuffleSubconPaintings[p].value > 0 and key in painting_reqs.keys():
-            # have to do it like this because Python is... dumb.
-            value: int = painting_reqs.get(key)
-            add_rule(location, lambda state: state.has("Progressive Painting Unlock", p, value))
+        if data.paintings > 0 and mw.ShuffleSubconPaintings[p].value > 0:
+            add_rule(location, lambda state: state.count("Progressive Painting Unlock", p) >= data.paintings)
 
     set_specific_rules(w)
 
@@ -269,7 +298,10 @@ def set_rules(world: World):
         if mw.UmbrellaLogic[p].value > 0:
             add_rule(entrance, lambda state: state.has("Umbrella", p))
 
-    mw.completion_condition[p] = lambda state: state.has("Time Piece Cluster", p)
+    if mw.EndGoal[p].value == 1:
+        mw.completion_condition[p] = lambda state: state.has("Time Piece Cluster", p)
+    elif mw.EndGoal[p].value == 2:
+        mw.completion_condition[p] = lambda state: state.has("Rush Hour Cleared", p)
 
 
 def set_specific_rules(world: World):
@@ -403,6 +435,29 @@ def set_specific_rules(world: World):
     if mw.EnableDLC1[p].value > 0:
         add_rule(mw.get_entrance("Cruise Ship Entrance BV", p), lambda state: can_use_hookshot(state, w))
 
+        # This particular item isn't present in Act 3 for some reason, yes in vanilla too
+        add_rule(mw.get_location("The Arctic Cruise - Toilet", p),
+                 lambda state: state.can_reach("Bon Voyage!", "Region", p) or state.can_reach("Ship Shape", "Region", p))
+
+    if mw.EnableDLC2[p].value > 0:
+        add_rule(mw.get_entrance("-> Bluefin Tunnel", p),
+                 lambda state: state.has("Metro Ticket - Green", p) or state.has("Metro Ticket - Blue", p))
+
+        add_rule(mw.get_entrance("-> Pink Paw Station", p),
+                 lambda state: state.has("Metro Ticket - Pink", p)
+                 or state.has("Metro Ticket - Yellow", p) and state.has("Metro Ticket - Blue", p))
+
+        add_rule(mw.get_entrance("Nyakuza Metro - Finale", p),
+                 lambda state: can_clear_metro(state, w))
+
+        add_rule(mw.get_location("Act Completion (Rush Hour)", p),
+                 lambda state: state.has("Metro Ticket - Yellow", p) and state.has("Metro Ticket - Blue", p)
+                 and state.has("Metro Ticket - Pink", p))
+
+        for key in shop_locations.keys():
+            if "Green Clean Station Thug B" in key and is_location_valid(w, key):
+                add_rule(mw.get_location(key, p), lambda state: state.has("Metro Ticket - Yellow", p), "or")
+
 
 def set_sdj_rules(world: World):
     add_rule(world.multiworld.get_location("Subcon Forest - Long Tree Climb Chest", world.player),
@@ -457,13 +512,6 @@ def reg_act_connection(world: World, region: typing.Union[str, Region], unlocked
         entrance = unlocked_entrance
 
     world.multiworld.register_indirect_condition(reg, entrance)
-
-
-def set_indirect_connections(world: World):
-    reg_act_connection(world, "The Birdhouse", "Alpine Skyline - Finale")
-    reg_act_connection(world, "The Lava Cake", "Alpine Skyline - Finale")
-    reg_act_connection(world, "The Windmill", "Alpine Skyline - Finale")
-    reg_act_connection(world, "The Twilight Bell", "Alpine Skyline - Finale")
 
 
 # See randomize_act_entrances in Regions.py
@@ -541,8 +589,9 @@ def set_rift_rules(world: World, regions: typing.Dict[str, Region]):
         for entrance in regions["Time Rift - Deep Sea"].entrances:
             add_rule(entrance, lambda state: has_relic_combo(state, w, "Cake"))
 
-        # for entrance in regions["Time Rift - Tour"].entrances:
-        #   add_rule(entrance, lambda state: state.has("Time Piece", p, mw.TourRequiredTimePieces[p].value))
+    if mw.EnableDLC2[p].value > 0:
+        for entrance in regions["Time Rift - Rumbi Factory"].entrances:
+            add_rule(entrance, lambda state: has_relic_combo(state, w, "Necklace"))
 
 
 # Basically the same as above, but without the need of the dict since we are just setting defaults
@@ -619,8 +668,9 @@ def set_default_rift_rules(world: World):
         for entrance in mw.get_region("Time Rift - Deep Sea", p).entrances:
             add_rule(entrance, lambda state: has_relic_combo(state, w, "Cake"))
 
-        # for entrance in mw.get_region("Time Rift - Tour", p).entrances:
-        #   add_rule(entrance, lambda state: state.has("Time Piece", p, mw.TourRequiredTimePieces[p].value))
+    if mw.EnableDLC2[p].value > 0:
+        for entrance in mw.get_region("Time Rift - Rumbi Factory", p).entrances:
+            add_rule(entrance, lambda state: has_relic_combo(state, w, "Necklace"))
 
 
 def connect_regions(start_region: Region, exit_region: Region, entrancename: str, player: int) -> Entrance:

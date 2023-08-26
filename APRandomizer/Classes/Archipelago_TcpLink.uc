@@ -341,7 +341,6 @@ function ParseJSON(string json)
 	}
 	
 	m.DebugMessage("[ParseJSON] Reformatted command: " $json);
-	m.DebugMessage("a");
 	
 	// Security
 	for (i = 0; i < Len(json); i++)
@@ -366,8 +365,6 @@ function ParseJSON(string json)
 		return;
 	}
 	
-	m.DebugMessage("b");
-	
 	switch (jsonObj.GetStringValue("cmd"))
 	{
 		case "RoomInfo":
@@ -387,8 +384,6 @@ function ParseJSON(string json)
 				jsonChild = jsonObj.GetObject("slot_data");
 				m.LoadSlotData(jsonChild);
 			}
-
-			m.DebugMessage("c");
 			
 			// Initialize our player's names
 			m.ReplOnce(json, "players", "players_0", json, true);
@@ -463,8 +458,6 @@ function ParseJSON(string json)
 				m.SlotData.PlayerNames[jsonChild.GetIntValue("slot")] = jsonChild.GetStringValue("alias");
 			}
 			
-			m.DebugMessage("d");
-			
 			// Fully connected
 			m.OnFullyConnected();
 			break;
@@ -535,6 +528,7 @@ function OnLocationInfoCommand(string json)
 	local Archipelago_RandomizedItem_Base item;
 	local Hat_Collectible_Important collectible;
 	local class<Archipelago_ShopItem_Base> shopItemClass;
+	local array<class< Object > > shopItemClasses;
 	local Actor container;
 	local Archipelago_GameMod m;
 	
@@ -555,6 +549,7 @@ function OnLocationInfoCommand(string json)
 	}
 	
 	jsonObj = class'JsonObject'.static.DecodeJson(json);
+	shopItemClasses = class'Hat_ClassHelper'.static.GetAllScriptClasses("Archipelago_ShopItem_Base");
 	
 	for (i = 0; i <= count; i++)
 	{
@@ -562,7 +557,7 @@ function OnLocationInfoCommand(string json)
 		if (jsonChild == None)
 			continue;
 		
-		if (m.GetShopItemClassFromLocation(jsonChild.GetIntValue("location"), shopItemClass))
+		if (m.GetShopItemClassFromLocation_Cheap(shopItemClasses, jsonChild.GetIntValue("location"), shopItemClass))
 		{
 			if (!m.GetShopItemInfo(shopItemClass))
 			{
@@ -573,12 +568,13 @@ function OnLocationInfoCommand(string json)
 			
 			continue;
 		}
-
+		
 		isItem = false;
 		
 		foreach DynamicActors(class'Hat_Collectible_Important', collectible)
 		{
-			if (collectible.IsA('Hat_Collectible_VaultCode_Base') || collectible.IsA('Hat_Collectible_InstantCamera'))
+			if (collectible.IsA('Hat_Collectible_VaultCode_Base') || collectible.IsA('Hat_Collectible_InstantCamera')
+				|| collectible.IsA('Hat_Collectible_Sticker') || collectible.IsA('Hat_Collectible_MetroTicket_Base'))
 				continue;
 			
 			locId = m.ObjectToLocationId(collectible);
@@ -785,6 +781,7 @@ function GrantItem(int itemId, int playerId)
 	local ESpecialItemType special;
 	local ETrapType trap;
 	local Hat_SaveGame save;
+	local Hat_MetroTicketGate gate;
 	
 	if (class'Archipelago_ItemInfo'.static.GetNativeItemData(itemId, itemName, worldClass, invOverride))
 	{
@@ -810,6 +807,15 @@ function GrantItem(int itemId, int playerId)
 		else if (itemId == 300003) // Progressive painting
 		{
 			UnlockPaintings();
+		}
+		else if (itemId >= 300045 && itemId <= 300048)
+		{
+			// Metro ticket. Update gates if we're currently in Metro
+			if (`GameManager.GetCurrentMapFilename() ~= "dlc_metro")
+			{
+				foreach DynamicActors(class'Hat_MetroTicketGate', gate)
+					gate.DelayedInit();
+			}
 		}
 		else
 		{

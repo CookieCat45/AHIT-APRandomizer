@@ -16,6 +16,7 @@ defaultproperties
 	
 	CollectParticle = ParticleSystem'HatInTime_Items.ParticleSystems.energybit_collected2'
 	CollectParticleColor = (R=255,G=204,B=76,A=255);
+	HUDIcon = Texture2D'HatInTime_Hud_ItemIcons.Misc.badge_pin';
 }
 
 simulated function bool OnCollected(Actor a)

@@ -89,7 +89,7 @@ exec function ap_teleport(float x, float y, float z)
 	loc.x = x;
 	loc.y = y;
 	loc.z = z;
-	GetPlayerController().Pawn.SetLocation(loc);
+	Pawn.SetLocation(loc);
 }
 
 exec function ap_give_yarn(int count)
@@ -120,15 +120,28 @@ exec function ap_alpine_finale()
 	ConsoleCommand("servertravel alpsandsails");
 }
 
-function Hat_PlayerController GetPlayerController()
+exec function ap_closest_actors(float radius)
 {
-	local Hat_PlayerController c;
+	local Actor a;
+	local Archipelago_GameMod m;
+	local float distance;
 
-	foreach class'WorldInfo'.static.GetWorldInfo().AllControllers(class'Hat_PlayerController', c)
-	{
-		if (c.PlayerInput == self)
-			return c;
-	}
+	m = `AP;
+	if (!bool(m.DebugMode))
+		return;
 	
-	return None;
+	m.DebugMessage("Finding closest actors...");
+	foreach Pawn.AllActors(class'Actor', a)
+	{
+		distance = m.GetVectorDistance(Pawn.Location, a.Location);
+		if (distance > radius)
+			continue;
+		
+		m.DebugMessage("ACTOR: " $a.Name $ ", DISTANCE: " $distance);
+	}
+}
+
+exec function ap_show_seedinfo()
+{
+	`AP.ShowSeedInfoMenu();
 }

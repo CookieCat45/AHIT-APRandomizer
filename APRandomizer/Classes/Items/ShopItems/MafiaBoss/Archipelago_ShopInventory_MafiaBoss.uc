@@ -1,6 +1,7 @@
-class Archipelago_ShopInventory_MafiaBoss extends Hat_ShopInventory;
+class Archipelago_ShopInventory_MafiaBoss extends Archipelago_ShopInventory_Base;
 
 defaultproperties
 {
-	ItemsForSale[0] = (CollectibleClass=class'Archipelago_MafiaBossItem_1', ItemCost=25, PreventRePurchase=true);
+	ShopNPC = class'Hat_NPC_MafiaBossJar';
+	ItemsForSale[0] = (CollectibleClass=class'Archipelago_ShopItem_MafiaBoss', ItemCost=25, PreventRePurchase=true);
 }

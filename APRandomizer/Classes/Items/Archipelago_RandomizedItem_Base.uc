@@ -90,7 +90,7 @@ simulated function bool OnCollected(Actor Collector)
 			item = class'Hat_Loadout'.static.MakeLoadoutItem(InventoryClass);
 			loadout = pc.GetLoadout();
 			autoEquip = true;
-
+			
 			if (class'Hat_Loadout'.static.IsClassBadge(InventoryClass))
 			{
 				for (i = 0; i < loadout.MyLoadout.Badges.Length; i++)
@@ -240,5 +240,6 @@ defaultproperties
 	ScaleOnCollect = 0.65;
 	RotationAnimation = true;
 	DoSpinEffect = true;
+	bAlwaysTick = true;
 	LocationId = 0;
 }

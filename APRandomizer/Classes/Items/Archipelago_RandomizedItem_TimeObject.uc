@@ -28,4 +28,6 @@ defaultproperties
 	End Object
 	Components.Add(IdleAudioComponent0);
 	IdleAudioComponent = IdleAudioComponent0;
+	
+	HUDIcon = Texture2D'HatInTime_Hud.Textures.Collectibles.collectible_timepiece';
 }

@@ -34,11 +34,8 @@ function UpdateClosestMarker(HUD H)
 	local LocationInfo locInfo;
 	local Actor a;
 	
-	if (`GameManager.IsMidMapTransition || `SaveManager == None || `SaveManager.GetCurrentSaveData() == None)
-		return;
-	
 	m = `AP;
-	if (m == None || m.SlotData == None || m.IsInSpaceship())
+	if (m == None || m.SlotData == None)
 		return;
 	
 	bestindx = INDEX_NONE;
@@ -54,7 +51,7 @@ function UpdateClosestMarker(HUD H)
 	foreach H.PlayerOwner.DynamicActors(class'Archipelago_RandomizedItem_Base', item)
 	{
 		if (item.PickupActor != None) continue;
-		if (!CanReachLocation(item.LocationId)) continue;
+		if (!CanReachLocation(item.LocationId, H)) continue;
 		if (onlyImportant && item.ItemFlags == ItemFlag_Garbage) continue;
 		
 		UpdateClosestMarker_Actor(H, item, closest_distance, bestindx);
@@ -67,7 +64,7 @@ function UpdateClosestMarker(HUD H)
 		if (m.ChestArray.Find(chest) == -1) continue;
 		
 		locId = m.ObjectToLocationId(chest);
-		if (!CanReachLocation(locId) || m.IsLocationChecked(locId)) continue;
+		if (!CanReachLocation(locId, H) || m.IsLocationChecked(locId)) continue;
 		
 		locInfo = m.GetLocationInfoFromID(locId);
 		
@@ -80,7 +77,7 @@ function UpdateClosestMarker(HUD H)
 	foreach H.PlayerOwner.DynamicActors(class'Hat_Collectible_StoryBookPage', page)
 	{
 		locId = m.ObjectToLocationId(page);
-		if (!CanReachLocation(locId)) continue;
+		if (!CanReachLocation(locId, H)) continue;
 		
 		locInfo = m.GetLocationInfoFromID(locId);
 		if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
@@ -107,7 +104,7 @@ function UpdateClosestMarker(HUD H)
 			if (valid)
 			{
 				locId = m.ObjectToLocationId(b);
-				if (!CanReachLocation(locId) || m.IsLocationChecked(locId)) continue;
+				if (!CanReachLocation(locId, H) || m.IsLocationChecked(locId)) continue;
 				
 				locInfo = m.GetLocationInfoFromID(locId);
 				if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
@@ -126,7 +123,7 @@ function UpdateClosestMarker(HUD H)
 			if (a.Name == 'Hat_InteractiveFoliage_HarborBush_2' || a.Name == 'Hat_InteractiveFoliage_HarborBush_3')
 			{
 				locId = a.Name == 'Hat_InteractiveFoliage_HarborBush_2' ? m.SubconBushCheck1 : m.SubconBushCheck2;
-				if (!CanReachLocation(locId) || m.IsLocationChecked(locId)) continue;
+				if (!CanReachLocation(locId, H) || m.IsLocationChecked(locId)) continue;
 				
 				locInfo = m.GetLocationInfoFromID(locId);
 				if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
@@ -139,7 +136,7 @@ function UpdateClosestMarker(HUD H)
 				continue;
 			
 			locId = m.ObjectToLocationId(a);
-			if (!CanReachLocation(locId) || m.IsLocationChecked(locId)) continue;
+			if (!CanReachLocation(locId, H) || m.IsLocationChecked(locId)) continue;
 			
 			locInfo = m.GetLocationInfoFromID(locId);
 			if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
@@ -208,7 +205,7 @@ function bool UpdateClosestMarker_Actor(HUD H, Actor item, out float closest_dis
 {
 	local float distance;
 	local Vector itemloc;
-
+	
 	// Mafia Town secret cave location
 	if (Archipelago_RandomizedItem_Base(item) != None && Archipelago_RandomizedItem_Base(item).LocationId == 305220)
 	{
@@ -231,17 +228,22 @@ function bool UpdateClosestMarker_Actor(HUD H, Actor item, out float closest_dis
 	return true;
 }
 
-function bool CanReachLocation(int id)
+function bool CanReachLocation(int id, HUD H)
 {
 	local bool finale;
 	local int paintingUnlock;
 	local Archipelago_GameMod m;
+	local string mapName;
+	local Hat_Loadout lo;
+
 	m = `AP;
+	mapName = `GameManager.GetCurrentMapFilename();
+	lo = Hat_PlayerController(H.PlayerOwner).MyLoadout;
 
 	// Mafia Town secret cave item
 	if (id == 305220)
 	{
-		return (`GameManager.IsCurrentAct(6) || class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Chemical'));
+		return (`GameManager.IsCurrentAct(6) || lo.BackpackHasInventory(class'Hat_Ability_Chemical'));
 	}
 	
 	// Chest behind Mafia HQ
@@ -255,21 +257,21 @@ function bool CanReachLocation(int id)
 	{
 		if (`GameManager.IsCurrentAct(3))
 		{
-			return class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Hookshot') 
+			return lo.BackpackHasInventory(class'Hat_Ability_Hookshot') 
 				&& (!m.SlotData.ShuffleSubconPaintings || m.GetPaintingUnlocks() >= 1);
 		}
 		
 		return `GameManager.IsCurrentAct(6);
 	}
 	
-	if (`GameManager.GetCurrentMapFilename() ~= "DeadBirdStudio")
+	if (mapName ~= "DeadBirdStudio")
 	{
 		if (`GameManager.IsCurrentAct(6) || !CanHitDwellerBells(false))
 		{
 			return id == 304874 || id == 305024 || id == 305248 || id == 305247;
 		}
 	}
-	else if (m.SlotData.ShuffleSubconPaintings && `GameManager.GetCurrentMapFilename() ~= "subconforest")
+	else if (m.SlotData.ShuffleSubconPaintings && mapName ~= "subconforest")
 	{
 		paintingUnlock = m.GetPaintingUnlocks();
 		
@@ -289,14 +291,14 @@ function bool CanReachLocation(int id)
 		return CanHitDwellerBells(true);
 	}
 	
-	if (`GameManager.IsCurrentChapter(4))
+	if (mapName ~= "alpsandsails")
 	{
 		finale = class'Hat_SeqCond_IsAlpineFinale'.static.IsAlpineFinale();
 		
 		if (!class'Hat_SaveBitHelper'.static.HasLevelBit("Actless_FreeRoam_Intro_Complete", 1, "AlpsAndSails") && !finale)
 			return false;
 		
-		if (!class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Hookshot'))
+		if (!lo.BackpackHasInventory(class'Hat_Ability_Hookshot'))
 			return id == 334855 || id == 334856;
 		
 		if (BirdhousePathLocs.Find(id) != -1 && !m.HasZipline(Zipline_Birdhouse))
@@ -319,7 +321,7 @@ function bool CanReachLocation(int id)
 	}
 	
 	// HUMT
-	if (`GameManager.IsCurrentChapter(1) && `GameManager.IsCurrentAct(6))
+	if (InStr(mapName, "mafia_town") != -1 && `GameManager.IsCurrentAct(6))
 	{
 		return id == 334758 ||
 		id == 304214 ||
@@ -327,7 +329,7 @@ function bool CanReachLocation(int id)
 		id == 304610 ||
 		id == 303535 ||
 		id == 304459 ||
-		id == 304213 && class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Hookshot') ||
+		id == 304213 && lo.BackpackHasInventory(class'Hat_Ability_Hookshot') ||
 		id == 304608 ||
 		id == 304462 ||
 		id == 303489 ||
@@ -335,11 +337,13 @@ function bool CanReachLocation(int id)
 		id == 304456 ||
 		id == 304457 ||
 		id == 304606 ||
-		id == 303481 && class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Hookshot') ||
-		id == 304607 && class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_StatueFall') ||
+		id == 303481 && lo.BackpackHasInventory(class'Hat_Ability_Hookshot') ||
+		id == 304607 && lo.BackpackHasInventory(class'Hat_Ability_StatueFall') ||
 		id == 304212 ||
 		id == 302003 ||
 		id == 302004 ||
+		id == 303532 ||
+		id == 304829 && lo.BackpackHasInventory(class'Hat_Ability_StatueFall') ||
 		id == 305218; 
 	}
 	
@@ -351,17 +355,40 @@ function bool CanReachLocation(int id)
 			return true;
 	}
 	
-	if (HookshotRequiredLocs.Find(id) != -1 && !class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Hookshot'))
+	if (HookshotRequiredLocs.Find(id) != -1 && !lo.BackpackHasInventory(class'Hat_Ability_Hookshot'))
 		return false;
 	
-	if (IceHatRequiredLocs.Find(id) != -1 && !class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_StatueFall'))
+	if (IceHatRequiredLocs.Find(id) != -1 && !lo.BackpackHasInventory(class'Hat_Ability_StatueFall'))
 		return false;
 	
-	if (DwellerMaskRequiredLocs.Find(id) != -1 && !class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_FoxMask'))
+	if (DwellerMaskRequiredLocs.Find(id) != -1 && !lo.BackpackHasInventory(class'Hat_Ability_FoxMask'))
 		return false;
 	
-	if (BrewingHatRequiredLocs.Find(id) != -1 && !class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Chemical'))
+	if (BrewingHatRequiredLocs.Find(id) != -1 && !lo.BackpackHasInventory(class'Hat_Ability_Chemical'))
 		return false;
+	
+	// Nyakuza Metro
+	if (id == 305111)
+	{
+		// Green or blue ticket
+		return lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteB')
+			|| lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteC');
+	}
+	else if (id == 305110)
+	{
+		// Pink or yellow+blue ticket
+		return lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteD') 
+			|| lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteA')
+			&& lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteC');
+	}
+	else if (id == 304106)
+	{
+		// Pink or yellow+blue AND Time Stop
+		return (lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteD')
+			|| lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteA')
+			&& lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteC'))
+			&& lo.BackpackHasInventory(class'Hat_Ability_TimeStop');
+	}
 	
 	return true;
 }
@@ -386,8 +413,7 @@ defaultproperties
 	IceHatRequiredLocs[0] = 304607;
 	IceHatRequiredLocs[1] = 304831;
 	IceHatRequiredLocs[2] = 304829;
-	IceHatRequiredLocs[3] = 335826;
-	IceHatRequiredLocs[4] = 304979;
+	IceHatRequiredLocs[3] = 304979;
 	
 	HookshotRequiredLocs[0] = 305218;
 	HookshotRequiredLocs[1] = 303481;
@@ -402,6 +428,8 @@ defaultproperties
 	HookshotRequiredLocs[10] = 305058;
 	HookshotRequiredLocs[11] = 305431;
 	HookshotRequiredLocs[12] = 305819;
+	HookshotRequiredLocs[13] = 305110;
+	HookshotRequiredLocs[14] = 304106;
 	
 	DwellerMaskRequiredLocs[0] = 324767;
 	DwellerMaskRequiredLocs[1] = 324464;
@@ -415,6 +443,8 @@ defaultproperties
 	DwellerMaskRequiredLocs[9] = 334434;
 	DwellerMaskRequiredLocs[10] = 336478;
 	DwellerMaskRequiredLocs[11] = 335826;
+	DwellerMaskRequiredLocs[12] = 305110;
+	DwellerMaskRequiredLocs[13] = 304106;
 	
 	BrewingHatRequiredLocs[0] = 305701;
 	BrewingHatRequiredLocs[1] = 334758;

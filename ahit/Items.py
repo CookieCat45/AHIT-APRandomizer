@@ -137,6 +137,10 @@ ahit_items = {
     # DLC2 items
     "Relic (Necklace Bust)": ItemData(300022, ItemClassification.progression, HatDLC.dlc2),
     "Relic (Necklace)": ItemData(300023, ItemClassification.progression, HatDLC.dlc2),
+    "Metro Ticket - Yellow": ItemData(300045, ItemClassification.progression, HatDLC.dlc2),
+    "Metro Ticket - Green": ItemData(300046, ItemClassification.progression, HatDLC.dlc2),
+    "Metro Ticket - Blue": ItemData(300047, ItemClassification.progression, HatDLC.dlc2),
+    "Metro Ticket - Pink": ItemData(300048, ItemClassification.progression, HatDLC.dlc2),
 
     # Death Wish items
     "One-Hit Hero Badge": ItemData(300038, ItemClassification.progression, HatDLC.death_wish),

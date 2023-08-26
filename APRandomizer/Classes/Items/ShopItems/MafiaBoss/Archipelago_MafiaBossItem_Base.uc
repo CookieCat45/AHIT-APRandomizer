@@ -1,2 +1,0 @@
-class Archipelago_MafiaBossItem_Base extends Archipelago_ShopItem_Base
-	abstract;

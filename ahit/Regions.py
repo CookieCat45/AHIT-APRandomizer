@@ -1,6 +1,6 @@
 from worlds.AutoWorld import World
 from BaseClasses import Region, Entrance, ItemClassification, Location
-from .Locations import HatInTimeLocation, location_table, storybook_pages, event_locs
+from .Locations import HatInTimeLocation, location_table, storybook_pages, event_locs, is_location_valid, shop_locations
 from .Items import HatInTimeItem
 from .Types import ChapterIndex
 import typing
@@ -47,9 +47,14 @@ act_entrances = {
     "Alpine Free Roam":               "Alpine Skyline - Free Roam",
     "The Illness has Spread":         "Alpine Skyline - Finale",
 
+    "The Finale":                     "Time's End - Act 1",
+
     "Bon Voyage!":                    "The Arctic Cruise - Act 1",
     "Ship Shape":                     "The Arctic Cruise - Act 2",
     "Rock the Boat":                  "The Arctic Cruise - Finale",
+
+    "Nyakuza Free Roam":              "Nyakuza Metro - Free Roam",
+    "Rush Hour":                      "Nyakuza Metro - Finale",
 }
 
 act_chapters = {
@@ -102,6 +107,10 @@ act_chapters = {
     "Rock the Boat":                    "The Arctic Cruise",
     "Time Rift - Balcony":              "The Arctic Cruise",
     "Time Rift - Deep Sea":             "The Arctic Cruise",
+
+    "Nyakuza Free Roam":                "Nyakuza Metro",
+    "Rush Hour":                        "Nyakuza Metro",
+    "Time Rift - Rumbi Factory":        "Nyakuza Metro",
 }
 
 # region: list[Region]
@@ -144,6 +153,8 @@ rift_access_regions = {
 
     "Time Rift - Balcony":       ["Cruise Ship"],
     "Time Rift - Deep Sea":      ["Cruise Ship"],
+
+    "Time Rift - Rumbi Factory": ["Nyakuza Free Roam"],
 }
 
 # Hat_ChapterActInfo, from the game files to be used in act shuffle
@@ -197,6 +208,10 @@ chapter_act_info = {
     "Rock the Boat":               "hatintime_chapterinfo_dlc1.Cruise.Cruise_Sinking",
     "Time Rift - Balcony":         "hatintime_chapterinfo_dlc1.Cruise.Cruise_WaterRift_Slide",
     "Time Rift - Deep Sea":        "hatintime_chapterinfo_dlc1.Cruise.Cruise_CaveRift",
+
+    "Nyakuza Free Roam":            "hatintime_chapterinfo_dlc2.metro.Metro_FreeRoam",
+    "Rush Hour":                    "hatintime_chapterinfo_dlc2.metro.Metro_Escape",
+    "Time Rift - Rumbi Factory":    "hatintime_chapterinfo_dlc2.metro.Metro_RumbiFactory"
 }
 
 # Guarantee that the first level a player can access is a location dense area beatable with no items
@@ -219,13 +234,14 @@ purple_time_rifts = [
     "Time Rift - Alpine Skyline",
     "Time Rift - Deep Sea",
     "Time Rift - Tour",
+    "Time Rift - Rumbi Factory",
 ]
 
 # Acts blacklisted in act shuffle
 # entrance: region
 blacklisted_acts = {
-    "Battle of the Birds - Finale A": "Award Ceremony",
-    "Time's End - Act 1": "The Finale",
+    "Battle of the Birds - Finale A":   "Award Ceremony",
+    "Time's End - Act 1":               "The Finale",
 }
 
 
@@ -321,7 +337,7 @@ def create_regions(world: World):
     create_rift_connections(w, create_region(w, "Time Rift - Pipe"))
     create_rift_connections(w, create_region(w, "Time Rift - Village"))
 
-    badge_seller = create_region(w, "Badge Seller")
+    badge_seller = create_badge_seller(w)
     connect_regions(mt_area, badge_seller, "MT Area -> Badge Seller", p)
     connect_regions(mt_area_humt, badge_seller, "MT Area (HUMT) -> Badge Seller", p)
     connect_regions(sf_area, badge_seller, "SF Area -> Badge Seller", p)
@@ -357,6 +373,23 @@ def create_regions(world: World):
 
         connect_regions(mw.get_region("Cruise Ship", p), badge_seller, "CS -> Badge Seller", p)
 
+    if mw.EnableDLC2[p].value > 0:
+        nyakuza_metro = create_region_and_connect(w, "Nyakuza Metro", "Telescope -> Nyakuza Metro", spaceship)
+        metro_freeroam = create_region_and_connect(w, "Nyakuza Free Roam", "Nyakuza Metro - Free Roam", nyakuza_metro)
+        create_region_and_connect(w, "Rush Hour", "Nyakuza Metro - Finale", nyakuza_metro)
+
+        yellow = create_region_and_connect(w, "Yellow Overpass Station", "-> Yellow Overpass Station", metro_freeroam)
+        green = create_region_and_connect(w, "Green Clean Station", "-> Green Clean Station", metro_freeroam)
+        pink = create_region_and_connect(w, "Pink Paw Station", "-> Pink Paw Station", metro_freeroam)
+        create_region_and_connect(w, "Bluefin Tunnel", "-> Bluefin Tunnel", metro_freeroam)  # No manhole
+
+        create_region_and_connect(w, "Yellow Overpass Manhole", "-> Yellow Overpass Manhole", yellow)
+        create_region_and_connect(w, "Green Clean Manhole", "-> Green Clean Manhole", green)
+        create_region_and_connect(w, "Pink Paw Manhole", "-> Pink Paw Manhole", pink)
+
+        create_rift_connections(w, create_region(w, "Time Rift - Rumbi Factory"))
+        create_thug_shops(w)
+
     # force recache
     mw.get_region("Time Rift - Sewers", p)
 
@@ -376,7 +409,7 @@ def create_tasksanity_locations(world: World):
     for i in range(world.multiworld.TasksanityCheckCount[world.player].value):
         location = HatInTimeLocation(world.player, format("Tasksanity Check %i" % (i+1)), id_start+i, ship_shape)
         ship_shape.locations.append(location)
-        world.location_name_to_id.setdefault(location.name, location.address)
+        # world.location_name_to_id.setdefault(location.name, location.address)
 
 
 def randomize_act_entrances(world: World):
@@ -386,7 +419,8 @@ def randomize_act_entrances(world: World):
     separate_rifts: bool = bool(world.multiworld.ActRandomizer[world.player].value == 1)
 
     for region in region_list.copy():
-        if act_chapters[region.name] == "Alpine Skyline" and "Time Rift" not in region.name:
+        if (act_chapters[region.name] == "Alpine Skyline" or act_chapters[region.name] == "Nyakuza Metro") \
+           and "Time Rift" not in region.name:
             region_list.remove(region)
             region_list.append(region)
 
@@ -431,9 +465,19 @@ def randomize_act_entrances(world: World):
         for candidate in region_list:
 
             if world.multiworld.VanillaAlpine[world.player].value > 0 and region.name == "Alpine Free Roam" \
-             or world.multiworld.VanillaAlpine[world.player].value == 2 and region.name == "The Illness has Spread":
-                candidate_list.append(region)  # force vanilla
+               or world.multiworld.VanillaAlpine[world.player].value == 2 and region.name == "The Illness has Spread":
+                candidate_list.append(region)
                 break
+
+            if world.multiworld.VanillaMetro[world.player].value > 0 and region.name == "Nyakuza Free Roam":
+                candidate_list.append(region)
+                break
+
+            if region.name == "Rush Hour":
+                if world.multiworld.EndGoal[world.player].value == 2 or \
+                   world.multiworld.VanillaMetro[world.player].value == 2:
+                    candidate_list.append(region)
+                    break
 
             # We're mapping something to the first act, make sure it is valid
             if not has_guaranteed:
@@ -476,6 +520,10 @@ def randomize_act_entrances(world: World):
             if region.name == "The Illness has Spread" and candidate.name == "Alpine Free Roam":
                 continue
 
+            # Ditto for Metro
+            if region.name == "Rush Hour" and candidate.name == "Nyakuza Free Roam":
+                continue
+
             if region.name in rift_access_regions and candidate.name in rift_access_regions[region.name]:
                 continue
 
@@ -509,6 +557,9 @@ def randomize_act_entrances(world: World):
         world.update_chapter_act_info(region, candidate)
 
     for name in blacklisted_acts.values():
+        if not is_act_blacklisted(world, name):
+            continue
+
         region: Region = world.multiworld.get_region(name, world.player)
         world.update_chapter_act_info(region, region)
 
@@ -525,20 +576,30 @@ def connect_time_rift(world: World, time_rift: Region, exit_region: Region):
         i += 1
 
 
-def get_act_regions(world: World, exclude_blacklisted: bool = True) -> typing.List[Region]:
+def get_act_regions(world: World) -> typing.List[Region]:
     act_list: typing.List[Region] = []
     for region in world.multiworld.get_regions(world.player):
         if region.name in chapter_act_info.keys():
-            if exclude_blacklisted is False or region.name not in blacklisted_acts.values():
+            if not is_act_blacklisted(world, region.name):
                 act_list.append(region)
 
     return act_list
+
+
+def is_act_blacklisted(world: World, name: str) -> bool:
+    if name == "The Finale":
+        return world.multiworld.EndGoal[world.player].value == 1
+
+    return name in blacklisted_acts.values()
 
 
 def create_region(world: World, name: str) -> Region:
     reg = Region(name, world.player, world.multiworld)
 
     for (key, data) in location_table.items():
+        if data.nyakuza_thug != "":
+            continue
+
         if data.region == name:
             if key in storybook_pages.keys() \
                and world.multiworld.ShuffleStorybookPages[world.player].value == 0:
@@ -546,9 +607,41 @@ def create_region(world: World, name: str) -> Region:
 
             location = HatInTimeLocation(world.player, key, data.id, reg)
             reg.locations.append(location)
+            if location.name in shop_locations:
+                world.shop_locs.append(location.name)
 
     world.multiworld.regions.append(reg)
     return reg
+
+
+def create_badge_seller(world: World) -> Region:
+    badge_seller = Region("Badge Seller", world.player, world.multiworld)
+    world.multiworld.regions.append(badge_seller)
+    count: int = 0
+    max_items: int = 0
+
+    if world.multiworld.BadgeSellerMaxItems[world.player].value > 0:
+        max_items = world.multiworld.random.randint(world.multiworld.BadgeSellerMinItems[world.player].value,
+                                                    world.multiworld.BadgeSellerMaxItems[world.player].value)
+
+    if max_items <= 0:
+        world.badge_seller_count = 0
+        return badge_seller
+
+    for (key, data) in shop_locations.items():
+        if "Badge Seller" not in key:
+            continue
+
+        location = HatInTimeLocation(world.player, key, data.id, badge_seller)
+        badge_seller.locations.append(location)
+        world.shop_locs.append(location.name)
+
+        count += 1
+        if count >= max_items:
+            break
+
+    world.badge_seller_count = max_items
+    return badge_seller
 
 
 def connect_regions(start_region: Region, exit_region: Region, entrancename: str, player: int):
@@ -603,15 +696,58 @@ def get_act_original_chapter(world: World, act_name: str) -> Region:
     return world.multiworld.get_region(act_chapters[act_name], world.player)
 
 
+def create_thug_shops(world: World):
+    min_items: int = world.multiworld.NyakuzaThugMinShopItems[world.player].value
+    max_items: int = world.multiworld.NyakuzaThugMaxShopItems[world.player].value
+    count: int = -1
+    step: int = 0
+    old_name: str = ""
+
+    for key, data in shop_locations.items():
+        if data.nyakuza_thug == "":
+            continue
+
+        if old_name != "" and old_name == data.nyakuza_thug:
+            continue
+
+        try:
+            if world.nyakuza_thug_items[data.nyakuza_thug] <= 0:
+                continue
+        except KeyError:
+            pass
+
+        if count == -1:
+            count = world.multiworld.random.randint(min_items, max_items)
+            world.nyakuza_thug_items.setdefault(data.nyakuza_thug, count)
+            if count <= 0:
+                continue
+
+        if count >= 1:
+            region = world.multiworld.get_region(data.region, world.player)
+            loc = HatInTimeLocation(world.player, key, data.id, region)
+            region.locations.append(loc)
+            world.shop_locs.append(loc.name)
+
+            step += 1
+            if step >= count:
+                old_name = data.nyakuza_thug
+                step = 0
+                count = -1
+
+
 def create_events(world: World) -> int:
-    w = world
-    mw = w.multiworld
     count: int = 0
 
     for (name, data) in event_locs.items():
-        event: Location = create_event(name, mw.get_region(data.region, w.player), w)
-        act_completion: str = format("Act Completion (%s)" % data.region)
-        event.access_rule = mw.get_location(act_completion, w.player).access_rule
+        if not is_location_valid(world, name):
+            continue
+
+        event: Location = create_event(name, world.multiworld.get_region(data.region, world.player), world)
+
+        if data.act_complete_event:
+            act_completion: str = format("Act Completion (%s)" % data.region)
+            event.access_rule = world.multiworld.get_location(act_completion, world.player).access_rule
+
         count += 1
 
     return count

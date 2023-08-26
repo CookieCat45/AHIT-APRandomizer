@@ -1,7 +1,8 @@
 from BaseClasses import Location
 from worlds.AutoWorld import World
 from .Types import HatDLC, HatType
-from typing import Optional, NamedTuple, Dict, List
+from typing import Optional, NamedTuple, List, Dict
+from .Options import TasksanityCheckCount
 
 
 class LocData(NamedTuple):
@@ -11,10 +12,15 @@ class LocData(NamedTuple):
     required_tps: Optional[int] = 0
     hookshot: Optional[bool] = False
     dlc_flags: Optional[HatDLC] = HatDLC.none
+    paintings: Optional[int] = 0  # Progressive paintings required for Subcon painting shuffle
 
     # For UmbrellaLogic setting
     umbrella: Optional[bool] = False  # Umbrella required for this check
     dweller_bell: Optional[int] = 0  # Dweller bell hit required, 1 means must hit bell, 2 means can bypass w/mask
+
+    # Other
+    act_complete_event: Optional[bool] = True  # Only used for event locations. Copy access rule from act completion
+    nyakuza_thug: Optional[str] = ""  # Name of Nyakuza thug NPC (for metro shops)
 
 
 class HatInTimeLocation(Location):
@@ -35,7 +41,7 @@ def get_total_locations(world: World) -> int:
 
 
 def location_dlc_enabled(world: World, location: str) -> bool:
-    data = location_table.get(location)
+    data = location_table.get(location) or event_locs.get(location)
 
     if data.dlc_flags == HatDLC.none:
         return True
@@ -57,10 +63,19 @@ def is_location_valid(world: World, location: str) -> bool:
        and world.multiworld.ShuffleStorybookPages[world.player].value == 0:
         return False
 
-    # if location in contract_locations.keys() and world.multiworld.ShuffleActContracts[world.player].value == 0:
-    #    return False
+    if location in shop_locations and location not in world.shop_locs:
+        return False
 
     return True
+
+
+def get_location_names() -> Dict[str, int]:
+    names = {name: data.id for name, data in location_table.items()}
+    id_start: int = 300204
+    for i in range(TasksanityCheckCount.range_end):
+        names.setdefault(format("Tasksanity Check %i") % (i+1), id_start+i)
+
+    return names
 
 
 ahit_locations = {
@@ -127,8 +142,10 @@ ahit_locations = {
     "Murder on the Owl Express - Cafeteria": LocData(305313, "Murder on the Owl Express"),
     "Murder on the Owl Express - Luggage Room Top": LocData(305090, "Murder on the Owl Express"),
     "Murder on the Owl Express - Luggage Room Bottom": LocData(305091, "Murder on the Owl Express"),
+
     "Murder on the Owl Express - Raven Suite Room": LocData(305701, "Murder on the Owl Express",
                                                             required_hats=[HatType.BREWING]),
+
     "Murder on the Owl Express - Raven Suite Top": LocData(305312, "Murder on the Owl Express"),
     "Murder on the Owl Express - Lounge Chest": LocData(303963, "Murder on the Owl Express"),
 
@@ -152,48 +169,85 @@ ahit_locations = {
     "Subcon Village - Graveyard Ice Cube": LocData(325077, "Subcon Forest Area"),
     "Subcon Village - House Top": LocData(325471, "Subcon Forest Area"),
     "Subcon Village - Ice Cube House": LocData(325469, "Subcon Forest Area"),
-    "Subcon Village - Snatcher Statue Chest": LocData(323730, "Subcon Forest Area"),
+    "Subcon Village - Snatcher Statue Chest": LocData(323730, "Subcon Forest Area", paintings=1),
     "Subcon Village - Stump Platform Chest": LocData(323729, "Subcon Forest Area"),
     "Subcon Forest - Giant Tree Climb": LocData(325470, "Subcon Forest Area"),
-    "Subcon Forest - Swamp Gravestone": LocData(326296, "Subcon Forest Area", required_hats=[HatType.BREWING]),
-    "Subcon Forest - Swamp Near Well": LocData(324762, "Subcon Forest Area"),
-    "Subcon Forest - Swamp Tree A": LocData(324763, "Subcon Forest Area"),
-    "Subcon Forest - Swamp Tree B": LocData(324764, "Subcon Forest Area"),
-    "Subcon Forest - Swamp Ice Wall": LocData(324706, "Subcon Forest Area"),
-    "Subcon Forest - Swamp Treehouse": LocData(325468, "Subcon Forest Area"),
-    "Subcon Forest - Swamp Tree Chest": LocData(323728, "Subcon Forest Area"),
-    "Subcon Forest - Dweller Stump": LocData(324767, "Subcon Forest Area", required_hats=[HatType.DWELLER]),
-    "Subcon Forest - Dweller Floating Rocks": LocData(324464, "Subcon Forest Area", required_hats=[HatType.DWELLER]),
-    "Subcon Forest - Dweller Platforming Tree A": LocData(324709, "Subcon Forest Area"),
-    "Subcon Forest - Dweller Platforming Tree B": LocData(324855, "Subcon Forest Area", required_hats=[HatType.DWELLER]),
-    "Subcon Forest - Giant Time Piece": LocData(325473, "Subcon Forest Area"),
-    "Subcon Forest - Gallows": LocData(325472, "Subcon Forest Area"),
-    "Subcon Forest - Green and Purple Dweller Rocks": LocData(325082, "Subcon Forest Area", required_hats=[HatType.DWELLER]),
-    "Subcon Forest - Dweller Shack": LocData(324463, "Subcon Forest Area", required_hats=[HatType.DWELLER]),
+    
+    "Subcon Forest - Swamp Gravestone": LocData(326296, "Subcon Forest Area",
+                                                required_hats=[HatType.BREWING],
+                                                paintings=1),
+    
+    "Subcon Forest - Swamp Near Well": LocData(324762, "Subcon Forest Area", paintings=1),
+    "Subcon Forest - Swamp Tree A": LocData(324763, "Subcon Forest Area", paintings=1),
+    "Subcon Forest - Swamp Tree B": LocData(324764, "Subcon Forest Area", paintings=1),
+    "Subcon Forest - Swamp Ice Wall": LocData(324706, "Subcon Forest Area", paintings=1),
+    "Subcon Forest - Swamp Treehouse": LocData(325468, "Subcon Forest Area", paintings=1),
+    "Subcon Forest - Swamp Tree Chest": LocData(323728, "Subcon Forest Area", paintings=1),
+    
+    "Subcon Forest - Dweller Stump": LocData(324767, "Subcon Forest Area", 
+                                             required_hats=[HatType.DWELLER],
+                                             paintings=3),
+    
+    "Subcon Forest - Dweller Floating Rocks": LocData(324464, "Subcon Forest Area",
+                                                      required_hats=[HatType.DWELLER],
+                                                      paintings=3),
+    
+    "Subcon Forest - Dweller Platforming Tree A": LocData(324709, "Subcon Forest Area", paintings=3),
+    
+    "Subcon Forest - Dweller Platforming Tree B": LocData(324855, "Subcon Forest Area", 
+                                                          required_hats=[HatType.DWELLER],
+                                                          paintings=3),
+    
+    "Subcon Forest - Giant Time Piece": LocData(325473, "Subcon Forest Area", paintings=1),
+    "Subcon Forest - Gallows": LocData(325472, "Subcon Forest Area", paintings=1),
+    
+    "Subcon Forest - Green and Purple Dweller Rocks": LocData(325082, "Subcon Forest Area",
+                                                              required_hats=[HatType.DWELLER],
+                                                              paintings=3),
+    
+    "Subcon Forest - Dweller Shack": LocData(324463, "Subcon Forest Area",
+                                             required_hats=[HatType.DWELLER],
+                                             paintings=1),
+    
     "Subcon Forest - Tall Tree Hookshot Swing": LocData(324766, "Subcon Forest Area",
-                                                        required_hats=[HatType.DWELLER], hookshot=True),
-    "Subcon Forest - Burning House": LocData(324710, "Subcon Forest Area"),
-    "Subcon Forest - Burning Tree Climb": LocData(325079, "Subcon Forest Area"),
-    "Subcon Forest - Burning Stump Chest": LocData(323731, "Subcon Forest Area"),
-    "Subcon Forest - Burning Forest Treehouse": LocData(325467, "Subcon Forest Area"),  # Can hit the bell w/a cherry
-    "Subcon Forest - Spider Bone Cage A": LocData(324462, "Subcon Forest Area"),
-    "Subcon Forest - Spider Bone Cage B": LocData(325080, "Subcon Forest Area"),
-    "Subcon Forest - Triple Spider Bounce": LocData(324765, "Subcon Forest Area"),
-    "Subcon Forest - Noose Treehouse": LocData(324856, "Subcon Forest Area", hookshot=True),
-    "Subcon Forest - Ice Cube Shack": LocData(324465, "Subcon Forest Area"),
-    "Subcon Forest - Long Tree Climb Chest": LocData(323734, "Subcon Forest Area", required_hats=[HatType.DWELLER]),
+                                                        paintings=3,
+                                                        required_hats=[HatType.DWELLER],
+                                                        hookshot=True),
+    
+    "Subcon Forest - Burning House": LocData(324710, "Subcon Forest Area", paintings=2),
+    "Subcon Forest - Burning Tree Climb": LocData(325079, "Subcon Forest Area", paintings=2),
+    "Subcon Forest - Burning Stump Chest": LocData(323731, "Subcon Forest Area", paintings=2),
+    "Subcon Forest - Burning Forest Treehouse": LocData(325467, "Subcon Forest Area", paintings=2),
+    "Subcon Forest - Spider Bone Cage A": LocData(324462, "Subcon Forest Area", paintings=2),
+    "Subcon Forest - Spider Bone Cage B": LocData(325080, "Subcon Forest Area", paintings=2),
+    "Subcon Forest - Triple Spider Bounce": LocData(324765, "Subcon Forest Area", paintings=2),
+    "Subcon Forest - Noose Treehouse": LocData(324856, "Subcon Forest Area", hookshot=True, paintings=2),
+    "Subcon Forest - Ice Cube Shack": LocData(324465, "Subcon Forest Area", paintings=1),
+    
+    "Subcon Forest - Long Tree Climb Chest": LocData(323734, "Subcon Forest Area",
+                                                     required_hats=[HatType.DWELLER],
+                                                     paintings=2),
+    
     "Subcon Forest - Boss Arena Chest": LocData(323735, "Subcon Forest Area"),
-    "Subcon Forest - Manor Rooftop": LocData(325466, "Subcon Forest Area", dweller_bell=2),
-    "Subcon Forest - Infinite Yarn Bush": LocData(325478, "Subcon Forest Area", required_hats=[HatType.BREWING]),
-    "Subcon Forest - Magnet Badge Bush": LocData(325479, "Subcon Forest Area", required_hats=[HatType.BREWING]),
-    "Subcon Well - Hookshot Badge Chest": LocData(324114, "The Subcon Well", dweller_bell=1),
-    "Subcon Well - Above Chest": LocData(324612, "The Subcon Well", dweller_bell=1),
-    "Subcon Well - On Pipe": LocData(324311, "The Subcon Well", hookshot=True, dweller_bell=1),
-    "Subcon Well - Mushroom": LocData(325318, "The Subcon Well", dweller_bell=1),
-    "Queen Vanessa's Manor - Cellar": LocData(324841, "Queen Vanessa's Manor", dweller_bell=2),
-    "Queen Vanessa's Manor - Bedroom Chest": LocData(323808, "Queen Vanessa's Manor", dweller_bell=2),
-    "Queen Vanessa's Manor - Hall Chest": LocData(323896, "Queen Vanessa's Manor", dweller_bell=2),
-    "Queen Vanessa's Manor - Chandelier": LocData(325546, "Queen Vanessa's Manor", dweller_bell=2),
+    "Subcon Forest - Manor Rooftop": LocData(325466, "Subcon Forest Area", dweller_bell=2, paintings=1),
+    
+    "Subcon Forest - Infinite Yarn Bush": LocData(325478, "Subcon Forest Area", 
+                                                  required_hats=[HatType.BREWING],
+                                                  paintings=2),
+    
+    "Subcon Forest - Magnet Badge Bush": LocData(325479, "Subcon Forest Area",
+                                                 required_hats=[HatType.BREWING],
+                                                 paintings=3),
+    
+    "Subcon Well - Hookshot Badge Chest": LocData(324114, "The Subcon Well", dweller_bell=1, paintings=1),
+    "Subcon Well - Above Chest": LocData(324612, "The Subcon Well", dweller_bell=1, paintings=1),
+    "Subcon Well - On Pipe": LocData(324311, "The Subcon Well", hookshot=True, dweller_bell=1, paintings=1),
+    "Subcon Well - Mushroom": LocData(325318, "The Subcon Well", dweller_bell=1, paintings=1),
+    
+    "Queen Vanessa's Manor - Cellar": LocData(324841, "Queen Vanessa's Manor", dweller_bell=2, paintings=1),
+    "Queen Vanessa's Manor - Bedroom Chest": LocData(323808, "Queen Vanessa's Manor", dweller_bell=2, paintings=1),
+    "Queen Vanessa's Manor - Hall Chest": LocData(323896, "Queen Vanessa's Manor", dweller_bell=2, paintings=1),
+    "Queen Vanessa's Manor - Chandelier": LocData(325546, "Queen Vanessa's Manor", dweller_bell=2, paintings=1),
 
     # 330000 range - Alpine Skyline
     "Alpine Skyline - Goat Village: Below Hookpoint": LocData(334856, "Goat Village"),
@@ -204,8 +258,10 @@ ahit_locations = {
     "Alpine Skyline - The Purrloined Village: Horned Stone": LocData(335561, "Alpine Skyline Area"),
     "Alpine Skyline - The Purrloined Village: Chest Reward": LocData(334831, "Alpine Skyline Area"),
     "Alpine Skyline - The Birdhouse: Triple Crow Chest": LocData(334758, "The Birdhouse"),
+
     "Alpine Skyline - The Birdhouse: Dweller Platforms Relic": LocData(336497, "The Birdhouse",
                                                                        required_hats=[HatType.DWELLER]),
+
     "Alpine Skyline - The Birdhouse: Brewing Crate House": LocData(336496, "The Birdhouse"),
     "Alpine Skyline - The Birdhouse: Hay Bale": LocData(335885, "The Birdhouse"),
     "Alpine Skyline - The Birdhouse: Alpine Crow Mini-Gauntlet": LocData(335886, "The Birdhouse"),
@@ -246,6 +302,25 @@ ahit_locations = {
     "Rock the Boat - Lamp Post": LocData(304048, "Rock the Boat", dlc_flags=HatDLC.dlc1),
     "Rock the Boat - Iceberg Top": LocData(304046, "Rock the Boat", dlc_flags=HatDLC.dlc1),
     "Rock the Boat - Post Captain Rescue": LocData(304049, "Rock the Boat", dlc_flags=HatDLC.dlc1),
+
+    "Nyakuza Metro - Main Station Dining Area": LocData(304105, "Nyakuza Free Roam", dlc_flags=HatDLC.dlc2),
+    "Nyakuza Metro - Top of Ramen Shop": LocData(304104, "Nyakuza Free Roam", dlc_flags=HatDLC.dlc2),
+
+    "Nyakuza Metro - Yellow Overpass Station Crate": LocData(305413, "Yellow Overpass Station",
+                                                             dlc_flags=HatDLC.dlc2,
+                                                             required_hats=[HatType.BREWING]),
+
+    "Nyakuza Metro - Bluefin Tunnel Cat Vacuum": LocData(305111, "Bluefin Tunnel", dlc_flags=HatDLC.dlc2),
+
+    "Nyakuza Metro - Pink Paw Station Cat Vacuum": LocData(305110, "Pink Paw Station",
+                                                           dlc_flags=HatDLC.dlc2,
+                                                           hookshot=True,
+                                                           required_hats=[HatType.DWELLER]),
+
+    "Nyakuza Metro - Pink Paw Station Behind Fan": LocData(304106, "Pink Paw Station",
+                                                           dlc_flags=HatDLC.dlc2,
+                                                           hookshot=True,
+                                                           required_hats=[HatType.TIME_STOP, HatType.DWELLER]),
 }
 
 act_completions = {
@@ -275,10 +350,10 @@ act_completions = {
     "Act Completion (Time Rift - The Moon)": LocData(312785, "Time Rift - The Moon"),
     "Act Completion (Time Rift - Dead Bird Studio)": LocData(312577, "Time Rift - Dead Bird Studio"),
 
-    "Act Completion (Contractual Obligations)": LocData(312317, "Contractual Obligations"),
-    "Act Completion (The Subcon Well)": LocData(311160, "The Subcon Well", hookshot=True, umbrella=True),
-    "Act Completion (Toilet of Doom)": LocData(311984, "Toilet of Doom", hookshot=True),
-    "Act Completion (Queen Vanessa's Manor)": LocData(312017, "Queen Vanessa's Manor", umbrella=True),
+    "Act Completion (Contractual Obligations)": LocData(312317, "Contractual Obligations", paintings=1),
+    "Act Completion (The Subcon Well)": LocData(311160, "The Subcon Well", hookshot=True, umbrella=True, paintings=1),
+    "Act Completion (Toilet of Doom)": LocData(311984, "Toilet of Doom", hookshot=True, paintings=1),
+    "Act Completion (Queen Vanessa's Manor)": LocData(312017, "Queen Vanessa's Manor", umbrella=True, paintings=1),
     "Act Completion (Mail Delivery Service)": LocData(312032, "Mail Delivery Service", required_hats=[HatType.SPRINT]),
     "Act Completion (Your Contract has Expired)": LocData(311390, "Your Contract has Expired", umbrella=True),
     "Act Completion (Time Rift - Pipe)": LocData(313069, "Time Rift - Pipe", hookshot=True),
@@ -290,10 +365,13 @@ act_completions = {
     "Act Completion (The Twilight Bell)": LocData(311540, "The Twilight Bell"),
     "Act Completion (The Windmill)": LocData(312263, "The Windmill"),
     "Act Completion (The Illness has Spread)": LocData(312022, "The Illness has Spread", hookshot=True),
+    
     "Act Completion (Time Rift - The Twilight Bell)": LocData(312399, "Time Rift - The Twilight Bell",
                                                               required_hats=[HatType.DWELLER]),
+    
     "Act Completion (Time Rift - Curly Tail Trail)": LocData(313335, "Time Rift - Curly Tail Trail",
                                                              required_hats=[HatType.ICE]),
+    
     "Act Completion (Time Rift - Alpine Skyline)": LocData(311777, "Time Rift - Alpine Skyline"),
 
     "Act Completion (The Finale)": LocData(311872, "The Finale", hookshot=True, required_hats=[HatType.DWELLER]),
@@ -304,6 +382,40 @@ act_completions = {
     "Act Completion (Rock the Boat)": LocData(311437, "Rock the Boat", dlc_flags=HatDLC.dlc1),
     "Act Completion (Time Rift - Balcony)": LocData(312226, "Time Rift - Balcony", dlc_flags=HatDLC.dlc1, hookshot=True),
     "Act Completion (Time Rift - Deep Sea)": LocData(312434, "Time Rift - Deep Sea", dlc_flags=HatDLC.dlc1, hookshot=True),
+
+    "Act Completion (Nyakuza Metro Intro)": LocData(311138, "Nyakuza Free Roam", dlc_flags=HatDLC.dlc2),
+
+    "Act Completion (Yellow Overpass Station)": LocData(311206, "Yellow Overpass Station",
+                                                        dlc_flags=HatDLC.dlc2,
+                                                        hookshot=True),
+
+    "Act Completion (Yellow Overpass Manhole)": LocData(311387, "Yellow Overpass Manhole",
+                                                        dlc_flags=HatDLC.dlc2,
+                                                        required_hats=[HatType.ICE]),
+
+    "Act Completion (Green Clean Station)": LocData(311207, "Green Clean Station", dlc_flags=HatDLC.dlc2),
+
+    "Act Completion (Green Clean Manhole)": LocData(311388, "Green Clean Manhole",
+                                                    dlc_flags=HatDLC.dlc2,
+                                                    required_hats=[HatType.ICE, HatType.DWELLER]),
+
+    "Act Completion (Bluefin Tunnel)": LocData(311208, "Bluefin Tunnel", dlc_flags=HatDLC.dlc2),
+
+    "Act Completion (Pink Paw Station)": LocData(311209, "Pink Paw Station",
+                                                 dlc_flags=HatDLC.dlc2,
+                                                 hookshot=True,
+                                                 required_hats=[HatType.DWELLER]),
+
+    "Act Completion (Pink Paw Manhole)": LocData(311389, "Pink Paw Manhole",
+                                                 dlc_flags=HatDLC.dlc2,
+                                                 required_hats=[HatType.ICE]),
+
+    "Act Completion (Rush Hour)": LocData(311210, "Rush Hour",
+                                          dlc_flags=HatDLC.dlc2,
+                                          hookshot=True,
+                                          required_hats=[HatType.ICE, HatType.BREWING]),
+
+    "Act Completion (Rumbi Factory)": LocData(312736, "Time Rift - Rumbi Factory", dlc_flags=HatDLC.dlc2),
 }
 
 storybook_pages = {
@@ -358,6 +470,17 @@ storybook_pages = {
     "Tour - Page: Alpine Skyline - Birdhouse": LocData(345044, "Time Rift - Tour", dlc_flags=HatDLC.dlc1),
     "Tour - Page: Alpine Skyline - Behind Lava Isle": LocData(345047, "Time Rift - Tour", dlc_flags=HatDLC.dlc1),
     "Tour - Page: The Finale - Near Entrance": LocData(345087, "Time Rift - Tour", dlc_flags=HatDLC.dlc1),
+
+    "Rumbi Factory - Page: Manhole": LocData(345891, "Time Rift - Rumbi Factory", dlc_flags=HatDLC.dlc2),
+    "Rumbi Factory - Page: Shutter Doors": LocData(345888, "Time Rift - Rumbi Factory", dlc_flags=HatDLC.dlc2),
+    "Rumbi Factory - Page: Toxic Waste Dispenser": LocData(345892, "Time Rift - Rumbi Factory", dlc_flags=HatDLC.dlc2),
+    "Rumbi Factory - Page: 3rd Area Ledge": LocData(345889, "Time Rift - Rumbi Factory", dlc_flags=HatDLC.dlc2),
+    "Rumbi Factory - Page: Green Box Assembly Line": LocData(345884, "Time Rift - Rumbi Factory", dlc_flags=HatDLC.dlc2),
+    "Rumbi Factory - Page: Broken Window": LocData(345885, "Time Rift - Rumbi Factory", dlc_flags=HatDLC.dlc2),
+    "Rumbi Factory - Page: Money Vault": LocData(345890, "Time Rift - Rumbi Factory", dlc_flags=HatDLC.dlc2),
+    "Rumbi Factory - Page: Warehouse Boxes": LocData(345887, "Time Rift - Rumbi Factory", dlc_flags=HatDLC.dlc2),
+    "Rumbi Factory - Page: Glass Shelf": LocData(345886, "Time Rift - Rumbi Factory", dlc_flags=HatDLC.dlc2),
+    "Rumbi Factory - Page: Last Area": LocData(345883, "Time Rift - Rumbi Factory", dlc_flags=HatDLC.dlc2),
 }
 
 contract_locations = {
@@ -379,6 +502,128 @@ shop_locations = {
     "Badge Seller - Item 9": LocData(301011, "Badge Seller"),
     "Badge Seller - Item 10": LocData(301012, "Badge Seller"),
     "Mafia Boss Shop Item": LocData(301013, "Spaceship", required_tps=12),
+
+    "Yellow Overpass Station - Yellow Ticket Booth": LocData(301014, "Yellow Overpass Station", dlc_flags=HatDLC.dlc2),
+    "Green Clean Station - Green Ticket Booth": LocData(301015, "Green Clean Station", dlc_flags=HatDLC.dlc2),
+    "Bluefin Tunnel - Blue Ticket Booth": LocData(301016, "Bluefin Tunnel", dlc_flags=HatDLC.dlc2),
+    "Pink Paw Station - Pink Ticket Booth": LocData(301017, "Pink Paw Station", dlc_flags=HatDLC.dlc2),
+
+    "Main Station Thug A - Item 1": LocData(301048, "Nyakuza Free Roam", dlc_flags=HatDLC.dlc2,
+                                            nyakuza_thug="Hat_NPC_NyakuzaShop_0"),
+    "Main Station Thug A - Item 2": LocData(301049, "Nyakuza Free Roam", dlc_flags=HatDLC.dlc2,
+                                            nyakuza_thug="Hat_NPC_NyakuzaShop_0"),
+    "Main Station Thug A - Item 3": LocData(301050, "Nyakuza Free Roam", dlc_flags=HatDLC.dlc2,
+                                            nyakuza_thug="Hat_NPC_NyakuzaShop_0"),
+    "Main Station Thug A - Item 4": LocData(301051, "Nyakuza Free Roam", dlc_flags=HatDLC.dlc2,
+                                            nyakuza_thug="Hat_NPC_NyakuzaShop_0"),
+    "Main Station Thug A - Item 5": LocData(301052, "Nyakuza Free Roam", dlc_flags=HatDLC.dlc2,
+                                            nyakuza_thug="Hat_NPC_NyakuzaShop_0"),
+
+    "Main Station Thug B - Item 1": LocData(301053, "Nyakuza Free Roam", dlc_flags=HatDLC.dlc2,
+                                            nyakuza_thug="Hat_NPC_NyakuzaShop_1"),
+    "Main Station Thug B - Item 2": LocData(301054, "Nyakuza Free Roam", dlc_flags=HatDLC.dlc2,
+                                            nyakuza_thug="Hat_NPC_NyakuzaShop_1"),
+    "Main Station Thug B - Item 3": LocData(301055, "Nyakuza Free Roam", dlc_flags=HatDLC.dlc2,
+                                            nyakuza_thug="Hat_NPC_NyakuzaShop_1"),
+    "Main Station Thug B - Item 4": LocData(301056, "Nyakuza Free Roam", dlc_flags=HatDLC.dlc2,
+                                            nyakuza_thug="Hat_NPC_NyakuzaShop_1"),
+    "Main Station Thug B - Item 5": LocData(301057, "Nyakuza Free Roam", dlc_flags=HatDLC.dlc2,
+                                            nyakuza_thug="Hat_NPC_NyakuzaShop_1"),
+
+    "Main Station Thug C - Item 1": LocData(301058, "Nyakuza Free Roam", dlc_flags=HatDLC.dlc2,
+                                            nyakuza_thug="Hat_NPC_NyakuzaShop_2"),
+    "Main Station Thug C - Item 2": LocData(301059, "Nyakuza Free Roam", dlc_flags=HatDLC.dlc2,
+                                            nyakuza_thug="Hat_NPC_NyakuzaShop_2"),
+    "Main Station Thug C - Item 3": LocData(301060, "Nyakuza Free Roam", dlc_flags=HatDLC.dlc2,
+                                            nyakuza_thug="Hat_NPC_NyakuzaShop_2"),
+    "Main Station Thug C - Item 4": LocData(301061, "Nyakuza Free Roam", dlc_flags=HatDLC.dlc2,
+                                            nyakuza_thug="Hat_NPC_NyakuzaShop_2"),
+    "Main Station Thug C - Item 5": LocData(301062, "Nyakuza Free Roam", dlc_flags=HatDLC.dlc2,
+                                            nyakuza_thug="Hat_NPC_NyakuzaShop_2"),
+
+    "Yellow Overpass Thug A - Item 1": LocData(301018, "Yellow Overpass Station", dlc_flags=HatDLC.dlc2,
+                                               nyakuza_thug="Hat_NPC_NyakuzaShop_13"),
+    "Yellow Overpass Thug A - Item 2": LocData(301019, "Yellow Overpass Station", dlc_flags=HatDLC.dlc2,
+                                               nyakuza_thug="Hat_NPC_NyakuzaShop_13"),
+    "Yellow Overpass Thug A - Item 3": LocData(301020, "Yellow Overpass Station", dlc_flags=HatDLC.dlc2,
+                                               nyakuza_thug="Hat_NPC_NyakuzaShop_13"),
+    "Yellow Overpass Thug A - Item 4": LocData(301021, "Yellow Overpass Station", dlc_flags=HatDLC.dlc2,
+                                               nyakuza_thug="Hat_NPC_NyakuzaShop_13"),
+    "Yellow Overpass Thug A - Item 5": LocData(301022, "Yellow Overpass Station", dlc_flags=HatDLC.dlc2,
+                                               nyakuza_thug="Hat_NPC_NyakuzaShop_13"),
+
+    "Yellow Overpass Thug B - Item 1": LocData(301043, "Yellow Overpass Station", dlc_flags=HatDLC.dlc2,
+                                               nyakuza_thug="Hat_NPC_NyakuzaShop_5"),
+    "Yellow Overpass Thug B - Item 2": LocData(301044, "Yellow Overpass Station", dlc_flags=HatDLC.dlc2,
+                                               nyakuza_thug="Hat_NPC_NyakuzaShop_5"),
+    "Yellow Overpass Thug B - Item 3": LocData(301045, "Yellow Overpass Station", dlc_flags=HatDLC.dlc2,
+                                               nyakuza_thug="Hat_NPC_NyakuzaShop_5"),
+    "Yellow Overpass Thug B - Item 4": LocData(301046, "Yellow Overpass Station", dlc_flags=HatDLC.dlc2,
+                                               nyakuza_thug="Hat_NPC_NyakuzaShop_5"),
+    "Yellow Overpass Thug B - Item 5": LocData(301047, "Yellow Overpass Station", dlc_flags=HatDLC.dlc2,
+                                               nyakuza_thug="Hat_NPC_NyakuzaShop_5"),
+
+    "Yellow Overpass Thug C - Item 1": LocData(301063, "Yellow Overpass Station", dlc_flags=HatDLC.dlc2,
+                                               nyakuza_thug="Hat_NPC_NyakuzaShop_14"),
+    "Yellow Overpass Thug C - Item 2": LocData(301064, "Yellow Overpass Station", dlc_flags=HatDLC.dlc2,
+                                               nyakuza_thug="Hat_NPC_NyakuzaShop_14"),
+    "Yellow Overpass Thug C - Item 3": LocData(301065, "Yellow Overpass Station", dlc_flags=HatDLC.dlc2,
+                                               nyakuza_thug="Hat_NPC_NyakuzaShop_14"),
+    "Yellow Overpass Thug C - Item 4": LocData(301066, "Yellow Overpass Station", dlc_flags=HatDLC.dlc2,
+                                               nyakuza_thug="Hat_NPC_NyakuzaShop_14"),
+    "Yellow Overpass Thug C - Item 5": LocData(301067, "Yellow Overpass Station", dlc_flags=HatDLC.dlc2,
+                                               nyakuza_thug="Hat_NPC_NyakuzaShop_14"),
+
+    "Green Clean Station Thug A - Item 1": LocData(301033, "Green Clean Station", dlc_flags=HatDLC.dlc2,
+                                                   nyakuza_thug="Hat_NPC_NyakuzaShop_4"),
+    "Green Clean Station Thug A - Item 2": LocData(301034, "Green Clean Station", dlc_flags=HatDLC.dlc2,
+                                                   nyakuza_thug="Hat_NPC_NyakuzaShop_4"),
+    "Green Clean Station Thug A - Item 3": LocData(301035, "Green Clean Station", dlc_flags=HatDLC.dlc2,
+                                                   nyakuza_thug="Hat_NPC_NyakuzaShop_4"),
+    "Green Clean Station Thug A - Item 4": LocData(301036, "Green Clean Station", dlc_flags=HatDLC.dlc2,
+                                                   nyakuza_thug="Hat_NPC_NyakuzaShop_4"),
+    "Green Clean Station Thug A - Item 5": LocData(301037, "Green Clean Station", dlc_flags=HatDLC.dlc2,
+                                                   nyakuza_thug="Hat_NPC_NyakuzaShop_4"),
+
+    # This guy requires either the yellow ticket or the Ice Hat
+    "Green Clean Station Thug B - Item 1": LocData(301028, "Green Clean Station", dlc_flags=HatDLC.dlc2,
+                                                   required_hats=[HatType.ICE], nyakuza_thug="Hat_NPC_NyakuzaShop_6"),
+    "Green Clean Station Thug B - Item 2": LocData(301029, "Green Clean Station", dlc_flags=HatDLC.dlc2,
+                                                   required_hats=[HatType.ICE], nyakuza_thug="Hat_NPC_NyakuzaShop_6"),
+    "Green Clean Station Thug B - Item 3": LocData(301030, "Green Clean Station", dlc_flags=HatDLC.dlc2,
+                                                   required_hats=[HatType.ICE], nyakuza_thug="Hat_NPC_NyakuzaShop_6"),
+    "Green Clean Station Thug B - Item 4": LocData(301031, "Green Clean Station", dlc_flags=HatDLC.dlc2,
+                                                   required_hats=[HatType.ICE], nyakuza_thug="Hat_NPC_NyakuzaShop_6"),
+    "Green Clean Station Thug B - Item 5": LocData(301032, "Green Clean Station", dlc_flags=HatDLC.dlc2,
+                                                   required_hats=[HatType.ICE], nyakuza_thug="Hat_NPC_NyakuzaShop_6"),
+
+    "Bluefin Tunnel Thug - Item 1": LocData(301023, "Bluefin Tunnel", dlc_flags=HatDLC.dlc2,
+                                            nyakuza_thug="Hat_NPC_NyakuzaShop_7"),
+    "Bluefin Tunnel Thug - Item 2": LocData(301024, "Bluefin Tunnel", dlc_flags=HatDLC.dlc2,
+                                            nyakuza_thug="Hat_NPC_NyakuzaShop_7"),
+    "Bluefin Tunnel Thug - Item 3": LocData(301025, "Bluefin Tunnel", dlc_flags=HatDLC.dlc2,
+                                            nyakuza_thug="Hat_NPC_NyakuzaShop_7"),
+    "Bluefin Tunnel Thug - Item 4": LocData(301026, "Bluefin Tunnel", dlc_flags=HatDLC.dlc2,
+                                            nyakuza_thug="Hat_NPC_NyakuzaShop_7"),
+    "Bluefin Tunnel Thug - Item 5": LocData(301027, "Bluefin Tunnel", dlc_flags=HatDLC.dlc2,
+                                            nyakuza_thug="Hat_NPC_NyakuzaShop_7"),
+
+    "Pink Paw Station Thug - Item 1": LocData(301038, "Pink Paw Station", dlc_flags=HatDLC.dlc2,
+                                              required_hats=[HatType.DWELLER], hookshot=True,
+                                              nyakuza_thug="Hat_NPC_NyakuzaShop_12"),
+    "Pink Paw Station Thug - Item 2": LocData(301039, "Pink Paw Station", dlc_flags=HatDLC.dlc2,
+                                              required_hats=[HatType.DWELLER], hookshot=True,
+                                              nyakuza_thug="Hat_NPC_NyakuzaShop_12"),
+    "Pink Paw Station Thug - Item 3": LocData(301040, "Pink Paw Station", dlc_flags=HatDLC.dlc2,
+                                              required_hats=[HatType.DWELLER], hookshot=True,
+                                              nyakuza_thug="Hat_NPC_NyakuzaShop_12"),
+    "Pink Paw Station Thug - Item 4": LocData(301041, "Pink Paw Station", dlc_flags=HatDLC.dlc2,
+                                              required_hats=[HatType.DWELLER], hookshot=True,
+                                              nyakuza_thug="Hat_NPC_NyakuzaShop_12"),
+    "Pink Paw Station Thug - Item 5": LocData(301042, "Pink Paw Station", dlc_flags=HatDLC.dlc2,
+                                              required_hats=[HatType.DWELLER], hookshot=True,
+                                              nyakuza_thug="Hat_NPC_NyakuzaShop_12"),
+
 }
 
 # Don't put any of the locations from peaks here, the rules for their entrances are set already
@@ -398,55 +643,6 @@ zipline_unlocks = {
     "Alpine Skyline - The Twilight Path":   "Zipline Unlock - The Twilight Bell Path",
 }
 
-# How many progressive paintings are required for each location
-painting_reqs = {
-    "Subcon Forest - Swamp Gravestone": 1,
-    "Subcon Forest - Swamp Near Well": 1,
-    "Subcon Forest - Swamp Tree A": 1,
-    "Subcon Forest - Swamp Tree B": 1,
-    "Subcon Forest - Swamp Ice Wall": 1,
-    "Subcon Forest - Swamp Treehouse": 1,
-    "Subcon Forest - Swamp Tree Chest": 1,
-    "Subcon Forest - Manor Rooftop": 1,
-    "Subcon Forest - Ice Cube Shack": 1,
-    "Subcon Village - Snatcher Statue Chest": 1,
-    "Subcon Well - Hookshot Badge Chest": 1,
-    "Subcon Well - Above Chest": 1,
-    "Subcon Well - On Pipe": 1,
-    "Subcon Well - Mushroom": 1,
-    "Queen Vanessa's Manor - Cellar": 1,
-    "Queen Vanessa's Manor - Bedroom Chest": 1,
-    "Queen Vanessa's Manor - Hall Chest": 1,
-    "Queen Vanessa's Manor - Chandelier": 1,
-    "Act Completion (Contractual Obligations)": 1,
-    "Act Completion (The Subcon Well)": 1,
-    "Act Completion (Toilet of Doom)": 1,
-    "Act Completion (Queen Vanessa's Manor)": 1,
-
-    "Subcon Forest - Burning House": 2,
-    "Subcon Forest - Burning Tree Climb": 2,
-    "Subcon Forest - Burning Stump Chest": 2,
-    "Subcon Forest - Burning Forest Treehouse": 2,
-    "Subcon Forest - Spider Bone Cage A": 2,
-    "Subcon Forest - Spider Bone Cage B": 2,
-    "Subcon Forest - Triple Spider Bounce": 2,
-    "Subcon Forest - Noose Treehouse": 2,
-    "Subcon Forest - Infinite Yarn Bush": 2,
-    "Subcon Forest - Long Tree Climb Chest": 2,
-
-    "Subcon Forest - Dweller Stump": 3,
-    "Subcon Forest - Dweller Floating Rocks": 3,
-    "Subcon Forest - Dweller Platforming Tree A": 3,
-    "Subcon Forest - Dweller Platforming Tree B": 3,
-    "Subcon Forest - Giant Time Piece": 3,
-    "Subcon Forest - Gallows": 3,
-    "Subcon Forest - Green and Purple Dweller Rocks": 3,
-    "Subcon Forest - Dweller Shack": 3,
-    "Subcon Forest - Tall Tree Hookshot Swing": 3,
-    "Subcon Forest - Magnet Badge Bush": 3,
-}
-
-
 # Locations in Alpine that are available in The Illness has Spread
 # Goat Village locations don't need to be put here
 tihs_locations = [
@@ -458,9 +654,23 @@ tihs_locations = [
 ]
 
 event_locs = {
+    "Birdhouse Cleared": LocData(0, "The Birdhouse"),
+    "Lava Cake Cleared": LocData(0, "The Lava Cake"),
     "Windmill Cleared": LocData(0, "The Windmill"),
     "Twilight Bell Cleared": LocData(0, "The Twilight Bell"),
     "Time Piece Cluster": LocData(0, "The Finale"),
+
+    # not really an act
+    "Nyakuza Intro Cleared": LocData(0, "Nyakuza Free Roam", dlc_flags=HatDLC.dlc2, act_complete_event=False),
+
+    "Yellow Overpass Station Cleared": LocData(0, "Yellow Overpass Station", dlc_flags=HatDLC.dlc2),
+    "Green Clean Station Cleared": LocData(0, "Green Clean Station", dlc_flags=HatDLC.dlc2),
+    "Bluefin Tunnel Cleared": LocData(0, "Bluefin Tunnel", dlc_flags=HatDLC.dlc2),
+    "Pink Paw Station Cleared": LocData(0, "Pink Paw Station", dlc_flags=HatDLC.dlc2),
+    "Yellow Overpass Manhole Cleared": LocData(0, "Yellow Overpass Manhole", dlc_flags=HatDLC.dlc2),
+    "Green Clean Manhole Cleared": LocData(0, "Green Clean Manhole", dlc_flags=HatDLC.dlc2),
+    "Pink Paw Manhole Cleared": LocData(0, "Pink Paw Manhole", dlc_flags=HatDLC.dlc2),
+    "Rush Hour Cleared": LocData(0, "Rush Hour", dlc_flags=HatDLC.dlc2),
 }
 
 location_table = {

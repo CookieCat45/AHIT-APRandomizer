@@ -19,6 +19,7 @@ var int ShopItemRandStep;
 var array<int> PageLocationIDs;
 var bool TimePiecesCached;
 
+var int Goal;
 var bool ActRando;
 var bool ShuffleStorybookPages;
 var bool ShuffleActContracts;
@@ -36,6 +37,7 @@ var int TaskStep;
 var int CompletedTasks;
 
 var bool DLC2;
+var bool BaseballBat;
 
 var int CompassBadgeMode;
 
@@ -45,6 +47,7 @@ var int Chapter3Cost;
 var int Chapter4Cost;
 var int Chapter5Cost;
 var int Chapter6Cost;
+var int Chapter7Cost;
 
 var int SprintYarnCost;
 var int BrewingYarnCost;
@@ -52,8 +55,11 @@ var int IceYarnCost;
 var int DwellerYarnCost;
 var int TimeStopYarnCost;
 
+var int BadgeSellerItemCount;
 var int MinPonCost;
 var int MaxPonCost;
+var int MetroMinPonCost;
+var int MetroMaxPonCost;
 
 var array<Hat_ChapterActInfo> LockedBlueRifts;
 var array< class<Hat_SnatcherContract_Act> > ObtainedContracts;

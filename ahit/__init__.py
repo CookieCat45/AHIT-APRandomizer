@@ -1,14 +1,17 @@
 from BaseClasses import Item, ItemClassification, Region, LocationProgressType
 
 from .Items import HatInTimeItem, item_table, item_frequencies, item_dlc_enabled, junk_weights,\
-    create_item, create_multiple_items, create_junk_items, relic_groups, act_contracts, alps_hooks, get_total_time_pieces
+    create_item, create_multiple_items, create_junk_items, relic_groups, act_contracts, alps_hooks, \
+    get_total_time_pieces
 
 from .Regions import create_region, create_regions, connect_regions, randomize_act_entrances, chapter_act_info, \
     create_events, chapter_regions, act_chapters
 
-from .Locations import HatInTimeLocation, location_table, get_total_locations, contract_locations, is_location_valid
+from .Locations import HatInTimeLocation, location_table, get_total_locations, contract_locations, is_location_valid, \
+    get_location_names
+
 from .Types import HatDLC, HatType, ChapterIndex
-from .Options import ahit_options, slot_data_options
+from .Options import ahit_options, slot_data_options, adjust_options
 from worlds.AutoWorld import World
 from .Rules import set_rules
 import typing
@@ -24,7 +27,7 @@ class HatInTimeWorld(World):
     data_version = 1
 
     item_name_to_id = {name: data.code for name, data in item_table.items()}
-    location_name_to_id = {name: data.id for name, data in location_table.items()}
+    location_name_to_id = get_location_names()
 
     option_definitions = ahit_options
 
@@ -32,28 +35,13 @@ class HatInTimeWorld(World):
     hat_yarn_costs: typing.Dict[HatType, int]
     chapter_timepiece_costs: typing.Dict[ChapterIndex, int]
     act_connections: typing.Dict[str, str] = {}
+    nyakuza_thug_items: typing.Dict[str, int] = {}
+    shop_locs: typing.List[str] = []
     item_name_groups = relic_groups
+    badge_seller_count: int = 0
 
     def generate_early(self):
-        # Fix options
-        self.multiworld.HighestChapterCost[self.player].value = max(self.multiworld.HighestChapterCost[self.player].value,
-                                                                    self.multiworld.LowestChapterCost[self.player].value)
-
-        self.multiworld.LowestChapterCost[self.player].value = min(self.multiworld.LowestChapterCost[self.player].value,
-                                                                   self.multiworld.HighestChapterCost[self.player].value)
-
-        self.multiworld.Chapter5MinCost[self.player].value = min(self.multiworld.Chapter5MinCost[self.player].value,
-                                                                 self.multiworld.Chapter5MaxCost[self.player].value)
-
-        self.multiworld.Chapter5MaxCost[self.player].value = max(self.multiworld.Chapter5MaxCost[self.player].value,
-                                                                 self.multiworld.Chapter5MinCost[self.player].value)
-
-        total_tps: int = get_total_time_pieces(self)
-        if self.multiworld.HighestChapterCost[self.player].value > total_tps-5:
-            self.multiworld.HighestChapterCost[self.player].value = min(40, total_tps-5)
-
-        if self.multiworld.Chapter5MaxCost[self.player].value > total_tps:
-            self.multiworld.Chapter5MaxCost[self.player].value = min(50, total_tps)
+        adjust_options(self)
 
         # If our starting chapter is 4 and act rando isn't on, force hookshot into inventory
         # If starting chapter is 3 and painting shuffle is enabled, and act rando isn't, give one free painting unlock
@@ -71,6 +59,8 @@ class HatInTimeWorld(World):
             self.multiworld.push_precollected(self.create_item("Compass Badge"))
 
     def create_regions(self):
+        self.nyakuza_thug_items = {}
+        self.shop_locs = []
         create_regions(self)
 
         # place default contract locations if contract shuffle is off so logic can still utilize them
@@ -133,6 +123,9 @@ class HatInTimeWorld(World):
                 if self.multiworld.EnableDLC1[self.player].value > 0:
                     max_extra += 6
 
+                if self.multiworld.EnableDLC2[self.player].value > 0:
+                    max_extra += 10
+
                 tp_count += min(max_extra, self.multiworld.MaxExtraTimePieces[self.player].value)
                 tp_list: typing.List[Item] = create_multiple_items(self, name, tp_count)
 
@@ -180,16 +173,22 @@ class HatInTimeWorld(World):
                            "Chapter4Cost": self.chapter_timepiece_costs[ChapterIndex.ALPINE],
                            "Chapter5Cost": self.chapter_timepiece_costs[ChapterIndex.FINALE],
                            "Chapter6Cost": self.chapter_timepiece_costs[ChapterIndex.CRUISE],
+                           "Chapter7Cost": self.chapter_timepiece_costs[ChapterIndex.METRO],
                            "Hat1": int(self.hat_craft_order[0]),
                            "Hat2": int(self.hat_craft_order[1]),
                            "Hat3": int(self.hat_craft_order[2]),
                            "Hat4": int(self.hat_craft_order[3]),
                            "Hat5": int(self.hat_craft_order[4]),
+                           "BadgeSellerItemCount": self.badge_seller_count,
                            "SeedNumber": self.multiworld.seed}  # For shop prices
 
         if self.multiworld.ActRandomizer[self.player].value > 0:
             for name in self.act_connections.keys():
                 slot_data[name] = self.act_connections[name]
+
+        if self.multiworld.EnableDLC2[self.player].value > 0:
+            for name in self.nyakuza_thug_items.keys():
+                slot_data[name] = self.nyakuza_thug_items[name]
 
         for option_name in slot_data_options:
             option = getattr(self.multiworld, option_name)[self.player]
@@ -199,12 +198,32 @@ class HatInTimeWorld(World):
 
     def extend_hint_information(self, hint_data: typing.Dict[int, typing.Dict[int, str]]):
         new_hint_data = {}
+        alpine_regions = ["The Birdhouse", "The Lava Cake", "The Windmill", "The Twilight Bell"]
+        metro_regions = ["Yellow Overpass Station", "Green Clean Station", "Bluefin Tunnel", "Pink Paw Station"]
+
         for key, data in location_table.items():
-            if data.region not in chapter_act_info.keys() or not is_location_valid(self, key):
+            if not is_location_valid(self, key):
                 continue
 
             location = self.multiworld.get_location(key, self.player)
-            new_hint_data[location.address] = self.get_shuffled_region(location.parent_region.name)
+            region_name: str
+
+            if data.region in alpine_regions:
+                region_name = "Alpine Free Roam"
+            elif data.region in metro_regions:
+                region_name = "Nyakuza Free Roam"
+            elif data.region in chapter_act_info.keys():
+                region_name = location.parent_region.name
+            else:
+                continue
+
+            new_hint_data[location.address] = self.get_shuffled_region(region_name)
+
+        if self.multiworld.EnableDLC1[self.player].value > 0 and self.multiworld.Tasksanity[self.player].value > 0:
+            ship_shape_region = self.get_shuffled_region("Ship Shape")
+            id_start: int = 300204
+            for i in range(self.multiworld.TasksanityCheckCount[self.player].value):
+                new_hint_data[id_start+i] = ship_shape_region
 
         hint_data[self.player] = new_hint_data
 

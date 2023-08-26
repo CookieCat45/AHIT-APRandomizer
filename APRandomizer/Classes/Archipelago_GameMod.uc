@@ -6,6 +6,7 @@ class Archipelago_GameMod extends GameMod
 var Archipelago_TcpLink Client;
 var Archipelago_SlotData SlotData;
 var Archipelago_ItemResender ItemResender;
+var transient int ActMapChangeChapter;
 var transient bool ActMapChange;
 var transient bool CollectiblesShuffled;
 var transient bool ControllerCapsLock;
@@ -92,6 +93,7 @@ var array<Hat_TreasureChest_Base> ChestArray;
 var array<Hat_NPC> BulliedNPCArray;
 var array<Hat_Enemy_ScienceBand_Base> ParadeArray;
 var array<Texture2D> UnlockScreenNumbers;
+var array<string> ThugCatShops;
 
 event OnModLoaded()
 {
@@ -286,7 +288,7 @@ event PreBeginPlay()
 	
 	if (!IsArchipelagoEnabled())
 		return;
-
+	
 	SlotData = new class'Archipelago_SlotData';
 	path = "APSlotData/slot_data"$`SaveManager.GetCurrentSaveData().CreationTimeStamp;
 	
@@ -379,14 +381,13 @@ event PreBeginPlay()
 	}
 	
 	SetAPBits("AlpineFinale", 0);
+	ConsoleCommand("set Hat_IntruderInfo_CookingCat HasIntruderAlert false");
 }
 
 event PostBeginPlay()
 {
-	local int i;
-	local array<SequenceObject> seqObjects;
-	
 	Super.PostBeginPlay();
+
 	if (!IsArchipelagoEnabled())
 		return;
 	
@@ -398,19 +399,13 @@ event PostBeginPlay()
 		class'Hat_SaveBitHelper'.static.SetLevelBits("hub_cinematics", 1);
 	}
 	
-	WorldInfo.GetGameSequence().FindSeqObjectsByClass(class'Hat_SeqAct_ClearContractObjective', true, seqObjects);
-	for (i = 0; i < seqObjects.Length; i++)
-	{
-		Hat_SeqAct_ClearContractObjective(seqObjects[i]).ContractClass = None;
-	}
-	
 	ItemResender = new class'Archipelago_ItemResender';
 }
 
 function OnPostInitGame()
 {
 	local int i, saveCount;
-	local string mapName;
+	local string mapName, realMapName;
 	local Hat_BackpackItem item;
 	local Hat_TreasureChest_Base chest;
 	local Hat_TimeRiftPortal portal;
@@ -419,8 +414,11 @@ function OnPostInitGame()
 	local Hat_Player ply;
 	local Hat_PlayerController ctr;
 	local Hat_NPC npc;
-	local Actor a;
 	local Hat_SubconPainting painting;
+	local array<SequenceObject> seqObjects;
+	local Hat_MetroTicketBooth_Base booth;
+	local ShopInventoryItem dummy;
+	local array<Object> shopInvs;
 	
 	// If on titlescreen, find any Archipelago-enabled save files and do this stuff 
 	// to prevent the game from forcing the player into Mafia Town.
@@ -449,20 +447,8 @@ function OnPostInitGame()
 	
 	HideItems();
 	
-	// Some maps like Arctic Cruise need this for some stupid reason otherwise not all of them get hidden
+	// Bon Voyage hotfix
 	SetTimer(0.5, false, NameOf(HideItems));
-	
-	foreach DynamicActors(class'Actor', a)
-	{
-		if (a.IsA('Hat_NPC_BadgeSalesman') && !a.IsA('Archipelago_NPC_BadgeSalesman'))
-		{
-			if (a.bHidden)
-				continue;
-			
-			Spawn(class'Archipelago_NPC_BadgeSalesman', , , a.Location, a.Rotation);
-			a.Destroy();
-		}
-	}
 	
 	if (IsInSpaceship())
 	{
@@ -538,26 +524,62 @@ function OnPostInitGame()
 			}
 		}
 		
+		if (SlotData.BadgeSellerItemCount <= 0)
+		{
+			foreach DynamicActors(class'Hat_NPC', npc)
+			{
+				if (npc.IsA('Hat_NPC_BadgeSalesman'))
+					npc.ShutDown();
+			}
+		}
+		
 		mapName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename();
-	
+		realMapName = `GameManager.GetCurrentMapFilename();
+		
 		// Fix for Rock the Boat
-		if (`GameManager.GetCurrentMapFilename() ~= "ship_sinking")
+		if (realMapName ~= "ship_sinking")
 			mapName = "ship_sinking";
 		
-		// Shuffle items from cache?
 		if (IsMapScouted(mapName))
-			ShuffleCollectibles(true);
+			SetTimer(0.4, false, NameOf(ShuffleCollectibles2));
 		
-		if (mapName ~= "mafia_town")
+		if (InStr(realMapName, "mafia_town") != -1)
 		{
 			DeleteCameraParticle();
 		}
-		else if (mapName ~= "alpsandsails")
+		else if (realMapName ~= "alpsandsails" && SlotData.ShuffleZiplines)
 		{
 			SetTimer(0.8, true, NameOf(UpdateZiplineUnlocks));
 		}
-		
-		if (`GameManager.GetCurrentMapFilename() ~= "subconforest")
+		else if (realMapName ~= "dlc_metro")
+		{
+			CleanUpMetro();
+			
+			// so the shopkeeper doesn't say "we're sold out" when the player has the ticket
+			foreach DynamicActors(class'Hat_MetroTicketBooth_Base', booth)
+				booth.WasBought = false;
+			
+			shopInvs = class'Hat_ClassHelper'.static.GetAllObjectsExpensive("Hat_ShopInventory");
+			dummy.CollectibleClass = class'Archipelago_ShopItem_Dummy';
+			
+			for (i = 0; i < shopInvs.Length; i++)
+			{
+				if (Archipelago_ShopInventory_Base(shopInvs[i]) != None
+				|| Hat_ShopInventory_MetroFood(shopInvs[i]) != None)
+					continue;
+			
+				Hat_ShopInventory(shopInvs[i]).ItemsForSale.AddItem(dummy);
+			}
+			
+			foreach DynamicActors(class'Hat_NPC', npc)
+			{
+				if (npc.IsA('Hat_NPC_NyakuzaShop'))
+				{
+					ConsoleCommand("set " $npc.Name $" SoldOut false");
+				}
+			}
+		}
+		else if (realMapName ~= "subconforest")
 		{
 			// If act rando or contracts are shuffled, remove these act transitions for the well/manor if we don't enter from the proper act.
 			// This forces the player to find the act/contracts in order to enter them
@@ -575,7 +597,7 @@ function OnPostInitGame()
 					}
 					
 					// If contracts are shuffled, disable the bag trap trigger if we already checked the Subcon Well contract
-					if (SlotData.ShuffleActContracts && trigger.Name == 'TriggerVolume_23')
+					if (SlotData.ShuffleActContracts && trigger.Name == 'TriggerVolume_4')
 					{
 						if (SlotData.CheckedContracts.Find(class'Hat_SnatcherContract_IceWall') != -1)
 						{
@@ -596,6 +618,13 @@ function OnPostInitGame()
 						painting.SetCollision(false, false);
 					}
 				}
+			}
+			
+			// Kismet edits here
+			WorldInfo.GetGameSequence().FindSeqObjectsByClass(class'Hat_SeqAct_ClearContractObjective', true, seqObjects);
+			for (i = 0; i < seqObjects.Length; i++)
+			{
+				Hat_SeqAct_ClearContractObjective(seqObjects[i]).ContractClass = None;
 			}
 		}
 	}
@@ -657,12 +686,22 @@ function OnPostInitGame()
 		CreateClient();
 }
 
+function OnPostLevelIntro()
+{
+	if (!IsArchipelagoEnabled())
+		return;
+
+	if (`GameManager.GetCurrentMapFilename() ~= "dlc_metro")
+		SetTimer(0.1, false, NameOf(CleanUpMetro));
+}
+
 function HideItems()
 {
 	local Hat_Collectible_Important a;
 	foreach DynamicActors(class'Hat_Collectible_Important', a)
 	{
-		if (a.IsA('Hat_Collectible_VaultCode_Base') || a.IsA('Hat_Collectible_Sticker'))
+		if (a.IsA('Hat_Collectible_VaultCode_Base') || a.IsA('Hat_Collectible_Sticker')
+			|| a.IsA('Hat_Collectible_MetroTicket_Base'))
 			continue;
 		
 		if (a.IsA('Hat_Collectible_InstantCamera'))
@@ -805,7 +844,7 @@ function OnPreConnected()
 // All slot data should be available at this point.
 function OnFullyConnected()
 {
-	ShuffleCollectibles();
+	SetTimer(0.5, false, NameOf(ShuffleCollectibles));
 	UpdateChapterInfo();
 	
 	// Have we beaten our seed? Send again in case we somehow weren't connected before.
@@ -845,6 +884,7 @@ function LoadSlotData(JsonObject json)
 		return;
 	
 	SlotData.ConnectedOnce = true;
+	SlotData.Goal = json.GetIntValue("EndGoal");
 	SlotData.ActRando = json.GetBoolValue("ActRandomizer");
 	SlotData.ShuffleStorybookPages = json.GetBoolValue("ShuffleStorybookPages");
 	SlotData.ShuffleActContracts = json.GetBoolValue("ShuffleActContracts");
@@ -862,8 +902,9 @@ function LoadSlotData(JsonObject json)
 	SlotData.Chapter3Cost = json.GetIntValue("Chapter3Cost");
 	SlotData.Chapter4Cost = json.GetIntValue("Chapter4Cost");
 	SlotData.Chapter5Cost = json.GetIntValue("Chapter5Cost");
-
+	
 	SlotData.DLC1 = json.GetBoolValue("EnableDLC1");
+	SlotData.DLC2 = json.GetBoolValue("EnableDLC2");
 	
 	if (SlotData.DLC1)
 	{
@@ -876,15 +917,33 @@ function LoadSlotData(JsonObject json)
 		}
 	}
 	
+	if (SlotData.DLC2)
+	{
+		SlotData.Chapter7Cost = json.GetIntValue("Chapter7Cost");
+		for (i = 0; i < ThugCatShops.Length; i++)
+		{
+			// Set shop item count as level bit
+			DebugMessage(ThugCatShops[i] $" THUG SHOP COUNT: "$json.GetIntValue(ThugCatShops[i]));
+			SetAPBits(ThugCatShops[i], json.GetIntValue(ThugCatShops[i]));
+		}
+		
+		SlotData.MetroMinPonCost = json.GetIntValue("MetroMinPonCost");
+		SlotData.MetroMaxPonCost = json.GetIntValue("MetroMaxPonCost");
+		SlotData.MetroMinPonCost = Min(SlotData.MetroMinPonCost, SlotData.MetroMaxPonCost);
+		SlotData.MetroMaxPonCost = Max(SlotData.MetroMinPonCost, SlotData.MetroMaxPonCost);
+	}
+	
+	SlotData.BaseballBat = json.GetBoolValue("BaseballBat");
+	
 	SlotData.SprintYarnCost = json.GetIntValue("SprintYarnCost");
 	SlotData.BrewingYarnCost = json.GetIntValue("BrewingYarnCost");
 	SlotData.IceYarnCost = json.GetIntValue("IceYarnCost");
 	SlotData.DwellerYarnCost = json.GetIntValue("DwellerYarnCost");
 	SlotData.TimeStopYarnCost = json.GetIntValue("TimeStopYarnCost");
 	
+	SlotData.BadgeSellerItemCount = json.GetIntValue("BadgeSellerItemCount");
 	SlotData.MinPonCost = json.GetIntValue("MinPonCost");
 	SlotData.MaxPonCost = json.GetIntValue("MaxPonCost");
-	
 	SlotData.MinPonCost = Min(SlotData.MinPonCost, SlotData.MaxPonCost);
 	SlotData.MaxPonCost = Max(SlotData.MinPonCost, SlotData.MaxPonCost);
 	
@@ -968,18 +1027,27 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 	
 	ActMapChange = true;
 	
-	if (!SlotData.ActRando && Hat_ChapterInfo(ChapterInfo).ChapterID == 4)
+	if (!SlotData.ActRando)
 	{
-		if (ActID == 99 && class'Hat_SaveBitHelper'.static.HasLevelBit("Actless_FreeRoam_Intro_Complete", 1, "AlpsAndSails"))
+		if (Hat_ChapterInfo(ChapterInfo).ChapterID == 4)
 		{
-			ActID = 1;
-			
-			if (class'Hat_SeqCond_IsAlpineFinale'.static.IsAlpineFinale())
-				DisableAlpineFinale();
+			if (ActID == 99 && class'Hat_SaveBitHelper'.static.HasLevelBit("Actless_FreeRoam_Intro_Complete", 1, "AlpsAndSails"))
+			{
+				ActID = 1;
+				
+				if (class'Hat_SeqCond_IsAlpineFinale'.static.IsAlpineFinale())
+					DisableAlpineFinale();
+			}
+			else if (ActID == 1)
+			{
+				EnableAlpineFinale();
+			}
 		}
-		else if (ActID == 1)
+		else if (Hat_ChapterInfo(ChapterInfo).ChapterID == 7)
 		{
-			EnableAlpineFinale();
+			// ActID 99 is intro, skip if completed
+			if (ActID == 99 && IsActReallyCompleted(GetChapterActInfoFromHourglass("Metro_Intro")))
+				ActID = 98;
 		}
 		
 		return;
@@ -1074,15 +1142,20 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 	
 	if (basement == 1)
 	{
+		ActMapChangeChapter = 2;
 		ActID = 6;
 		MapName = "DeadBirdStudio";
 	}
 	else // Normal act shuffle
 	{
+		ActMapChangeChapter = shuffled.ChapterInfo.ChapterID;
 		ActID = shuffled.ActID;
 		MapName = shuffled.MapName;
 	}
 	
+	// Game will override it if we do it here
+	SetTimer(0.01, false, NameOf(SetMapChangeChapter));
+
 	if (shuffled.ChapterInfo.ChapterID == 4)
 	{
 		// Free Roam
@@ -1099,8 +1172,19 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 			EnableAlpineFinale();
 		}
 	}
+	else if (shuffled.ChapterInfo.ChapterID == 7)
+	{
+		// ActID 99 is intro, skip if completed
+		if (ActID == 99 && IsActReallyCompleted(GetChapterActInfoFromHourglass("Metro_Intro")))
+			ActID = 98;
+	}
 	
 	DebugMessage("Switching act " $PathName(act) $" with act: " $PathName(shuffled) $", map:" $MapName $" Act ID: "$ActID);
+}
+
+function SetMapChangeChapter()
+{
+	`SaveManager.SetCurrentChapter(ActMapChangeChapter);
 }
 
 function OnMiniMissionGenericEvent(Object MiniMission, String id)
@@ -1138,57 +1222,141 @@ function OnPreOpenHUD(HUD InHUD, out class<Object> InHUDElement)
 	if (!IsArchipelagoEnabled())
 		return;
 	
-	if (InHUDElement == class'Hat_HUDElementGhostPartyJoinAct')
+	switch (InHUDElement)
 	{
-		if (SlotData == None || SlotData.ActRando)
-			InHUDElement = None;
-	}
-	else if (InHUDElement == class'Hat_HUDMenuShop')
-	{
-		SetTimer(0.0001, false, NameOf(CheckShopOverride), self, Hat_HUD(InHUD));
-	}
-	else if (InHUDElement == class'Hat_HUDMenuActSelect')
-	{
-		InHUDElement = class'Archipelago_HUDMenuActSelect';
-	}
-	else if (InHUDElement == class'Hat_HUDElementActTitleCard' && SlotData != None && SlotData.ActRando && !ActMapChange)
-	{
-		SetTimer(0.0001, false, NameOf(CheckActTitleCard), self, Hat_HUD(InHUD));
+		case class'Hat_HUDMenuLoadout':
+			Hat_HUD(InHUD).OpenHUD(class'Archipelago_HUDElementInfoButton', , true);
+			break;
+		
+		case class'Hat_HUDElementGhostPartyJoinAct':
+			if (SlotData == None || SlotData.ActRando)
+				InHUDElement = None;
+			
+			break;
+		
+		case class'Hat_HUDElementRareStickerAlert':
+			SetTimer(0.0001, false, NameOf(RemoveRareStickerAlert), self, Hat_HUD(InHUD));
+			break;
+
+		case class'Hat_HUDMenuShop':
+			SetTimer(0.0001, false, NameOf(CheckShopOverride), self, Hat_HUD(InHUD));
+			break;
+		
+		case class'Hat_HUDMenuActSelect':
+			InHUDElement = class'Archipelago_HUDMenuActSelect';
+			break;
+
+		case class'Hat_HUDElementActTitleCard':
+			if (SlotData != None && SlotData.ActRando && !ActMapChange)
+				SetTimer(0.0001, false, NameOf(CheckActTitleCard), self, Hat_HUD(InHUD));
+
+			break;
+		
+		case class'Hat_HUDElementCinematic':
+			SetTimer(0.1, false, NameOf(OnCutsceneStart), self, Hat_HUD(InHUD));
+			break;
+	
+		default:
+			break;
 	}
 }
 
 function CheckShopOverride(Hat_HUD hud)
 {
 	local Actor merchant;
+	local Hat_MetroTicketBooth_Base booth;
 	local int i;
+	local array<int> hintIds;
 	local Hat_HUDMenuShop shop;
 	local ShopItemInfo shopInfo;
-	local Archipelago_ShopInventory_MafiaBoss mShop;
+	local array<class <Object> > shopInvs;
+	local Archipelago_ShopInventory_Base newShop;
 	
+	shopInvs = class'Hat_ClassHelper'.static.GetAllScriptClasses("Archipelago_ShopInventory_Base");
 	shop = Hat_HUDMenuShop(hud.GetHUD(class'Hat_HUDMenuShop'));
 	merchant = shop.MerchantActor;
 	
-	if (merchant.IsA('Hat_NPC_MafiaBossJar'))
+	if (merchant.IsA('Hat_NPC_MetroCreepyCat_FoodShop') || merchant.IsA('Hat_NPC_MetroHelpDesk'))
+		return;
+	
+	if (merchant.IsA('Hat_NPC_MetroCreepyCat') && !merchant.IsA('Hat_NPC_NyakuzaShop'))
 	{
-		mShop = new class'Archipelago_ShopInventory_MafiaBoss';
-		for (i = 0; i < mShop.ItemsForSale.Length; i++)
+		foreach DynamicActors(class'Hat_MetroTicketBooth_Base', booth)
 		{
-			GetShopItemInfo(class<Archipelago_ShopItem_Base>(mShop.ItemsForSale[i].CollectibleClass), shopInfo);
-			mShop.ItemsForSale[0].ItemCost = shopInfo.PonCost;
-			
-			if (!shopInfo.Hinted)
+			if (booth.BoothCat.Name == merchant.Name)
 			{
-				if (shopInfo.ItemFlags == ItemFlag_Important || shopInfo.ItemFlags == ItemFlag_ImportantSkipBalancing)
-				{
-					SendLocationCheck(shopInfo.ID, true, true);
-				}
-				
+				merchant = booth;
+				break;
+			}
+		}
+	}
+	
+	if (merchant.IsA('Hat_NPC_MetroCreepyCat') && !merchant.IsA('Hat_NPC_NyakuzaShop'))
+		return;
+	
+	if (merchant.IsA('Hat_NPC_MetroTicketBooth_Base'))
+		shop.PurchaseDelegates.Length = 0;
+	
+	for (i = 0; i < shopInvs.Length; i++)
+	{
+		if (class<Archipelago_ShopInventory_Base>(shopInvs[i]).default.ShopNPC != None
+			&& class<Archipelago_ShopInventory_Base>(shopInvs[i]).default.ShopNPC == merchant.Class
+			|| class<Archipelago_ShopInventory_Base>(shopInvs[i]).default.ShopNPCName != ""
+			&& class<Archipelago_ShopInventory_Base>(shopInvs[i]).default.ShopNPCName == string(merchant.Name))
+		{
+			newShop = new class<Archipelago_ShopInventory_Base>(shopInvs[i]);
+			break;
+		}
+	}
+	
+	if (newShop == None)
+		return;
+	
+	for (i = 0; i < newShop.ItemsForSale.Length; i++)
+	{
+		GetShopItemInfo(class<Archipelago_ShopItem_Base>(newShop.ItemsForSale[i].CollectibleClass), shopInfo);
+		newShop.ItemsForSale[i].ItemCost = shopInfo.PonCost;
+		
+		if (shopInfo.ID <= 0)
+			continue;
+		
+		if (!shopInfo.Hinted)
+		{
+			if (shopInfo.ItemFlags == ItemFlag_Important || shopInfo.ItemFlags == ItemFlag_ImportantSkipBalancing)
+			{
+				hintIds.AddItem(shopInfo.ID);
 				SetShopInfoAsHinted(shopInfo);
 			}
 		}
-		
-		shop.SetShopInventory(hud, mShop);
 	}
+	
+	if (merchant.IsA('Hat_NPC_BadgeSalesman'))
+	{
+		newShop.ItemsForSale.Length = SlotData.BadgeSellerItemCount;
+	}
+	else if (InStr(newShop.ShopNPCName, "Hat_NPC_NyakuzaShop") != -1)
+	{
+		newShop.ItemsForSale.Length = GetAPBits(newShop.ShopNPCName);
+	}
+	
+	if (newShop.ItemsForSale.Length <= 0 && !merchant.IsA('Hat_NPC_BadgeSalesman'))
+		return;
+	
+	hintIds.Length = newShop.ItemsForSale.Length;
+		
+	for (i = 0; i < hintIds.Length; i++)
+	{
+		if (hintIds[i] <= 0)
+		{
+			hintIds.RemoveItem(hintIds[i]);
+			i--;
+		}
+	}
+	
+	if (hintIds.Length > 0)
+		SendMultipleLocationChecks(hintIds, true, true);
+	
+	shop.SetShopInventory(hud, newShop);
 }
 
 function CheckActTitleCard(Hat_HUD hud)
@@ -1239,6 +1407,34 @@ function CheckActTitleCard(Hat_HUD hud)
 	}
 }
 
+function OnCutsceneStart(Hat_HUD hud)
+{
+	local Hat_HUDElementCinematic cutscene;
+	
+	cutscene = Hat_HUDElementCinematic(hud.GetHUD(class'Hat_HUDElementCinematic'));
+	if (cutscene == None)
+		return;
+	
+	// Skip Nyakuza intro cutscene manually if already watched once since it will keep replaying 
+	// presumably due to not having the Metro_Intro time piece
+	if (`GameManager.GetCurrentMapFilename() ~= "dlc_metro")
+	{
+		if (HasAPBit("MetroCutscene", 1))
+		{
+			cutscene.IsSkippingCinematic = 99;
+		}
+		
+		SetAPBits("MetroCutscene", 1);
+	}
+}
+
+function RemoveRareStickerAlert(Hat_HUD hud)
+{
+	local Hat_HUDElementRareStickerAlert alert;
+	alert = Hat_HUDElementRareStickerAlert(hud.GetHUD(class'Hat_HUDElementRareStickerAlert', true));
+	alert.Progress = 0.99;
+}
+
 static function bool HasZipline(EZiplineType zipline)
 {
 	local string id;
@@ -1262,7 +1458,12 @@ static function bool HasZipline(EZiplineType zipline)
 			break;
 	}
 	
-	return HasAPBit(id, 1);
+	return HasAPBit("ZiplineUnlock_"$id, 1);
+}
+
+function ShowSeedInfoMenu()
+{
+	Hat_HUD(GetALocalPlayerController().MyHUD).OpenHUD(class'Archipelago_HUDMenuSeedInfo');
 }
 
 static function int GetPaintingUnlocks()
@@ -1299,11 +1500,14 @@ function OnTimePieceCollected(string Identifier)
 	
 	if (class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false))
 		return;
-
+	
 	`SaveManager.GetCurrentSaveData().RemoveTimePiece(Identifier);
 
-	if (Identifier ~= "TheFinale_FinalBoss")
+	if (SlotData.Goal == 1 && Identifier ~= "TheFinale_FinalBoss"
+		|| SlotData.Goal == 2 && Identifier ~= "Metro_Escape")
+	{
 		BeatGame();
+	}
 	
 	id = GetTimePieceLocationID(Identifier);
 	DebugMessage("Collected Time Piece: "$Identifier $", Location ID = " $id);
@@ -1311,7 +1515,9 @@ function OnTimePieceCollected(string Identifier)
 	actless = (Identifier ~= "Alps_Birdhouse"
 	|| Identifier ~= "AlpineSkyline_WeddingCake"
 	|| Identifier ~= "Alpine_Twilight"
-	|| Identifier ~= "AlpineSkyline_Windmill");
+	|| Identifier ~= "AlpineSkyline_Windmill"
+	|| Identifier ~= "Metro_Intro"
+	|| InStr(Identifier, "Metro_Route") != -1 || InStr(Identifier, "Metro_Manhole") != -1);
 	
 	// We actually completed this act, so set the Time Piece ID as a level bit
 	if (SlotData.ActRando)
@@ -1368,6 +1574,10 @@ static function int GetTimePieceLocationID(string Identifier)
 {
 	local int id, i;
 	
+	// Happens to be the same as Green Clean Station
+	if (Identifier ~= "Metro_Escape")
+		return 311210;
+	
 	for (i = 0; i < Len(Identifier); i++)
 		id += Asc(Mid(Identifier, i, 1));
 	
@@ -1414,7 +1624,18 @@ function UpdateChapterInfo()
 		SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo_DLC1.ChapterInfos.ChapterInfo_Cruise', 99);
 	}
 	
+	if (SlotData.DLC2)
+	{
+		SetChapterTimePieceRequirement(Hat_ChapterInfo'hatintime_chapterinfo_dlc2.ChapterInfos.ChapterInfo_Metro', SlotData.Chapter7Cost);
+	}
+	else
+	{
+		SetChapterTimePieceRequirement(Hat_ChapterInfo'hatintime_chapterinfo_dlc2.ChapterInfos.ChapterInfo_Metro', 99);
+	}
+	
 	UpdateActUnlocks();
+	FixActRequirements();
+
 	if (IsInSpaceship() && !class'Hat_SeqCond_IsMuMission'.static.IsFinaleMuMission() 
 		&& !class'Hat_SaveBitHelper'.static.HasActBit("thefinale_ending", 1))
 	{
@@ -1494,6 +1715,8 @@ function ResetEverything()
 	SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo.maingame.Sand_and_Sails', 14);
 	SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo.maingame.Mu_Finale', 25);
 	SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo_DLC1.ChapterInfos.ChapterInfo_Cruise', 35);
+	
+	ConsoleCommand("set Hat_IntruderInfo_CookingCat HasIntruderAlert true");
 }
 
 function OpenBedroomDoor()
@@ -1527,6 +1750,45 @@ function UpdateActUnlocks()
 			{
 				act.RequiredActID.Length = 0;
 				act.RequiredActID.AddItem(0); // else game thinks it's a purple rift
+			}
+		}
+	}
+}
+
+function FixActRequirements()
+{
+	local array<Hat_ChapterInfo> chapterInfoArray;
+	local Hat_ChapterInfo chapter;
+	local Hat_ChapterActInfo act;
+	local string hg;
+	
+	chapterInfoArray = class'Hat_ChapterInfo'.static.GetAllChapterInfo();
+	foreach chapterInfoArray(chapter)
+	{
+		chapter.ConditionalUpdateActList();
+		foreach chapter.ChapterActInfo(act)
+		{
+			hg = act.hourglass;
+			if (hg ~= "mafiatown_lava" || hg ~= "moon_parade" || hg ~= "snatcher_boss")
+			{
+				act.RequiredItems.Length = 0;
+				if (SlotData.UmbrellaLogic)
+				{
+					act.RequiredItems.AddItem(SlotData.BaseballBat ? class'Archipelago_Weapon_BaseballBat' : class'Archipelago_Weapon_Umbrella');
+				}
+			}
+			else if (hg ~= "subcon_cave" || hg ~= "AlpineSkyline_Finale" || hg ~= "Cruise_Boarding" || hg ~= "Cruise_CaveRift_Aquarium"
+					|| hg ~= "chapter2_toiletboss" || hg ~= "Cruise_WaterRift_Slide" || hg ~= "TimeRift_Water_Subcon_Hookshot")
+			{
+				act.RequiredItems.Length = 0;
+				act.RequiredItems.AddItem(class'Hat_Ability_Hookshot');
+			}
+			else if (hg ~= "Metro_Escape")
+			{
+				act.RequiredItems.Length = 0;
+				act.RequiredItems.AddItem(class'Hat_Ability_Hookshot');
+				act.RequiredItems.AddItem(class'Hat_Ability_StatueFall');
+				act.RequiredItems.AddItem(class'Hat_Ability_Chemical');
 			}
 		}
 	}
@@ -1648,7 +1910,7 @@ function bool IsChapterActInfoUnlocked(Hat_ChapterActInfo ChapterActInfo, option
 			}
 			
 			if (HasAPBit("ActComplete_"$hourglass, 1)) continue;
-
+			
 			j = INDEX_NONE;
 			break;
 		}
@@ -1666,16 +1928,18 @@ function ShuffleCollectibles(optional bool cache)
 {
 	local Hat_Collectible_Important collectible;
 	local Hat_NPC npc;
-	local int locId, i;
+	local int locId, i, maxItems;
 	local Actor a;
 	local array<int> locationArray, shopLocationArray, forceSendArray;
-	local array<class<Object>> shopItemClasses;
+	local array<class<Object > > shopInvClasses;
 	local LocationInfo locInfo;
-	local class<Object> shopItem;
-	local string mapName;
+	local class<Object> shopInvClass;
+	local class<Archipelago_ShopItem_Base> shopItem;
+	local string mapName, bitName;
 	local array<Hat_ChapterInfo> chapterInfoArray;
 	local Hat_ChapterInfo chapter;
 	local Hat_ChapterActInfo act;
+	local Archipelago_ShopInventory_Base shopInv;
 	
 	if (CollectiblesShuffled)
 		return;
@@ -1690,7 +1954,7 @@ function ShuffleCollectibles(optional bool cache)
 	foreach DynamicActors(class'Hat_Collectible_Important', collectible)
 	{
 		if (collectible.IsA('Hat_Collectible_VaultCode_Base') || collectible.IsA('Hat_Collectible_InstantCamera')
-		|| collectible.IsA('Hat_Collectible_Sticker'))
+		|| collectible.IsA('Hat_Collectible_Sticker') || collectible.IsA('Hat_Collectible_MetroTicket_Base'))
 			continue;
 		
 		// Some items only appear in certain acts
@@ -1839,25 +2103,57 @@ function ShuffleCollectibles(optional bool cache)
 			forceSendArray.AddItem(locId);
 		}
 		
+		bitName = class'Hat_SaveBitHelper'.static.GetBitId(npc, 0);
+		if (class'Hat_SaveBitHelper'.static.HasLevelBit(bitName, 1))
+			continue;
+		
 		BulliedNPCArray.AddItem(npc);
 		locationArray.AddItem(locId);
 	}
 	
-	shopItemClasses = class'Hat_ClassHelper'.static.GetAllScriptClasses("Archipelago_ShopItem_Base");
-	
-	foreach shopItemClasses(shopItem)
+	shopInvClasses = class'Hat_ClassHelper'.static.GetAllScriptClasses("Archipelago_ShopInventory_Base");
+	foreach shopInvClasses(shopInvClass)
 	{
-		if (shopItem == class'Archipelago_ShopItem_Base')
+		shopInv = new class<Archipelago_ShopInventory_Base>(shopInvClass);
+		
+		if (shopInv.ItemsForSale.Length <= 0)
 			continue;
 		
-		if (IsShopItemCached(class<Archipelago_ShopItem_Base>(shopItem)))
-		{
-			InitShopItemDisplayName(class<Archipelago_ShopItem_Base>(shopItem));
+		if (InStr(shopInv.ShopNPCName, "Hat_NPC_NyakuzaShop") != -1 && !SlotData.DLC2
+			|| InStr(shopInv.ShopNPCName, "Hat_MetroTicketBooth") != -1 && !SlotData.DLC2)
 			continue;
+		
+		if (InStr(shopInv.ShopNPCName, "Hat_NPC_NyakuzaShop", false, true) != -1
+			|| shopInv.ShopNPC == class'Hat_NPC_BadgeSalesman')
+		{
+			maxItems = shopInv.ShopNPC == class'Hat_NPC_BadgeSalesman' ? SlotData.BadgeSellerItemCount : GetAPBits(shopInv.ShopNPCName, 0);	
+		}
+		else
+		{
+			maxItems = 1;
 		}
 		
-		shopLocationArray.AddItem(class<Archipelago_ShopItem_Base>(shopItem).default.LocationID);
+		if (maxItems <= 0)
+			continue;
+		
+		for (i = 0; i < maxItems; i++)
+		{
+			if (!GetShopItemClassFromLocation(
+				class<Archipelago_ShopItem_Base>(shopInv.ItemsForSale[i].CollectibleClass).default.LocationID, shopItem))
+				continue;
+			
+			if (IsShopItemCached(shopItem))
+			{
+				InitShopItemDisplayName(shopItem);
+				continue;
+			}
+			
+			shopLocationArray.AddItem(shopItem.default.LocationID);
+		}
 	}
+	
+	if (cache)
+		shopLocationArray.Length = 0;
 	
 	if (locationArray.Length > 0 || shopLocationArray.Length > 0 || forceSendArray.Length > 0)
 	{
@@ -1884,7 +2180,8 @@ function ShuffleCollectibles(optional bool cache)
 			
 			foreach DynamicActors(class'Hat_Collectible_Important', collectible)
 			{
-				if (collectible.IsA('Hat_Collectible_VaultCode_Base') || collectible.IsA('Hat_Collectible_Sticker'))
+				if (collectible.IsA('Hat_Collectible_VaultCode_Base') || collectible.IsA('Hat_Collectible_Sticker')
+				 	|| collectible.IsA('Hat_Collectible_MetroTicket_Base') || collectible.IsA('Hat_Collectible_InstantCamera'))
 					continue;
 				
 				if (forceSendArray.Find(ObjectToLocationId(collectible)) != -1)
@@ -1901,6 +2198,11 @@ function ShuffleCollectibles(optional bool cache)
 	}
 	
 	CollectiblesShuffled = true;
+}
+
+function ShuffleCollectibles2()
+{
+	ShuffleCollectibles(true);
 }
 
 function LocationInfo GetLocationInfoFromID(int id)
@@ -2091,14 +2393,33 @@ function bool IsLocationChecked(int id)
 
 function bool GetShopItemClassFromLocation(int locationId, out class<Archipelago_ShopItem_Base> outClass)
 {
-	local array<class<Object>> shopItemClasses;
+	local array<class<Object > > shopItemClasses;
 	local class<Object> shopItem;
 	
 	shopItemClasses = class'Hat_ClassHelper'.static.GetAllScriptClasses("Archipelago_ShopItem_Base");
 	
 	foreach shopItemClasses(shopItem)
 	{
-		if (shopItem == class'Archipelago_ShopItem_Base')
+		if (class<Archipelago_ShopItem_Base>(shopItem).default.LocationID <= 0)
+			continue;
+		
+		if (class<Archipelago_ShopItem_Base>(shopItem).default.LocationID == locationId)
+		{
+			outClass = class<Archipelago_ShopItem_Base>(shopItem);
+			return true;
+		}
+	}
+	
+	return false;
+}
+
+// way less expensive, but needs the class array upfront
+function bool GetShopItemClassFromLocation_Cheap(array<class< Object > > shopItemClasses, int locationId, out class<Archipelago_ShopItem_Base> outClass)
+{
+	local class<Object> shopItem;
+	foreach shopItemClasses(shopItem)
+	{
+		if (class<Archipelago_ShopItem_Base>(shopItem).default.LocationID <= 0)
 			continue;
 		
 		if (class<Archipelago_ShopItem_Base>(shopItem).default.LocationID == locationId)
@@ -2120,8 +2441,17 @@ function ShopItemInfo CreateShopItemInfo(class<Archipelago_ShopItem_Base> itemCl
 	shopInfo.ItemID = itemId;
 	shopInfo.ItemFlags = flags;
 	
-	shopInfo.PonCost = SlotData.MinPonCost + 
-		class'Hat_Math'.static.SeededRandWithSeed(SlotData.MaxPonCost-SlotData.MinPonCost+1, SlotData.Seed+SlotData.ShopItemRandStep);
+	if (class<Archipelago_ShopItem_Metro>(itemClass) != None)
+	{
+		shopInfo.PonCost = SlotData.MetroMinPonCost + 
+			class'Hat_Math'.static.SeededRandWithSeed(SlotData.MetroMaxPonCost-SlotData.MetroMinPonCost+1, SlotData.Seed+SlotData.ShopItemRandStep);
+	}
+	else
+	{
+		shopInfo.PonCost = SlotData.MinPonCost + 
+			class'Hat_Math'.static.SeededRandWithSeed(SlotData.MaxPonCost-SlotData.MinPonCost+1, SlotData.Seed+SlotData.ShopItemRandStep);
+	}
+	
 	
 	SlotData.ShopItemRandStep++;
 	SlotData.ShopItemList.AddItem(shopInfo);
@@ -2130,15 +2460,47 @@ function ShopItemInfo CreateShopItemInfo(class<Archipelago_ShopItem_Base> itemCl
 	return shopInfo;
 }
 
+function Archipelago_ShopInventory_Base GetShopInventoryFromShopItem(class<Archipelago_ShopItem_Base> itemClass)
+{
+	local int i, j;
+	local array<class<Object > > invClasses;
+	local Archipelago_ShopInventory_Base shopInv;
+	
+	invClasses = class'Hat_ClassHelper'.static.GetAllScriptClasses("Archipelago_ShopInventory_Base");
+	for (i = 0; i < invClasses.Length; i++)
+	{
+		shopInv = new class<Archipelago_ShopInventory_Base>(invClasses[i]);
+
+		for (j = 0; j < shopInv.ItemsForSale.Length; j++)
+		{
+			if (shopInv.ItemsForSale[j].CollectibleClass == itemClass)
+				return shopInv;
+		}
+	}
+	
+	return None;
+}
+
+function class<Hat_NPC> GetShopItemMerchantClass(class<Archipelago_ShopItem_Base> itemClass)
+{
+	return GetShopInventoryFromShopItem(itemClass).ShopNPC;
+}
+
+function string GetShopItemMerchantName(class<Archipelago_ShopItem_Base> itemClass)
+{
+	return GetShopInventoryFromShopItem(itemClass).ShopNPCName;
+}
+
 function InitShopItemDisplayName(class<Archipelago_ShopItem_Base> itemClass)
 {
 	local ShopItemInfo shopInfo;
 	local string displayName;
+	local class<Actor> worldClass;
 	
 	if (!GetShopItemInfo(itemClass, shopInfo))
 		return;
 	
-	if (!class'Archipelago_ItemInfo'.static.GetNativeItemData(shopInfo.ItemID, displayName))
+	if (!class'Archipelago_ItemInfo'.static.GetNativeItemData(shopInfo.ItemID, displayName, worldClass))
 	{
 		switch (shopInfo.ItemFlags)
 		{
@@ -2164,7 +2526,14 @@ function InitShopItemDisplayName(class<Archipelago_ShopItem_Base> itemClass)
 		}
 	}
 	
-	displayName $= " (" $itemClass.default.ItemNumberName $")";
+	if (itemClass.default.ItemNumberName != "")
+		displayName $= " (" $itemClass.default.ItemNumberName $")";
+	
+	if (worldClass != None)
+	{
+		itemClass.static.SetHUDIcon(class<Archipelago_RandomizedItem_Base>(worldClass).default.HUDIcon);
+	}
+	
 	itemClass.static.SetDisplayName(displayName);
 }
 
@@ -2433,7 +2802,12 @@ function OnCollectibleSpawned(Object collectible)
 		{
 			// Rumbi yarn
 			Actor(collectible).Destroy();
-			SendLocationCheck(RumbiYarnCheck);
+
+			if (!HasAPBit("RumbiYarn", 1))
+			{
+				SendLocationCheck(RumbiYarnCheck);
+				SetAPBits("RumbiYarn", 1);
+			}
 		}
 	}
 	else if (Hat_Collectible_Important(collectible) != None && Actor(collectible).CreationTime > 0)
@@ -2574,7 +2948,7 @@ function OnYarnCollected(optional int amount=1)
 	}
 	else if (amount > 0)
 	{
-		pons = 20 * amount;
+		pons = 25 * amount;
 		`GameManager.AddEnergyBits(pons);
 		ScreenMessage("Got " $pons $" Pons", 'Warning');
 	}
@@ -2582,8 +2956,13 @@ function OnYarnCollected(optional int amount=1)
 
 function class<Hat_Ability> GetNextHat()
 {
+	return GetHatByIndex(GetAPBits("HatCraftIndex", 1));
+}
+
+function class<Hat_Ability> GetHatByIndex(int index)
+{
 	local EHatType type;
-	switch (GetAPBits("HatCraftIndex", 1))
+	switch (index)
 	{
 		case 1:
 			type = SlotData.Hat1;
@@ -2592,7 +2971,7 @@ function class<Hat_Ability> GetNextHat()
 		case 2:
 			type = SlotData.Hat2;
 			break;
-
+		
 		case 3:
 			type = SlotData.Hat3;
 			break;
@@ -2623,8 +3002,6 @@ function class<Hat_Ability> GetNextHat()
 		case HatType_TimeStop: 
 			return class'Hat_Ability_TimeStop';
 	}
-	
-	return None;
 }
 
 function int GetHatYarnCost(class<Hat_Ability> hatClass)
@@ -2695,7 +3072,7 @@ function SendLocationCheck(int id, optional bool scout, optional bool hint)
 	{
 		if (hint)
 		{
-			jsonMessage = "[{\"cmd\":\"LocationScouts\",\"locations\":[" $id $"],\"create_as_hint\":1}]";
+			jsonMessage = "[{\"cmd\":\"LocationScouts\",\"locations\":[" $id $"],\"create_as_hint\":2}]";
 		}
 		else
 		{
@@ -3075,7 +3452,8 @@ function ReplaceUnarmedWeapon()
 	local Hat_PlayerController ctr;
 	
 	ctr = Hat_PlayerController(GetALocalPlayerController());
-	if (ctr.MyLoadout.BackpackHasInventory(class'Archipelago_Weapon_Umbrella', true))
+	if (ctr.MyLoadout.BackpackHasInventory(class'Archipelago_Weapon_Umbrella', true)
+	|| ctr.MyLoadout.BackpackHasInventory(class'Archipelago_Weapon_BaseballBat', true))
 		return;
 	
 	save = `SaveManager.GetCurrentSaveData();
@@ -3160,14 +3538,14 @@ function BeatGame()
 	json = None;
 }
 
-function bool IsDLC1Installed()
+function bool IsDLC1Installed(optional bool AndEnabled)
 {
-	return class'Hat_GameDLCInfo'.static.IsGameDLCInfoInstalled(class'Hat_GameDLCInfo_DLC1');
+	return class'Hat_GameDLCInfo'.static.IsGameDLCInfoInstalled(class'Hat_GameDLCInfo_DLC1') && (!AndEnabled || SlotData.DLC1);
 }
 
-function bool IsDLC2Installed()
+function bool IsDLC2Installed(optional bool AndEnabled)
 {
-	return class'Hat_GameDLCInfo'.static.IsGameDLCInfoInstalled(class'Hat_GameDLCInfo_DLC2');
+	return class'Hat_GameDLCInfo'.static.IsGameDLCInfoInstalled(class'Hat_GameDLCInfo_DLC2') && (!AndEnabled || SlotData.DLC2);
 }
 
 function bool IsArchipelagoEnabled()
@@ -3207,17 +3585,17 @@ function bool IsInSpaceship()
 function bool IsActReallyCompleted(Hat_ChapterActInfo act)
 {
 	local Hat_ChapterActInfo shuffled;
-	//local int basement;
 	
 	if (SlotData != None && SlotData.Initialized)
 	{
 		if (SlotData.ActRando)
 		{
+			// Free roam acts are free!
 			if (IsChapterActInfoUnlocked(act))
 			{
 				shuffled = GetShuffledAct(act);
 				
-				if (shuffled != None && shuffled.hourglass == "") // Free Roam
+				if (shuffled != None && shuffled.hourglass == "")
 				{
 					SetAPBits("ActComplete_"$act.hourglass, 1);
 					return true;
@@ -3418,6 +3796,56 @@ function bool ReplOnce(string str, string match, string with, out string result,
 	return found;
 }
 
+function CleanUpMetro()
+{
+	local int i;
+	local Actor a;
+	local array<SequenceObject> seqObjects;
+	
+	foreach DynamicActors(class'Actor', a)
+	{
+		// Force open jewelry store door, otherwise player gets trapped inside of it after collecting a Time Piece
+		// Force open the barrier near the jewelry store, and remove the crates covering the mud puddle
+		if (a.Name == 'InterpActor_10' || a.Name == 'InterpActor_13'
+			|| a.Name == 'Hat_DynamicStaticActor_17' || a.Name == 'Hat_DynamicStaticActor_18'
+			|| a.Name == 'Hat_DynamicStaticActor_35' || a.Name == 'Hat_DynamicStaticActor_36'
+			|| a.Name == 'Hat_DynamicStaticActor_37' || a.Name == 'Hat_DynamicStaticActor_38')
+		{
+			ConsoleCommand("set " $a.Name $" bnodelete false"); // Fuck you. Die.
+			a.Destroy();
+		}
+		
+		// These are the opened jewelery store doors, unhide them
+		if (a.Name == 'InterpActor_14' || a.Name == 'InterpActor_17')
+		{
+			a.SetHidden(false);
+		}
+		
+		// Remove the cat holding the time piece if we already completed the intro
+		if (a.IsA('Hat_Goodie_Chaser_Base') && HasAPBit("ActComplete_Metro_Intro", 1))
+		{
+			a.Destroy();
+		}
+		
+		// Hide the Time Piece as well
+		if (a.Name == 'Hat_TimeObject_Metro_2' && HasAPBit("ActComplete_Metro_Intro", 1))
+		{
+			a.SetHidden(true);
+		}
+	}
+	
+	WorldInfo.GetGameSequence().FindSeqObjectsByClass(class'SeqAct_ToggleHidden', true, seqObjects);
+	for (i = 0; i < seqObjects.Length; i++)
+	{
+		// this hides the opened doors in the jewelery store
+		if (seqObjects[i].Name == 'SeqAct_ToggleHidden_18')
+		{
+			SeqAct_ToggleHidden(seqObjects[i]).Targets.Length = 0;
+			break;
+		}
+	}
+}
+
 function float GetVectorDistance(Vector start, Vector end)
 {
 	local float distance;
@@ -3519,4 +3947,15 @@ defaultproperties
 	UnlockScreenNumbers[48] = Texture2D'APRandomizer_content.unlock_screen_numbers_48';
 	UnlockScreenNumbers[49] = Texture2D'APRandomizer_content.unlock_screen_numbers_49';
 	UnlockScreenNumbers[50] = Texture2D'APRandomizer_content.unlock_screen_numbers_50';
+	
+	ThugCatShops[0] = "Hat_NPC_NyakuzaShop_0";
+	ThugCatShops[1] = "Hat_NPC_NyakuzaShop_1";
+	ThugCatShops[2] = "Hat_NPC_NyakuzaShop_2";
+	ThugCatShops[3] = "Hat_NPC_NyakuzaShop_5";
+	ThugCatShops[4] = "Hat_NPC_NyakuzaShop_13";
+	ThugCatShops[5] = "Hat_NPC_NyakuzaShop_12";
+	ThugCatShops[6] = "Hat_NPC_NyakuzaShop_14";
+	ThugCatShops[7] = "Hat_NPC_NyakuzaShop_4";
+	ThugCatShops[8] = "Hat_NPC_NyakuzaShop_6";
+	ThugCatShops[9] = "Hat_NPC_NyakuzaShop_7";
 }

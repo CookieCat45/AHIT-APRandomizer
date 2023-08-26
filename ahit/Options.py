@@ -1,8 +1,60 @@
 import typing
+from worlds.AutoWorld import World
 from Options import Option, Range, Toggle, DeathLink, Choice
+from .Items import get_total_time_pieces
+
+
+def adjust_options(world: World):
+    world.multiworld.HighestChapterCost[world.player].value = max(
+        world.multiworld.HighestChapterCost[world.player].value,
+        world.multiworld.LowestChapterCost[world.player].value)
+
+    world.multiworld.LowestChapterCost[world.player].value = min(
+        world.multiworld.LowestChapterCost[world.player].value,
+        world.multiworld.HighestChapterCost[world.player].value)
+
+    world.multiworld.FinalChapterMinCost[world.player].value = min(
+        world.multiworld.FinalChapterMinCost[world.player].value,
+        world.multiworld.FinalChapterMaxCost[world.player].value)
+
+    world.multiworld.FinalChapterMaxCost[world.player].value = max(
+        world.multiworld.FinalChapterMaxCost[world.player].value,
+        world.multiworld.FinalChapterMinCost[world.player].value)
+
+    world.multiworld.BadgeSellerMinItems[world.player].value = min(
+        world.multiworld.BadgeSellerMinItems[world.player].value,
+        world.multiworld.BadgeSellerMaxItems[world.player].value)
+
+    world.multiworld.BadgeSellerMaxItems[world.player].value = max(
+        world.multiworld.BadgeSellerMinItems[world.player].value,
+        world.multiworld.BadgeSellerMaxItems[world.player].value)
+
+    total_tps: int = get_total_time_pieces(world)
+    if world.multiworld.HighestChapterCost[world.player].value > total_tps-5:
+        world.multiworld.HighestChapterCost[world.player].value = min(45, total_tps-5)
+
+    if world.multiworld.FinalChapterMaxCost[world.player].value > total_tps:
+        world.multiworld.FinalChapterMaxCost[world.player].value = min(50, total_tps)
+
+    # Don't allow Rush Hour goal if DLC2 content is disabled
+    if world.multiworld.EndGoal[world.player].value == 2 and world.multiworld.EnableDLC2[world.player].value == 0:
+        world.multiworld.EndGoal[world.player].value = 1
 
 
 # General
+class EndGoal(Choice):
+    """The end goal required to beat the game.
+    Finale: Reach Time's End and beat Mustache Girl. The Finale will be in its vanilla location.
+
+    Rush Hour: Reach and complete Rush Hour. The level will be in its vanilla location and Chapter 7
+    will be the final chapter. You also must find Nyakuza Metro itself and complete all of its levels.
+    Requires DLC2 content to be enabled."""
+    display_name = "End Goal"
+    option_finale = 1
+    option_rush_hour = 2
+    default = 1
+
+
 class ActRandomizer(Choice):
     """If enabled, shuffle the game's Acts between each other.
     Separate Rifts will cause Time Rifts to only be shuffled amongst each other,
@@ -113,8 +165,9 @@ class CTRWithSprint(Toggle):
 # DLC
 class EnableDLC1(Toggle):
     """Shuffle content from The Arctic Cruise (Chapter 6) into the game. This also includes the Tour time rift.
-    DO NOT ENABLE THIS OPTION IF YOU DO NOT HAVE THE DLC INSTALLED!!!"""
+    DO NOT ENABLE THIS OPTION IF YOU DO NOT HAVE SEAL THE DEAL DLC INSTALLED!!!"""
     display_name = "Shuffle Chapter 6"
+    default = 0
 
 
 class Tasksanity(Toggle):
@@ -140,9 +193,57 @@ class TasksanityCheckCount(Range):
 
 
 class EnableDLC2(Toggle):
-    """NOT IMPLEMENTED Shuffle content from Nyakuza Metro (Chapter 7) into the game.
-    DO NOT ENABLE THIS OPTION IF YOU DO NOT HAVE THE DLC INSTALLED!!!"""
+    """Shuffle content from Nyakuza Metro (Chapter 7) into the game.
+    DO NOT ENABLE THIS OPTION IF YOU DO NOT HAVE NYAKUZA METRO DLC INSTALLED!!!"""
     display_name = "Shuffle Chapter 7"
+    default = 0
+
+
+class MetroMinPonCost(Range):
+    """The cheapest an item can be in any Nyakuza Metro shop. Includes ticket booths."""
+    display_name = "Metro Shops Minimum Pon Cost"
+    range_start = 10
+    range_end = 800
+    default = 50
+
+
+class MetroMaxPonCost(Range):
+    """The most expensive an item can be in any Nyakuza Metro shop. Includes ticket booths."""
+    display_name = "Metro Shops Minimum Pon Cost"
+    range_start = 10
+    range_end = 800
+    default = 200
+
+
+class NyakuzaThugMinShopItems(Range):
+    """The smallest amount of items that the thugs in Nyakuza Metro can have for sale."""
+    display_name = "Nyakuza Thug Minimum Shop Items"
+    range_start = 0
+    range_end = 5
+    default = 2
+
+
+class NyakuzaThugMaxShopItems(Range):
+    """The largest amount of items that the thugs in Nyakuza Metro can have for sale."""
+    display_name = "Nyakuza Thug Maximum Shop Items"
+    range_start = 0
+    range_end = 5
+    default = 4
+
+
+class BaseballBat(Toggle):
+    """Replace the Umbrella with the baseball bat from Nyakuza Metro.
+    DLC2 content does not have to be shuffled for this option but Nyakuza Metro still needs to be installed."""
+    display_name = "Baseball Bat"
+    default = 0
+
+
+class VanillaMetro(Choice):
+    """Force Nyakuza Metro (and optionally its finale) onto their vanilla locations in act shuffle."""
+    display_name = "Vanilla Metro"
+    option_false = 0
+    option_true = 1
+    option_finale = 2
 
 
 class ChapterCostIncrement(Range):
@@ -150,7 +251,7 @@ class ChapterCostIncrement(Range):
     display_name = "Chapter Cost Increment"
     range_start = 1
     range_end = 8
-    default = 5
+    default = 4
 
 
 class ChapterCostMinDifference(Range):
@@ -175,21 +276,21 @@ class HighestChapterCost(Range):
     Chapter costs will, progressively, be calculated based on this value (except for Chapter 5)."""
     display_name = "Highest Possible Chapter Cost"
     range_start = 15
-    range_end = 50
+    range_end = 45
     default = 25
 
 
-class Chapter5MinCost(Range):
-    """Minimum Time Pieces required to enter Chapter 5 (Time's End). This is your goal."""
-    display_name = "Chapter 5 Minimum Time Piece Cost"
+class FinalChapterMinCost(Range):
+    """Minimum Time Pieces required to enter the final chapter. This is part of your goal."""
+    display_name = "Final Chapter Minimum Time Piece Cost"
     range_start = 0
     range_end = 50
     default = 30
 
 
-class Chapter5MaxCost(Range):
-    """Maximum Time Pieces required to enter Chapter 5 (Time's End). This is your goal."""
-    display_name = "Chapter 5 Maximum Time Piece Cost"
+class FinalChapterMaxCost(Range):
+    """Maximum Time Pieces required to enter the final chapter. This is part of your goal."""
+    display_name = "Final Chapter Maximum Time Piece Cost"
     range_start = 0
     range_end = 50
     default = 35
@@ -201,14 +302,14 @@ class MaxExtraTimePieces(Range):
     display_name = "Max Extra Time Piece Cost"
     range_start = 0
     range_end = 16
-    default = 0
+    default = 16
 
 
 # Death Wish
 class EnableDeathWish(Toggle):
     """NOT IMPLEMENTED Shuffle Death Wish contracts into the game.
     Each contract by default will have a single check granted upon completion.
-    DO NOT ENABLE THIS OPTION IF YOU DO NOT HAVE THE DLC INSTALLED!!!"""
+    DO NOT ENABLE THIS OPTION IF YOU DO NOT HAVE SEAL THE DEAL DLC INSTALLED!!!"""
     display_name = "Enable Death Wish"
     default = 0
 
@@ -257,7 +358,6 @@ class YarnAvailable(Range):
     default = 45
 
 
-# Shops
 class MinPonCost(Range):
     """The minimum amount of Pons that any shop item can cost."""
     display_name = "Minimum Shop Pon Cost"
@@ -272,6 +372,22 @@ class MaxPonCost(Range):
     range_start = 10
     range_end = 800
     default = 400
+
+
+class BadgeSellerMinItems(Range):
+    """The smallest amount of items that the Badge Seller can have for sale."""
+    display_name = "Badge Seller Minimum Items"
+    range_start = 0
+    range_end = 10
+    default = 4
+
+
+class BadgeSellerMaxItems(Range):
+    """The largest amount of items that the Badge Seller can have for sale."""
+    display_name = "Badge Seller Maximum Items"
+    range_start = 0
+    range_end = 10
+    default = 8
 
 
 # Traps
@@ -312,6 +428,7 @@ class ParadeTrapWeight(Range):
 
 ahit_options: typing.Dict[str, type(Option)] = {
 
+    "EndGoal":                  EndGoal,
     "ActRandomizer":            ActRandomizer,
     "ShuffleAlpineZiplines":    ShuffleAlpineZiplines,
     "VanillaAlpine":            VanillaAlpine,
@@ -334,6 +451,12 @@ ahit_options: typing.Dict[str, type(Option)] = {
 
     "EnableDeathWish":          EnableDeathWish,
     "EnableDLC2":               EnableDLC2,
+    "BaseballBat":              BaseballBat,
+    "VanillaMetro":             VanillaMetro,
+    "MetroMinPonCost":          MetroMinPonCost,
+    "MetroMaxPonCost":          MetroMaxPonCost,
+    "NyakuzaThugMinShopItems":  NyakuzaThugMinShopItems,
+    "NyakuzaThugMaxShopItems":  NyakuzaThugMaxShopItems,
 
     "LowestChapterCost":        LowestChapterCost,
     "HighestChapterCost":       HighestChapterCost,
@@ -341,8 +464,8 @@ ahit_options: typing.Dict[str, type(Option)] = {
     "ChapterCostMinDifference": ChapterCostMinDifference,
     "MaxExtraTimePieces":       MaxExtraTimePieces,
 
-    "Chapter5MinCost":          Chapter5MinCost,
-    "Chapter5MaxCost":          Chapter5MaxCost,
+    "FinalChapterMinCost":          FinalChapterMinCost,
+    "FinalChapterMaxCost":          FinalChapterMaxCost,
 
     "YarnCostMin":              YarnCostMin,
     "YarnCostMax":              YarnCostMax,
@@ -350,6 +473,8 @@ ahit_options: typing.Dict[str, type(Option)] = {
 
     "MinPonCost":               MinPonCost,
     "MaxPonCost":               MaxPonCost,
+    "BadgeSellerMinItems":      BadgeSellerMinItems,
+    "BadgeSellerMaxItems":      BadgeSellerMaxItems,
 
     "TrapChance":               TrapChance,
     "BabyTrapWeight":           BabyTrapWeight,
@@ -361,6 +486,7 @@ ahit_options: typing.Dict[str, type(Option)] = {
 
 slot_data_options: typing.Dict[str, type(Option)] = {
 
+    "EndGoal": EndGoal,
     "ActRandomizer": ActRandomizer,
     "ShuffleAlpineZiplines": ShuffleAlpineZiplines,
     "LogicDifficulty": LogicDifficulty,
@@ -378,7 +504,11 @@ slot_data_options: typing.Dict[str, type(Option)] = {
     "TasksanityCheckCount": TasksanityCheckCount,
 
     "EnableDeathWish": EnableDeathWish,
+
     "EnableDLC2": EnableDLC2,
+    "MetroMinPonCost": MetroMinPonCost,
+    "MetroMaxPonCost": MetroMaxPonCost,
+    "BaseballBat": BaseballBat,
 
     "MinPonCost": MinPonCost,
     "MaxPonCost": MaxPonCost,

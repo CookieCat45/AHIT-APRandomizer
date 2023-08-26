@@ -242,6 +242,18 @@ optional out class<Actor> inventoryOverride) // Item inventory class override. M
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_CakeC';
 			return true;
+
+		case 300022:
+			itemName = "Relic (Necklace Bust)";
+			worldClass = class'Archipelago_RandomizedItem_Decoration';
+			inventoryOverride = class'Hat_Collectible_Decoration_JewelryDisplay';
+			return true;
+		
+		case 300023:
+			itemName = "Relic (Necklace)";
+			worldClass = class'Archipelago_RandomizedItem_Decoration';
+			inventoryOverride = class'Hat_Collectible_Decoration_GoldNecklace';
+			return true;
 			
 			
 		// -------- BADGES ----------------------------------------------------------------------------------------------- \\	
@@ -324,7 +336,7 @@ optional out class<Actor> inventoryOverride) // Item inventory class override. M
 			itemName = "Parade Trap";
 			worldClass = class'Archipelago_RandomizedItem_Misc';
 			return true;
-
+		
 		case RandomCosmeticItem:
 			itemName = "Random Cosmetic";
 			worldClass = class'Archipelago_RandomizedItem_Misc';
@@ -338,8 +350,17 @@ optional out class<Actor> inventoryOverride) // Item inventory class override. M
 			return true;
 			
 		case 300033:
-			itemName = "Umbrella";
-			worldClass = class'Archipelago_RandomizedItem_Umbrella';
+			if (`AP.SlotData.BaseballBat && `AP.IsDLC2Installed())
+			{
+				itemName = "Baseball Bat";
+				worldClass = class'Archipelago_RandomizedItem_BaseballBat';
+			}
+			else
+			{
+				itemName = "Umbrella";
+				worldClass = class'Archipelago_RandomizedItem_Umbrella';
+			}
+			
 			return true;
 		
 		case 300043:
@@ -390,6 +411,26 @@ optional out class<Actor> inventoryOverride) // Item inventory class override. M
 		case 300003:
 			itemName = "Progressive Painting Unlock";
 			worldClass = class'Archipelago_RandomizedItem_Misc';
+			return true;
+		
+		case 300045:
+			itemName = "Metro Ticket - Yellow";
+			worldClass = class'Archipelago_RandomizedItem_MetroTicketYellow';
+			return true;
+		
+		case 300046:
+			itemName = "Metro Ticket - Green";
+			worldClass = class'Archipelago_RandomizedItem_MetroTicketGreen';
+			return true;
+		
+		case 300047:
+			itemName = "Metro Ticket - Blue";
+			worldClass = class'Archipelago_RandomizedItem_MetroTicketBlue';
+			return true;
+		
+		case 300048:
+			itemName = "Metro Ticket - Pink";
+			worldClass = class'Archipelago_RandomizedItem_MetroTicketPink';
 			return true;
 		
 		default:

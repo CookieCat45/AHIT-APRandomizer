@@ -16,4 +16,6 @@ defaultproperties
 	Mesh=Model2;
 	Components.Add(Model2);
 	RotationComponents.Add(Model2);
+	
+	HUDIcon = Texture2D'APRandomizer_content.ap_logo';
 }
