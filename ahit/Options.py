@@ -57,7 +57,7 @@ class EndGoal(Choice):
 
 class ActRandomizer(Choice):
     """If enabled, shuffle the game's Acts between each other.
-    Separate Rifts will cause Time Rifts to only be shuffled amongst each other,
+    Light will cause Time Rifts to only be shuffled amongst each other,
     and Blue Time Rifts and Purple Time Rifts are shuffled separately."""
     display_name = "Shuffle Acts"
     option_false = 0
@@ -299,7 +299,7 @@ class FinalChapterMaxCost(Range):
 class MaxExtraTimePieces(Range):
     """Maximum amount of extra Time Pieces from the DLCs.
     Arctic Cruise will add up to 6. Nyakuza Metro will add up to 10. The absolute maximum is 56."""
-    display_name = "Max Extra Time Piece Cost"
+    display_name = "Max Extra Time Pieces"
     range_start = 0
     range_end = 16
     default = 16

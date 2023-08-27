@@ -245,7 +245,8 @@ def set_rules(world: World):
                 add_rule(location, lambda state: can_hit_bells(state, w) or can_use_hat(state, w, HatType.DWELLER))
 
         if data.paintings > 0 and mw.ShuffleSubconPaintings[p].value > 0:
-            add_rule(location, lambda state: state.count("Progressive Painting Unlock", p) >= data.paintings)
+            value: int = data.paintings
+            add_rule(location, lambda state: state.count("Progressive Painting Unlock", p) >= value)
 
     set_specific_rules(w)
 
@@ -437,7 +438,8 @@ def set_specific_rules(world: World):
 
         # This particular item isn't present in Act 3 for some reason, yes in vanilla too
         add_rule(mw.get_location("The Arctic Cruise - Toilet", p),
-                 lambda state: state.can_reach("Bon Voyage!", "Region", p) or state.can_reach("Ship Shape", "Region", p))
+                 lambda state: state.can_reach("Bon Voyage!", "Region", p)
+                 or state.can_reach("Ship Shape", "Region", p))
 
     if mw.EnableDLC2[p].value > 0:
         add_rule(mw.get_entrance("-> Bluefin Tunnel", p),
