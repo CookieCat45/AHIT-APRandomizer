@@ -10,6 +10,7 @@ var transient bool FullyConnected;
 var transient bool Refused;
 var transient int EmptyCount;
 var transient bool FirstReceivedItems;
+var transient array<Archipelago_GameData> GamesToCache;
 
 const MaxSentMessageLength = 246;
 
@@ -301,11 +302,15 @@ event Tick(float d)
 function ParseJSON(string json)
 {
 	local bool b;
+	local Name msgType;
 	local int i, a, count, split, pos, locId, count1, count2;
 	local array<int> missingLocs;
-	local string s, text, num;
-	local JsonObject jsonObj, jsonChild;
+	local string s, text, num, json2, game, checksum, player;
+	local JsonObject jsonObj, jsonChild, games, myGame, mappings, textObj;
 	local Archipelago_GameMod m;
+	local Archipelago_GameData data;
+	local LocationMap locMapping;
+	local ItemMap itemMapping;
 	
 	m = `AP;
 	if (Len(json) <= 10) // this is probably garbage that we thought was a json
@@ -368,8 +373,166 @@ function ParseJSON(string json)
 	switch (jsonObj.GetStringValue("cmd"))
 	{
 		case "RoomInfo":
+			if (m.GameDataLoaded)
+			{
+				m.DebugMessage("Received RoomInfo packet, sending Connect packet...");
+				ConnectToAP();
+				break;
+			}
+
+			games = jsonObj.GetObject("datapackage_checksums");
+			json2 = games.EncodeJson(games);
+			
+			b = true;
+			game = "";
+			
+			for (i = 0; i < Len(json2); i++)
+			{
+				if (!b && Mid(json2, i, 2) == "\",") // start of game name string
+				{
+					b = true;
+				}
+				else if (b && Mid(json2, i, 2) == "\":") // end of game name string
+				{
+					m.DebugMessage("Found game: " $game);
+					data = new class'Archipelago_GameData';
+					class'Engine'.static.BasicLoadObject(data, "APGameData/"$game, false, 1);
+					
+					// do we need to update the data for this game, or create it?
+					checksum = games.GetStringValue(game);
+					if (data.Game == "" || data.Checksum != checksum)
+					{
+						data.Game = game;
+						data.Checksum = checksum;
+						GamesToCache.AddItem(data);
+					}
+					else
+					{
+						m.GameData.AddItem(data);
+					}
+					
+					game = "";
+					b = false;
+				}
+				else if (b)
+				{
+					s = Mid(json2, i, 1);
+					
+					if (s != "\"" && s != "{" && s != "}" && s != ",")
+					{
+						game $= Mid(json2, i, 1);
+					}
+				}
+			}
+			
+			if (GamesToCache.Length > 0)
+			{
+				json2 = "[{\"cmd\":\"GetDataPackage\",\"games\":[";
+				for (i = 0; i < GamesToCache.Length; i++)
+				{
+					json2 $= "\""$GamesToCache[i].Game$"\"";
+					if (i < GamesToCache.Length-1)
+					{
+						json2 $= ",";
+					}
+					else
+					{
+						json2 $= "]}]";
+					}
+				}
+				
+				m.ScreenMessage("Reading new game location/item data...");
+				SendBinaryMessage(json2);
+			}
+			
 			m.DebugMessage("Received RoomInfo packet, sending Connect packet...");
 			ConnectToAP();
+			break;
+		
+		case "DataPackage":
+			if (m.GameDataLoaded)
+				break;
+			
+			m.DebugMessage("Reading data package...");
+			games = jsonObj.GetObject("data").GetObject("games");
+			if (games == None)
+			{
+				m.DebugMessage("Failed to read datapackage!");
+				break;
+			}
+			
+			for (i = 0; i < GamesToCache.Length; i++)
+			{
+				myGame = games.GetObject(GamesToCache[i].Game);
+				if (myGame == None)
+				{
+					m.DebugMessage("Failed to cache game: " $GamesToCache[i].Game);
+					continue;
+				}
+			
+				mappings = myGame.GetObject("item_name_to_id");
+				json2 = mappings.EncodeJson(mappings);
+				
+				for (a = 0; a < Len(json2); a++)
+				{
+					if (Mid(json2, a, 1) == "\"")
+					{
+						if (!b)
+						{
+							b = true;
+						}
+						else
+						{
+							// Found an item
+							m.DebugMessage("Found item: " $s $", game: " $GamesToCache[i].Game);
+							itemMapping.ID = mappings.GetIntValue(s);
+							itemMapping.Item = s;
+							GamesToCache[i].ItemMappings.AddItem(itemMapping);
+							s = "";
+							b = false;
+						}
+					}
+					else if (b)
+					{
+						s $= Mid(json2, a, 1);
+					}
+				}
+				
+				mappings = myGame.GetObject("location_name_to_id");
+				json2 = mappings.EncodeJson(mappings);
+				b = false;
+				s = "";
+				
+				for (a = 0; a < Len(json2); a++)
+				{
+					if (Mid(json2, a, 1) == "\"")
+					{
+						if (!b)
+						{
+							b = true;
+						}
+						else
+						{
+							// Found a location
+							m.DebugMessage("Found location: " $s $", game: " $GamesToCache[i].Game);
+							locMapping.ID = mappings.GetIntValue(s);
+							locMapping.Location = s;
+							GamesToCache[i].LocationMappings.AddItem(locMapping);
+							b = false;
+							s = "";
+						}
+					}
+					else if (b)
+					{
+						s $= Mid(json2, a, 1);
+					}
+				}
+				
+				class'Engine'.static.BasicSaveObject(GamesToCache[i], "APGameData/"$GamesToCache[i].Game, false, 1);
+				m.GameData.AddItem(GamesToCache[i]);
+			}
+			
+			m.GameDataLoaded = true;
 			break;
 		
 		case "Connected":
@@ -464,20 +627,55 @@ function ParseJSON(string json)
 			
 			
 		case "PrintJSON":
-			jsonChild = jsonObj.GetObject("data");
+			m.ReplOnce(json, "\"data\"", "\"0\"", json);
 			
-			if (jsonChild != None)
+			for (i = 0; i < Len(json); i++)
 			{
-				if (IsValidMessageType(jsonChild.GetStringValue("type")))
+				if (Mid(json, i, 3) == "},{")
 				{
-					text = jsonChild.GetStringValue("text");
-					if (InStr(text, "[Hint]:") == -1)
-					{
-						m.ScreenMessage(text);
-					}
+					m.ReplOnce(json, "},{", 
+						"}," $"\"" $a+1 $"\"" $":{", json);
+					
+					a++;
 				}
 			}
 			
+			jsonChild = class'JsonObject'.static.DecodeJson(json);
+			if (jsonChild == None)
+				break;
+				
+			for (i = 0; i <= a; i++)
+			{
+				textObj = jsonChild.GetObject(string(i));
+				if (textObj == None)
+					continue;
+				
+				switch (textObj.GetStringValue("type"))
+				{
+					case "player_id":
+						player = m.PlayerIDToName(int(textObj.GetStringValue("text")));
+
+						if (player == m.SlotData.SlotName)
+							msgType = 'Warning';
+						
+						text $= player;
+						break;
+					
+					case "item_id":
+						text $= m.ItemIDToName(int(textObj.GetStringValue("text")));
+						break;
+					
+					case "location_id":
+						text $= m.LocationIDToName(int(textObj.GetStringValue("text")));
+						break;
+					
+					default:
+						text $= textObj.GetStringValue("text");
+						break;
+				}
+			}
+			
+			m.ScreenMessage(text, msgType);
 			break;
 			
 			
@@ -511,11 +709,9 @@ function ParseJSON(string json)
 
 	jsonObj = None;
 	jsonChild = None;
-}
-
-function bool IsValidMessageType(string msgType)
-{
-	return (msgType != "ItemSend" && msgType != "Hint" && msgType != "player_id");
+	myGame = None;
+	games = None;
+	textObj = None;
 }
 
 function OnLocationInfoCommand(string json)
@@ -563,7 +759,8 @@ function OnLocationInfoCommand(string json)
 			{
 				m.CreateShopItemInfo(shopItemClass, 
 					jsonChild.GetIntValue("item"),
-					jsonChild.GetIntValue("flags"));
+					jsonChild.GetIntValue("flags"),
+					jsonChild.GetIntValue("player"));
 			}
 			
 			continue;
@@ -832,6 +1029,7 @@ function GrantItem(int itemId, int playerId)
 			}
 		}
 		
+		/*
 		// We already show a different message for yarn
 		if (itemId != class'Archipelago_ItemInfo'.static.GetYarnItemID())
 		{
@@ -844,6 +1042,7 @@ function GrantItem(int itemId, int playerId)
 				`AP.ScreenMessage("Got " $itemName);
 			}
 		}
+		*/
 	}
 	else
 	{
@@ -1018,7 +1217,8 @@ function bool GiveRandomSkin(array<class< Object > > skins)
 	lo = Hat_PlayerController(GetALocalPlayerController()).MyLoadout;
 	for (i = 0; i < skins.Length; i++)
 	{
-		if (!class'Hat_GameDLCInfo'.static.IsGameDLCInfoInstalled(class<Hat_Collectible_Skin>(skins[i]).default.RequiredDLC))
+		if (class<Hat_Collectible_Skin>(skins[i]).default.RequiredDLC != None &&
+			!class'Hat_GameDLCInfo'.static.IsGameDLCInfoInstalled(class<Hat_Collectible_Skin>(skins[i]).default.RequiredDLC))
 			continue;
 		
 		if (!lo.BackpackHasInventory(class<Hat_Collectible_Skin>(skins[i]))
@@ -1045,7 +1245,8 @@ function bool GiveRandomFlair(array<class< Object > > flairs)
 	lo = Hat_PlayerController(GetALocalPlayerController()).MyLoadout;
 	for (i = 0; i < flairs.Length; i++)
 	{
-		if (!class'Hat_GameDLCInfo'.static.IsGameDLCInfoInstalled(class<Hat_CosmeticItemQualityInfo>(flairs[i]).default.RequiredDLC))
+		if (class<Hat_CosmeticItemQualityInfo>(flairs[i]).default.RequiredDLC != None &&
+			!class'Hat_GameDLCInfo'.static.IsGameDLCInfoInstalled(class<Hat_CosmeticItemQualityInfo>(flairs[i]).default.RequiredDLC))
 			continue;
 		
 		if (class<Hat_CosmeticItemQualityInfo>(flairs[i]).default.RequiredDLC == class'Hat_GameDLCInfo_KickstarterHat'
@@ -1066,7 +1267,7 @@ function bool GiveRandomFlair(array<class< Object > > flairs)
 	if (candidates.Length > 0)
 	{
 		chosen = candidates[RandRange(0, candidates.Length-1)];
-		lo.AddBackpack(lo.MakeLoadoutItem(chosen.static.GetBaseCosmeticItemWeApplyTo(), chosen));
+		lo.AddBackpack(lo.MakeLoadoutItem(chosen.static.GetBaseCosmeticItemWeApplyTo(), chosen), false);
 		return true;
 	}
 	

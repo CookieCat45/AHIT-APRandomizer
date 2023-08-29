@@ -47,6 +47,22 @@ function UpdateClosestMarker(HUD H)
 	mode = m.SlotData.CompassBadgeMode;
 	onlyImportant = (mode == 2 || mode == 3 && AreImportantItemsLeft(H));
 	
+	if (m.IsInSpaceship() && !m.HasAPBit("RumbiYarn", 1))
+	{
+		// Point to Rumbi, most players don't realize that she is a check.
+		if ((!m.SlotData.UmbrellaLogic || CanHitDwellerBells(false)) && `SaveManager.GetNumberOfTimePieces() >= 4)
+		{
+			foreach H.PlayerOwner.DynamicActors(class'Actor', a)
+			{
+				if (a.IsA('Hat_Vacuum'))
+				{
+					UpdateClosestMarker_Actor(H, a, closest_distance, bestindx);
+					break;
+				}
+			}
+		}
+	}
+	
 	// Iterations
 	foreach H.PlayerOwner.DynamicActors(class'Archipelago_RandomizedItem_Base', item)
 	{
@@ -271,6 +287,15 @@ function bool CanReachLocation(int id, HUD H)
 			return id == 304874 || id == 305024 || id == 305248 || id == 305247;
 		}
 	}
+	else if (mapName ~= "dlc_metro" && `GameManager.IsCurrentAct(8))
+	{
+		return false;
+	}
+	else if (mapName ~= "ship_main" && `GameManager.IsCurrentAct(1))
+	{
+		if (!lo.BackpackHasInventory(class'Hat_Ability_Hookshot'))
+			return id == 305321 || id == 304313;
+	}
 	else if (m.SlotData.ShuffleSubconPaintings && mapName ~= "subconforest")
 	{
 		paintingUnlock = m.GetPaintingUnlocks();
@@ -301,21 +326,24 @@ function bool CanReachLocation(int id, HUD H)
 		if (!lo.BackpackHasInventory(class'Hat_Ability_Hookshot'))
 			return id == 334855 || id == 334856;
 		
-		if (BirdhousePathLocs.Find(id) != -1 && !m.HasZipline(Zipline_Birdhouse))
-			return false;
-		
-		if (LavaCakePathLocs.Find(id) != -1 && !m.HasZipline(Zipline_LavaCake))
-			return false;
-		
-		if (WindmillPathLocs.Find(id) != -1 && !m.HasZipline(Zipline_Windmill))
-			return false;
-		
-		if (BellPathLocs.Find(id) != -1 && !m.HasZipline(Zipline_Bell))
-			return false;
+		if (m.SlotData.ShuffleZiplines)
+		{
+			if (BirdhousePathLocs.Find(id) != -1 && !m.HasZipline(Zipline_Birdhouse))
+				return false;
+
+			if (LavaCakePathLocs.Find(id) != -1 && !m.HasZipline(Zipline_LavaCake))
+				return false;
+			
+			if (WindmillPathLocs.Find(id) != -1 && !m.HasZipline(Zipline_Windmill))
+				return false;
+			
+			if (BellPathLocs.Find(id) != -1 && !m.HasZipline(Zipline_Bell))
+				return false;
+		}
 		
 		if (finale)
 		{
-			return id == 333635 || id == 334855 || id == 334856 || id == 335911 
+			return id == 334855 || id == 334856 || id == 335911 
 			|| id == 335756 || id == 336311 || id == 334760 || id == 334776;
 		}
 	}
@@ -348,7 +376,6 @@ function bool CanReachLocation(int id, HUD H)
 	}
 	
 	if (id == 323734
-	|| id == 325082
 	|| id == 336497)
 	{
 		if (CanSDJ())
@@ -393,7 +420,7 @@ function bool CanReachLocation(int id, HUD H)
 	return true;
 }
 
-function bool CanHitDwellerBells(optional bool MaskBypass)
+static function bool CanHitDwellerBells(optional bool MaskBypass)
 {
 	if (!`AP.SlotData.UmbrellaLogic)
 		return true;
@@ -434,17 +461,16 @@ defaultproperties
 	DwellerMaskRequiredLocs[0] = 324767;
 	DwellerMaskRequiredLocs[1] = 324464;
 	DwellerMaskRequiredLocs[2] = 324855;
-	DwellerMaskRequiredLocs[3] = 325082;
-	DwellerMaskRequiredLocs[4] = 324463;
-	DwellerMaskRequiredLocs[5] = 324766;
-	DwellerMaskRequiredLocs[6] = 336497;
-	DwellerMaskRequiredLocs[7] = 336395;
-	DwellerMaskRequiredLocs[8] = 323734;
-	DwellerMaskRequiredLocs[9] = 334434;
-	DwellerMaskRequiredLocs[10] = 336478;
-	DwellerMaskRequiredLocs[11] = 335826;
-	DwellerMaskRequiredLocs[12] = 305110;
-	DwellerMaskRequiredLocs[13] = 304106;
+	DwellerMaskRequiredLocs[3] = 324463;
+	DwellerMaskRequiredLocs[4] = 324766;
+	DwellerMaskRequiredLocs[5] = 336497;
+	DwellerMaskRequiredLocs[6] = 336395;
+	DwellerMaskRequiredLocs[7] = 323734;
+	DwellerMaskRequiredLocs[8] = 334434;
+	DwellerMaskRequiredLocs[9] = 336478;
+	DwellerMaskRequiredLocs[10] = 335826;
+	DwellerMaskRequiredLocs[11] = 305110;
+	DwellerMaskRequiredLocs[12] = 304106;
 	
 	BrewingHatRequiredLocs[0] = 305701;
 	BrewingHatRequiredLocs[1] = 334758;

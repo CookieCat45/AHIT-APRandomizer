@@ -13,9 +13,7 @@ var int LocationId;
 var int ItemId;
 var int ItemOwner;
 var int ItemFlags;
-var int Player;
-var string ItemDisplayName;
-var string ItemDesc;
+var string ItemDisplayName; // Deprecated
 var Surface HUDIcon;
 var bool DoSpinEffect;
 var class<object> InventoryClass;

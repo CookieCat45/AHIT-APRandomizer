@@ -4,10 +4,9 @@ class Archipelago_HUDMenuActSelect extends Hat_HUDMenuActSelect;
 
 simulated function BuildActs(HUD H)
 {
-	local int i,j, InventoryIndex, actid, total_num, basement, context;
+	local int i, j, actid, total_num, basement, context;
 	local float angle, angle_radians;
 	local Array<Hat_ChapterActInfo> UnlockedActIDs;
-	local Array< class<Inventory> > InventoryClasses;
 	local MenuSelectHourglass s;
 	local Hat_ChapterActInfo shuffledAct;
 	
@@ -132,23 +131,12 @@ simulated function BuildActs(HUD H)
 		s.MapName = ChapterInfo.GetActMap(actid, s.IsComplete);
 		s.ActID = actid;
 		
-		InventoryClasses = shuffledAct.RequiredItems;
-		s.IsMissingItem = false;
-		s.SupportsCoop = ChapterInfo.GetSupportsCoop(s.Hourglass);
-		if (InventoryClasses.Length > 0 && !s.IsComplete)
-		{
-			for (InventoryIndex = 0; InventoryIndex < InventoryClasses.Length; InventoryIndex++)
-			{
-				if (Hat_PlayerController(H.PlayerOwner).GetLoadout().BackpackHasInventory(InventoryClasses[InventoryIndex], true)) continue;
-				s.IsMissingItem = true;
-				break;
-			}
-		}
-		
+		s.IsMissingItem = !s.IsComplete && !`AP.IsActCompletable(shuffledAct, Hat_PlayerController(H.PlayerOwner).MyLoadout, bool(basement));
 		s.Highscore = GetTimePieceHighscore(s.Hourglass);
-			
+		s.SupportsCoop = ChapterInfo.GetSupportsCoop(s.Hourglass);
 		s.PonPayCost = 0;
 		s.DeathWishPayCost = 0;
+		
 		if (!s.IsComplete && !HasPaidTimePiece(s.Hourglass))
 		{
 			s.PonPayCost = ChapterInfo.GetActOrbCost(actid);
@@ -173,7 +161,7 @@ simulated function BuildActs(HUD H)
 		else
 			s.SpecialAnimation = None;
 		s.IsValid = true;
-
+		
 		Hourglasses.AddItem(s);
 	}
 	
@@ -311,6 +299,7 @@ simulated function BuildSpecialHourglasses(HUD H)
 			shuffledAct = s.ChapterActInfo;
 		}
 		
+		s.IsMissingItem = !s.IsComplete && !`AP.IsActCompletable(shuffledAct, Hat_PlayerController(H.PlayerOwner).MyLoadout, bool(basement));
 		context = shuffledAct.IsBonus ? 1 : `AP.IsActFreeRoam(shuffledAct) ? 2 : 0;
 		
 		s.ActInfoboxName = basement == 0 ? GetLocalizedActName(shuffledAct, context) : 
@@ -324,12 +313,13 @@ simulated function BuildSpecialHourglasses(HUD H)
 				$" (" $s.ActInfoboxName $")";
 		}
 		
+		/*
 		if (s.IsUnlocked || s.IsComplete)
 		{
 			if (!ChapterInfo.IsActless)
 				s.ActInfoboxTitle = class'Hat_Localizer'.static.GetSystem("levels", "Act") $ " " $ s.ActID;
 			s.ActInfoboxName = GetLocalizedActName(shuffledAct, context);
-		}
+		*/
 		
 		s.ActDisplayLabel = s.ActInfoboxName;
 		
@@ -500,7 +490,7 @@ simulated function BuildBonusHourglasses(HUD H)
 	BonusUnlocked.Length = 0;
 	ColumnA.Length = 0;
 	ColumnB.Length = 0;
-
+	
 	HasCompletedEverythingExceptCaveRifts = class'Hat_GameManager'.static.AreAllActsComplete(ChapterInfo, false, false);
 
 	ChapterInfo.ConditionalUpdateActList();
@@ -583,6 +573,7 @@ simulated function BuildBonusHourglassesSide(HUD H, Array<Hat_ChapterActInfo> Ho
 			shuffledAct = s.ChapterActInfo;
 		}
 		
+		s.IsMissingItem = !IsCompleted && !`AP.IsActCompletable(shuffledAct, Hat_PlayerController(H.PlayerOwner).MyLoadout, bool(basement));
 		context = shuffledAct.IsBonus ? 1 : `AP.IsActFreeRoam(shuffledAct) ? 2 : 0;
 		
 		s.ActInfoboxName = basement == 0 ? GetLocalizedActName(shuffledAct, context) : 
@@ -592,7 +583,7 @@ simulated function BuildBonusHourglassesSide(HUD H, Array<Hat_ChapterActInfo> Ho
 		s.PosX = posx;
 		s.PosY = posy;
 		s.ActInfoboxTitle = class'Hat_Localizer'.static.GetGame("levels", s.ID == ActSelectType_TimeRift_Water ? "Location_DreamWorld_Water" : "Location_DreamWorld_Cave");
-		s.ActInfoboxName = GetLocalizedActName(shuffledAct, context);
+		//s.ActInfoboxName = GetLocalizedActName(shuffledAct, context);
 		s.ActDisplayLabel = s.ActInfoboxName;
 		s.IsDefault = false;
 		s.Photo = s.ID != ActSelectType_TimeRift_Cave_Reminder ? HourglassList[i].Photo : None;

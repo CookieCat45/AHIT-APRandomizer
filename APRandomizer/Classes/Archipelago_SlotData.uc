@@ -20,12 +20,14 @@ var array<int> PageLocationIDs;
 var bool TimePiecesCached;
 
 var int Goal;
+var int LogicDifficulty; // 0 = Normal, 1 = Hard, 2 = Expert
 var bool ActRando;
 var bool ShuffleStorybookPages;
 var bool ShuffleActContracts;
 var bool ShuffleZiplines;
 var bool ShuffleSubconPaintings;
 var bool SDJLogic;
+var bool CTRSprint;
 var bool UmbrellaLogic;
 var bool DeathLink;
 
