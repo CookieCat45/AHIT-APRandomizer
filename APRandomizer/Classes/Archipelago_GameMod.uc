@@ -7,6 +7,7 @@ class Archipelago_GameMod extends GameMod
 var Archipelago_TcpLink Client;
 var Archipelago_SlotData SlotData;
 var Archipelago_ItemResender ItemResender;
+var array<class<Archipelago_ShopItem_Base > > ShopItemsPending;
 var array<Archipelago_GameData> GameData;
 var transient int ActMapChangeChapter;
 var transient bool ActMapChange;
@@ -25,7 +26,7 @@ var const editconst Vector SpaceshipSpawnLocation;
 
 var transient array<Hat_SnatcherContract_Selectable> SelectContracts;
 var transient bool TrapsDestroyed;
-var float TimeSinceLastItem;
+var transient float TimeSinceLastItem;
 
 struct immutable ShuffledAct
 {
@@ -861,6 +862,8 @@ function OnPreConnected()
 // All slot data should be available at this point.
 function OnFullyConnected()
 {
+	local int i;
+
 	SetTimer(0.5, false, NameOf(ShuffleCollectibles));
 	UpdateChapterInfo();
 	
@@ -877,6 +880,13 @@ function OnFullyConnected()
 		SetTimer(0.5, false, NameOf(ResendLocations));
 	}
 	
+	for (i = 0; i < ShopItemsPending.Length; i++)
+	{
+		InitShopItemDisplayName(ShopItemsPending[i]);
+	}
+
+	ShopItemsPending.Length = 0;
+
 	// Call this just to see if we can craft a hat
 	OnYarnCollected(0);
 }
@@ -2236,7 +2246,7 @@ function ShuffleCollectibles(optional bool cache)
 			
 			if (IsShopItemCached(shopItem))
 			{
-				InitShopItemDisplayName(shopItem);
+				ShopItemsPending.AddItem(shopItem);
 				continue;
 			}
 			
@@ -2545,7 +2555,6 @@ function ShopItemInfo CreateShopItemInfo(class<Archipelago_ShopItem_Base> itemCl
 			class'Hat_Math'.static.SeededRandWithSeed(SlotData.MaxPonCost-SlotData.MinPonCost+1, SlotData.Seed+SlotData.ShopItemRandStep);
 	}
 	
-	
 	SlotData.ShopItemRandStep++;
 	SlotData.ShopItemList.AddItem(shopInfo);
 	InitShopItemDisplayName(itemClass);
@@ -2589,6 +2598,9 @@ function InitShopItemDisplayName(class<Archipelago_ShopItem_Base> itemClass)
 	local ShopItemInfo shopInfo;
 	local string displayName;
 	local class<Actor> worldClass;
+	
+	if (GameData.Length <= 0)
+		return;
 	
 	if (!GetShopItemInfo(itemClass, shopInfo))
 		return;
