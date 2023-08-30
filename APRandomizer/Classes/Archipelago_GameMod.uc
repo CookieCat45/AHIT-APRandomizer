@@ -15,7 +15,6 @@ var transient bool CollectiblesShuffled;
 var transient bool ControllerCapsLock;
 var transient bool ContractEventActive;
 var transient bool ItemSoundCooldown;
-var transient bool GameDataLoaded;
 var transient string DebugMsg;
 
 var config int DebugMode;
@@ -289,7 +288,7 @@ event PreBeginPlay()
 	if (IsCurrentPatch())
 		return;
 	
-	if (bool(DisableInjection) && !IsArchipelagoEnabled() || `GameManager.GetCurrentMapFilename() ~= `GameManager.TitleScreenMapName)
+	if (bool(DisableInjection) && !IsArchipelagoEnabled() || IsInTitlescreen())
 		return;
 	
 	save = `SaveManager.GetCurrentSaveData();
@@ -437,7 +436,7 @@ function OnPostInitGame()
 	
 	// If on titlescreen, find any Archipelago-enabled save files and do this stuff 
 	// to prevent the game from forcing the player into Mafia Town.
-	if (`GameManager.GetCurrentMapFilename() ~= `GameManager.TitleScreenMapName)
+	if (IsInTitlescreen())
 	{
 		saveCount = `SaveManager.NumUsedSaveSlots();
 		
@@ -3648,10 +3647,7 @@ function bool IsDLC2Installed(optional bool AndEnabled)
 
 function bool IsArchipelagoEnabled()
 {
-	if (IsCurrentPatch())
-		return false;
-	
-	if (`GameManager.GetCurrentMapFilename() ~= `GameManager.TitleScreenMapName)
+	if (IsCurrentPatch() || IsInTitlescreen())
 		return false;
 	
 	return HasAPBit("ArchipelagoEnabled", 1);
@@ -3661,13 +3657,17 @@ function bool IsCurrentPatch()
 {
 	local string version;
 	version = class'Engine'.static.GetBuildDate();
-	//DebugMessage("Build Date: " $version);
 	
 	// 2021 and later is around the time when TcpLink broke, which means we can't function. We only want 2019 or 2020 builds.
 	if (InStr(version, "2019") == -1 && InStr(version, "2020") == -1)
 		return true;
 	
 	return false;
+}
+
+function bool IsInTitlescreen()
+{
+	return `GameManager.GetCurrentMapFilename() ~= `GameManager.TitleScreenMapName || `SaveManager.GetCurrentSaveData() == None;
 }
 
 // Archipelago requires JSON messages to be encased in []

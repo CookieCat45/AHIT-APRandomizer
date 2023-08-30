@@ -10,6 +10,7 @@ var transient bool FullyConnected;
 var transient bool Refused;
 var transient int EmptyCount;
 var transient bool FirstReceivedItems;
+var transient bool GameDataLoaded;
 var transient array<Archipelago_GameData> GamesToCache;
 
 const MaxSentMessageLength = 246;
@@ -373,13 +374,13 @@ function ParseJSON(string json)
 	switch (jsonObj.GetStringValue("cmd"))
 	{
 		case "RoomInfo":
-			if (m.GameDataLoaded)
+			if (GameDataLoaded)
 			{
 				m.DebugMessage("Received RoomInfo packet, sending Connect packet...");
 				ConnectToAP();
 				break;
 			}
-
+			
 			games = jsonObj.GetObject("datapackage_checksums");
 			json2 = games.EncodeJson(games);
 			
@@ -444,20 +445,24 @@ function ParseJSON(string json)
 				m.ScreenMessage("Reading new game location/item data...");
 				SendBinaryMessage(json2);
 			}
+			else
+			{
+				GameDataLoaded = true;
+			}
 			
 			m.DebugMessage("Received RoomInfo packet, sending Connect packet...");
 			ConnectToAP();
 			break;
 		
 		case "DataPackage":
-			if (m.GameDataLoaded)
+			if (GameDataLoaded)
 				break;
 			
 			m.DebugMessage("Reading data package...");
 			games = jsonObj.GetObject("data").GetObject("games");
 			if (games == None)
 			{
-				m.DebugMessage("Failed to read datapackage!");
+				m.DebugMessage("Failed to read datapackage!", , true);
 				break;
 			}
 			
@@ -466,7 +471,7 @@ function ParseJSON(string json)
 				myGame = games.GetObject(GamesToCache[i].Game);
 				if (myGame == None)
 				{
-					m.DebugMessage("Failed to cache game: " $GamesToCache[i].Game);
+					m.DebugMessage("Failed to cache game: " $GamesToCache[i].Game, , true);
 					continue;
 				}
 			
@@ -532,7 +537,7 @@ function ParseJSON(string json)
 				m.GameData.AddItem(GamesToCache[i]);
 			}
 			
-			m.GameDataLoaded = true;
+			GameDataLoaded = true;
 			break;
 		
 		case "Connected":
