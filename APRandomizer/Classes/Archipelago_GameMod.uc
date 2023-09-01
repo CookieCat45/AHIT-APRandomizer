@@ -285,10 +285,10 @@ event PreBeginPlay()
 	
 	Super.PreBeginPlay();
 	
-	if (IsCurrentPatch())
+	if (IsInTitlescreen() || IsCurrentPatch())
 		return;
 	
-	if (bool(DisableInjection) && !IsArchipelagoEnabled() || IsInTitlescreen())
+	if (bool(DisableInjection) && !IsArchipelagoEnabled())
 		return;
 	
 	save = `SaveManager.GetCurrentSaveData();
@@ -449,7 +449,7 @@ function OnPostInitGame()
 			if (HasAPBit("ArchipelagoEnabled", 1, save))
 				save.AllowSaving = false;
 		}
-
+		
 		ResetEverything();
 	}
 	
@@ -610,8 +610,7 @@ function OnPostInitGame()
 					|| trigger.Name == 'TriggerVolume_20' && `GameManager.GetCurrentAct() != 4)
 					{
 						DebugMessage("Disabling trigger volume: "$trigger.Name);
-						ConsoleCommand("set "$trigger.Name $" bnodelete false");
-						trigger.Destroy();
+						trigger.ShutDown();
 					}
 					
 					// If contracts are shuffled, disable the bag trap trigger if we already checked the Subcon Well contract
@@ -620,8 +619,7 @@ function OnPostInitGame()
 						if (SlotData.CheckedContracts.Find(class'Hat_SnatcherContract_IceWall') != -1)
 						{
 							DebugMessage("Disabling trigger volume: "$trigger.Name);
-							ConsoleCommand("set "$trigger.Name $" bnodelete false");
-							trigger.Destroy();
+							trigger.ShutDown();
 						}
 					}
 				}
@@ -912,11 +910,11 @@ function LoadSlotData(JsonObject json)
 	SlotData.ConnectedOnce = true;
 	SlotData.Goal = json.GetIntValue("EndGoal");
 	SlotData.LogicDifficulty = json.GetIntValue("LogicDifficulty");
+	SlotData.KnowledgeTricks = json.GetBoolValue("KnowledgeChecks");
 	SlotData.ActRando = json.GetBoolValue("ActRandomizer");
 	SlotData.ShuffleStorybookPages = json.GetBoolValue("ShuffleStorybookPages");
 	SlotData.ShuffleActContracts = json.GetBoolValue("ShuffleActContracts");
 	SlotData.ShuffleZiplines = json.GetBoolValue("ShuffleAlpineZiplines");
-	SlotData.SDJLogic = json.GetBoolValue("SDJLogic");
 	SlotData.UmbrellaLogic = json.GetBoolValue("UmbrellaLogic");
 	SlotData.ShuffleSubconPaintings = json.GetBoolValue("ShuffleSubconPaintings");
 	SlotData.CTRSprint = json.GetBoolValue("CTRWithSprint");
@@ -1272,10 +1270,14 @@ function OnPreOpenHUD(HUD InHUD, out class<Object> InHUDElement)
 			
 			break;
 		
+		case class'Hat_HUDElementLocationBanner_Metro':
+			InHUDElement = class'Archipelago_HUDElementLocationBanner_Metro';
+			break;
+		
 		case class'Hat_HUDElementRareStickerAlert':
 			SetTimer(0.0001, false, NameOf(RemoveRareStickerAlert), self, Hat_HUD(InHUD));
 			break;
-
+		
 		case class'Hat_HUDMenuShop':
 			SetTimer(0.0001, false, NameOf(CheckShopOverride), self, Hat_HUD(InHUD));
 			break;
@@ -1795,18 +1797,20 @@ function UpdateActUnlocks()
 function bool IsActCompletable(Hat_ChapterActInfo act, Hat_Loadout lo, optional bool basement)
 {
 	local int difficulty;
-	local bool canHit, canHitMaskBypass, hookshot, umbrella, sdj;
+	local bool canHit, canHitMaskBypass, hookshot, umbrella, sdj, nobonk;
 	
+	difficulty = SlotData.LogicDifficulty; // 0 = Normal, 1 = Hard, 2 = Expert
+
 	// Can hit objects, has Umbrella or Brewing Hat, only for umbrella logic
-	canHit = !SlotData.UmbrellaLogic || class'Archipelago_HUDElementItemFinder'.static.CanHitDwellerBells();
+	canHit = !SlotData.UmbrellaLogic || class'Archipelago_HUDElementItemFinder'.static.CanHitObjects();
 	
 	// Can hit dweller bells, but not needed if player has Dweller Mask, only for umbrella logic
-	canHitMaskBypass = !SlotData.UmbrellaLogic || class'Archipelago_HUDElementItemFinder'.static.CanHitDwellerBells(true);
+	canHitMaskBypass = !SlotData.UmbrellaLogic || class'Archipelago_HUDElementItemFinder'.static.CanHitObjects(true);
 	
 	hookshot = lo.BackpackHasInventory(class'Hat_Ability_Hookshot');
 	umbrella = !SlotData.UmbrellaLogic || lo.BackpackHasInventory(class'Hat_Weapon_Umbrella', true);
-	sdj = SlotData.SDJLogic && lo.BackpackHasInventory(class'Hat_Ability_Sprint');
-	difficulty = SlotData.LogicDifficulty; // 0 = Normal, 1 = Hard, 2 = Expert
+	sdj = class'Archipelago_HUDElementItemFinder'.static.CanSDJ();
+	nobonk = lo.BackpackHasInventory(class'Hat_Ability_NoBonk');
 	
 	if (basement)
 	{
@@ -1833,16 +1837,16 @@ function bool IsActCompletable(Hat_ChapterActInfo act, Hat_Loadout lo, optional 
 				&& lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteD');
 		
 		case "chapter2_toiletboss":
-			if (SlotData.ShuffleSubconPaintings && GetPaintingUnlocks() < 1)
+			if (difficulty < 2 && SlotData.ShuffleSubconPaintings && GetPaintingUnlocks() < 1)
 				return false;
 			
-			return hookshot && canHit;
+			return (hookshot || difficulty >= 1 && sdj && nobonk || difficulty >= 2) && canHit;
 		
 		case "vanessa_manor_attic":
 			if (SlotData.ShuffleSubconPaintings && GetPaintingUnlocks() < 1)
 				return false;
 			
-			return canHitMaskBypass;
+			return canHitMaskBypass || difficulty >= 2;
 		
 		case "subcon_village_icewall":
 			return !SlotData.ShuffleSubconPaintings || GetPaintingUnlocks() >= 1;
@@ -1851,13 +1855,13 @@ function bool IsActCompletable(Hat_ChapterActInfo act, Hat_Loadout lo, optional 
 			if (SlotData.ShuffleSubconPaintings && GetPaintingUnlocks() < 1)
 				return false;
 			
-			return hookshot && canHit;
+			return difficulty >= 2 && nobonk || hookshot && canHit;
 		
 		case "TheFinale_FinalBoss":
 			return hookshot && lo.BackpackHasInventory(class'Hat_Ability_FoxMask');
 		
 		case "Spaceship_WaterRift_Gallery":
-			return sdj || lo.BackpackHasInventory(class'Hat_Ability_Chemical');
+			return difficulty >= 1 || lo.BackpackHasInventory(class'Hat_Ability_Chemical');
 		
 		case "Cruise_Sinking":
 			return difficulty >= 1 || lo.BackpackHasInventory(class'Hat_Ability_StatueFall');
@@ -2002,7 +2006,7 @@ function bool IsChapterActInfoUnlocked(Hat_ChapterActInfo ChapterActInfo, option
 			
 			// If a Free Roam act is shuffled onto this act, it's a free space
 			shuffled = GetShuffledAct(RequiredChapterActInfo);
-			if (shuffled != None && IsActFreeRoam(shuffled))
+			if (shuffled != None && IsActFreeRoam(shuffled) && shuffled.ActID != 1)
 				continue;
 			
 			if (ModPackageName != "")
@@ -3647,7 +3651,7 @@ function bool IsDLC2Installed(optional bool AndEnabled)
 
 function bool IsArchipelagoEnabled()
 {
-	if (IsCurrentPatch() || IsInTitlescreen())
+	if (IsInTitlescreen() || IsCurrentPatch())
 		return false;
 	
 	return HasAPBit("ArchipelagoEnabled", 1);
