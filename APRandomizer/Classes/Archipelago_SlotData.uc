@@ -33,6 +33,8 @@ var bool DeathLink;
 
 var bool DLC1;
 var bool Tasksanity;
+var bool ExcludeTour;
+var int ShipShapeCustomTaskGoal;
 var int TasksanityTaskStep;
 var int TasksanityCheckCount;
 var int TaskStep;

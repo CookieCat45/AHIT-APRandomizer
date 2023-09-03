@@ -504,9 +504,19 @@ function OnPostInitGame()
 			{
 				if (portal.Name == 'Hat_TimeRiftPortal_2')
 				{
-					portal.Enabled = true;
-					portal.SetIdleSound(true);
-					portal.SetHidden(false);
+					if (SlotData.ExcludeTour)
+					{
+						portal.Enabled = false;
+						portal.SetIdleSound(false);
+						portal.SetHidden(true);
+					}
+					else
+					{
+						portal.Enabled = true;
+						portal.SetIdleSound(true);
+						portal.SetHidden(false);
+					}
+					
 					break;
 				}
 			}
@@ -935,7 +945,10 @@ function LoadSlotData(JsonObject json)
 	if (SlotData.DLC1)
 	{
 		SlotData.Chapter6Cost = json.GetIntValue("Chapter6Cost");
+		SlotData.ShipShapeCustomTaskGoal = json.GetIntValue("ShipShapeCustomTaskGoal");
 		SlotData.Tasksanity = json.GetBoolValue("Tasksanity");
+		SlotData.ExcludeTour = json.GetBoolValue("ExcludeTour");
+		
 		if (SlotData.Tasksanity)
 		{
 			SlotData.TasksanityTaskStep = json.GetIntValue("TasksanityTaskStep");
@@ -1218,6 +1231,24 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 function SetMapChangeChapter()
 {
 	`SaveManager.SetCurrentChapter(ActMapChangeChapter);
+}
+
+function OnMiniMissionBegin(Object MiniMission)
+{
+	if (!IsArchipelagoEnabled() || !SlotData.Initialized)
+		return;
+	
+	if (Hat_MiniMissionTaskMaster(MiniMission) == None) 
+		return;
+	
+	if (!`GameManager.IsCurrentAct(2))
+		return;
+	
+	if (class'Hat_SnatcherContract_DeathWish_EndlessTasks'.static.IsActive(true))
+		return;
+	
+	if (Hat_MiniMissionTaskMaster(MiniMission).MissionMode == MiniMissionTaskMaster_ScoreTarget)
+		Hat_MiniMissionTaskMaster(MiniMission).ScoreTarget = SlotData.ShipShapeCustomTaskGoal;
 }
 
 function OnMiniMissionGenericEvent(Object MiniMission, String id)
