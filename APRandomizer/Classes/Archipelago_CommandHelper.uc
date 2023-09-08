@@ -11,6 +11,7 @@ exec function ap_set_connection_info(string ip, int port)
 	
 	`AP.SlotData.Host = ip;
 	`AP.SlotData.Port = port;
+	`AP.SaveGame();
 	`AP.ScreenMessage("Set target host to: "$ip $":" $port);
 }
 
@@ -36,6 +37,11 @@ exec function ap_say(string message)
 	json.SetStringValue("cmd", "Say");
 	json.SetStringValue("text", message);
 	`AP.Client.SendBinaryMessage("[" $class'JsonObject'.static.EncodeJson(json) $"]");
+}
+
+exec function ap_open_dw_map()
+{
+	Hat_HUD(Hat_PlayerController(Pawn.Controller).MyHUD).OpenHUD(class'Archipelago_HUDMenuDeathWish');
 }
 
 exec function ap_connect()

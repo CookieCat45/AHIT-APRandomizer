@@ -41,7 +41,7 @@ function bool Render(HUD H)
     if (mod == None || !mod.SlotData.Initialized)
     {
         H.Canvas.SetDrawColor(125, 125, 125, 255);
-        DrawBorderedText(H.Canvas, "No seed data! Connect at least once first.", x, y, 1.5, true);
+        DrawBorderedText(H.Canvas, "No seed data! Connect at least once first.", x, y, 0.7, true);
         return true;
     }
     
@@ -221,7 +221,25 @@ function bool Render(HUD H)
     H.Canvas.SetDrawColor(255, 255, 255);
     
     offsetY += H.Canvas.ClipY * 0.1;
-    text = mod.SlotData.Goal == 1 ? "GOAL: Beat Mustache Girl" : "GOAL: Clear Rush Hour";
+    switch (mod.SlotData.Goal)
+    {
+        case 1:
+            text = "GOAL: Beat Mustache Girl";
+            break;
+        
+        case 2:
+            text = "GOAL: Clear Rush Hour";
+            break;
+        
+        case 3:
+            text = "GOAL: Complete Seal the Deal";
+            break;
+        
+        default:
+            text = "GOAL: ???";
+            break;
+    }
+
     H.Canvas.SetDrawColor(25, 255, 25, 255);
     DrawBorderedText(H.Canvas, text, x, y+offsetY, 0.7, true);
     

@@ -25,6 +25,6 @@ simulated function bool OnCollected(Actor a)
 	{
 		`GameManager.AddBadgeSlots(1);
 	}
-
+	
 	return Super.OnCollected(a);
 }

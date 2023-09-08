@@ -89,8 +89,8 @@ function bool IsGamepad(HUD H)
 
 defaultproperties
 {
-    APIcon = Texture2D'APRandomizer_content.ap_logo';
-    APIconGamepad = Texture2D'APRandomizer_content.ap_logo_y';
+    APIcon = Texture2D'APRandomizer_contentNew.logo_new';
+    APIconGamepad = Texture2D'APRandomizer_contentNew.logo_new_y';
     HoverSound = SoundCue'HatInTime_Hud.SoundCues.CursorMove';
     RealTime = true;
 }

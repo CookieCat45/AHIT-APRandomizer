@@ -43,6 +43,18 @@ var int CompletedTasks;
 var bool DLC2;
 var bool BaseballBat;
 
+var bool DeathWish;
+var bool AutoCompleteBonuses;
+var bool BonusRewards;
+var bool DeathWishShuffle;
+var bool DeathWishOnly;
+var int DeathWishTPRequirement;
+var array<class<Hat_SnatcherContract_DeathWish> > ShuffledDeathWishes;
+var array<class<Hat_SnatcherContract_DeathWish> > CompletedDeathWishes;
+var array<class<Hat_SnatcherContract_DeathWish> > PerfectedDeathWishes;
+var array<class<Hat_SnatcherContract_DeathWish> > ExcludedContracts;
+var array<class<Hat_SnatcherContract_DeathWish> > ExcludedBonuses;
+
 var int CompassBadgeMode;
 
 var int Chapter1Cost;

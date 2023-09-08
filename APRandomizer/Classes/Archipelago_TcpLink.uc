@@ -21,7 +21,7 @@ event PostBeginPlay()
 	
 	if (bool(`AP.DisableAutoConnect))
 		return;
-
+	
 	if (`AP.SlotData.ConnectedOnce)
 	{
 		Connect();
@@ -39,7 +39,12 @@ function Connect()
 	
 	ReceiveMode = RMODE_Manual;
 	LinkMode = MODE_Line;
-	`AP.ScreenMessage("Connecting to host: " $`AP.SlotData.Host$":"$`AP.SlotData.Port);
+	
+	if (!ShouldFilterSelfJoins())
+	{
+		`AP.ScreenMessage("Connecting to host: " $`AP.SlotData.Host$":"$`AP.SlotData.Port);
+	}
+	
     Resolve(`AP.SlotData.Host);
 	
 	ClearTimer(NameOf(TimedOut));
@@ -168,8 +173,7 @@ event Tick(float d)
 	if (IsDataPending())
 	{
 		// IsDataPending seems to almost always return true even if no data is pending after a msg is sent, 
-		// so to check for the end of a message, 
-		// we simply count how many times we've read 0 bytes of data
+		// so to check for the end of a message, we simply count how many times we've read 0 bytes of data
 		count = ReadBinary(255, byteMessage);
 		if (count <= 0)
 		{
@@ -258,7 +262,7 @@ event Tick(float d)
 	
 	if (ParsingMessage)
 	{
-		if (EmptyCount >= 15)
+		if (EmptyCount >= 5)
 		{
 			// We've got a JSON message, parse it
 			msg = "";
@@ -542,7 +546,10 @@ function ParseJSON(string json)
 		
 		case "Connected":
 			m.OnPreConnected();
-			m.ScreenMessage("Successfully connected to " $m.SlotData.Host $":"$m.SlotData.Port);
+			
+			if (!ShouldFilterSelfJoins())
+				m.ScreenMessage("Successfully connected to " $m.SlotData.Host $":"$m.SlotData.Port);
+			
 			m.SlotData.PlayerSlot = jsonObj.GetIntValue("my_slot");
 			FullyConnected = true;
 			ConnectingToAP = false;
@@ -632,6 +639,12 @@ function ParseJSON(string json)
 			
 			
 		case "PrintJSON":
+			if (ShouldFilterSelfJoins() && jsonObj.GetStringValue("type") == "Join")
+			{
+				if (InStr(json, m.SlotData.SlotName) != -1)
+					break;
+			}
+			
 			m.ReplOnce(json, "\"data\"", "\"0\"", json);
 			
 			for (i = 0; i < Len(json); i++)
@@ -680,6 +693,9 @@ function ParseJSON(string json)
 				}
 			}
 			
+			if (ShouldFilterSelfJoins() && InStr(text, "Now that you are connected") != -1)
+				break;
+			
 			m.ScreenMessage(text, msgType);
 			break;
 			
@@ -716,6 +732,7 @@ function ParseJSON(string json)
 	jsonChild = None;
 	myGame = None;
 	games = None;
+	mappings = None;
 	textObj = None;
 }
 
@@ -1076,10 +1093,17 @@ function GrantItem(int itemId, int playerId)
 function GrantTimePiece(int playerId)
 {
 	local Archipelago_GameMod m;
+	local String hg;
 	local int tpCount;
 	
 	tpCount = `SaveManager.GetNumberOfTimePieces();
-	`SaveManager.GetCurrentSaveData().GiveTimePiece("ap_timepiece"$tpCount, false);
+	hg = "ap_timepiece"$tpCount;
+	
+	// Zero Jumps fix
+	class'Hat_SaveBitHelper'.static.SetLevelBits(
+		class'Hat_SnatcherContract_DeathWish_NoAPresses'.static.GetObjectiveBitID()$"_TimePieceCollected_"$hg, 1, "subconforest");
+	
+	`SaveManager.GetCurrentSaveData().GiveTimePiece(hg, false);
 	
 	m = `AP;
 	if (m.IsInSpaceship() && m.SlotData.Initialized)
@@ -1454,7 +1478,14 @@ event Closed()
 {
 	if (!Refused)
 	{
-		`AP.ScreenMessage("Connection was closed. Reconnecting in 5 seconds...");
+		//if (!`AP.SlotData.ConnectedOnce)
+		//{
+		//	`AP.ScreenMessage("Connection was closed. Try connecting via Archipelago WSS Proxy if you're connecting to the beta (24242) site.");
+		//}
+		if (!ShouldFilterSelfJoins())
+		{
+			`AP.ScreenMessage("Connection was closed. Reconnecting in 5 seconds...");
+		}
 	}
 	
 	CurrentMessage.Length = 0;
@@ -1478,6 +1509,19 @@ event Destroyed()
 {
 	Close();
 	Super.Destroyed();
+}
+
+function bool IsWSSProxyMode()
+{
+	return bool(`AP.WSSMode);
+}
+
+function bool ShouldFilterSelfJoins()
+{
+	if (bool(`AP.FilterSelfJoins))
+		return `AP.SlotData.ConnectedOnce;
+	
+	return false;
 }
 
 defaultproperties

@@ -37,5 +37,5 @@ defaultproperties
     SaveGameOnCollect = true;
     IsBackpackItem = false;
     ShouldShowInBackpack = false;
-	HUDIcon = Texture2D'APRandomizer_content.ap_logo';
+	HUDIcon = Texture2D'APRandomizer_contentNew.logo_new'
 }

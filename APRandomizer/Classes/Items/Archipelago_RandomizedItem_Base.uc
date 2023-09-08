@@ -239,5 +239,6 @@ defaultproperties
 	RotationAnimation = true;
 	DoSpinEffect = true;
 	bAlwaysTick = true;
+	TickOptimize = TickOptimize_Distance;
 	LocationId = 0;
 }

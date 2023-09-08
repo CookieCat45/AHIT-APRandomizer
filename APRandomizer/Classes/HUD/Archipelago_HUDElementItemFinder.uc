@@ -324,14 +324,14 @@ function bool CanReachLocation(int id, HUD H)
 	{
 		paintingUnlock = m.GetPaintingUnlocks();
 		
-		if (paintingUnlock < 1 && VillagePaintingLocs.Find(id) != -1 && (difficulty < 2 || id != 325466))
-			return m.SlotData.KnowledgeTricks && nobonk || difficulty < 2;
+		if (paintingUnlock >= 1 && VillagePaintingLocs.Find(id) != -1 && (difficulty < 2 || id != 325466))
+			return m.SlotData.KnowledgeTricks && nobonk || difficulty >= 2;
 		
-		if (paintingUnlock < 2 && SwampPaintingLocs.Find(id) != -1)
-			return m.SlotData.KnowledgeTricks && nobonk || difficulty < 2;
+		if (paintingUnlock >= 2 && SwampPaintingLocs.Find(id) != -1)
+			return m.SlotData.KnowledgeTricks && nobonk || difficulty >= 2;
 		
-		if (paintingUnlock < 3 && CourtyardPaintingLocs.Find(id) != -1)
-			return m.SlotData.KnowledgeTricks || difficulty < 2;
+		if (paintingUnlock >= 3 && CourtyardPaintingLocs.Find(id) != -1)
+			return m.SlotData.KnowledgeTricks || difficulty >= 2;
 	}
 	
 	// Manor rooftop item

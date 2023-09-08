@@ -297,7 +297,16 @@ optional out class<Actor> inventoryOverride) // Item inventory class override. M
 			itemName = "Scooter Badge";
 			worldClass = class'Archipelago_RandomizedItem_BadgeScooter';
 			return true;
-
+		
+		case 300038:
+			itemName = "One-Hit Hero Badge";
+			worldClass = class'Archipelago_RandomizedItem_BadgeOneHitDeath';
+			return true;
+		
+		case 300042:
+			itemName = "Camera Badge";
+			worldClass = class'Archipelago_RandomizedItem_BadgeCamera';
+			return true;
 		
 		
 		// --------- SPECIAL/TRAPS --------------------------------------------------------------------------------------- \\
@@ -480,4 +489,127 @@ static function class<Hat_SnatcherContract_Act> GetContractFromID(int id)
 		default:
 			return None;
 	}
+}
+
+// full clear location IDs are +1
+static function int GetDeathWishLocationID(class<Hat_SnatcherContract_DeathWish> contract)
+{
+	switch (contract)
+	{
+		case class'Hat_SnatcherContract_DeathWish_HeatingUpHarder':
+			return 350000;
+		
+		case class'Hat_SnatcherContract_DeathWish_KillEverybody':
+			return 350002;
+		
+		case class'Hat_SnatcherContract_DeathWish_BackFromSpace':
+			return 350004;
+		
+		case class'Hat_SnatcherContract_DeathWish_PonFrenzy':
+			return 350006;
+		
+		case class'Hat_SnatcherContract_DeathWish_RiftCollapse_MafiaTown':
+			return 350008;
+		
+		case class'Hat_SnatcherContract_DeathWish_Speedrun_MafiaAlien':
+			return 350010;
+		
+		case class'Hat_SnatcherContract_DeathWish_NoAPresses_MafiaAlien':
+			return 350012;
+
+		case class'Hat_SnatcherContract_DeathWish_MovingVault':
+			return 350014;
+
+		case class'Hat_SnatcherContract_DeathWish_MafiaBossEX':
+			return 350016;
+		
+		case class'Hat_SnatcherContract_DeathWish_Tokens_MafiaTown':
+			return 350018;
+	
+		case class'Hat_SnatcherContract_DeathWish_DeadBirdStudioMoreGuards':
+			return 350020;
+
+		case class'Hat_SnatcherContract_DeathWish_DifficultParade':
+			return 350022;
+
+		case class'Hat_SnatcherContract_DeathWish_RiftCollapse_Birds':
+			return 350024;
+		
+		case class'Hat_SnatcherContract_DeathWish_TrainRushShortTime':
+			return 350026;
+		
+		case class'Hat_SnatcherContract_DeathWish_BirdBossEX':
+			return 350028;
+
+		case class'Hat_SnatcherContract_DeathWish_Tokens_Birds':
+			return 350030;
+		
+		case class'Hat_SnatcherContract_DeathWish_NoAPresses':
+			return 350032;
+	
+		case class'Hat_SnatcherContract_DeathWish_Speedrun_SubWell':
+			return 350034;
+
+		case class'Hat_SnatcherContract_DeathWish_RiftCollapse_Subcon':
+			return 350036;
+	
+		case class'Hat_SnatcherContract_DeathWish_BossRush':
+			return 350038;
+
+		case class'Hat_SnatcherContract_DeathWish_SurvivalOfTheFittest':
+			return 350040;
+		
+		case class'Hat_SnatcherContract_DeathWish_SnatcherEX':
+			return 350042;
+
+		case class'Hat_SnatcherContract_DeathWish_Tokens_Subcon':
+			return 350044;
+
+		case class'Hat_SnatcherContract_DeathWish_NiceBirdhouse':
+			return 350046;
+
+		case class'Hat_SnatcherContract_DeathWish_RiftCollapse_Alps':
+			return 350048;
+
+		case class'Hat_SnatcherContract_DeathWish_FastWindmill':
+			return 350050;
+
+		case class'Hat_SnatcherContract_DeathWish_Speedrun_Illness':
+			return 350052;
+
+		case class'Hat_SnatcherContract_DeathWish_Tokens_Alps':
+			return 350054;
+		
+		case class'Hat_SnatcherContract_DeathWish_CameraTourist_1':
+			return 350056;
+
+		case class'Hat_SnatcherContract_DeathWish_HardCastle':
+			return 350058;
+
+		case class'Hat_SnatcherContract_DeathWish_MuGirlEX':
+			return 350060;
+
+		case class'Hat_SnatcherContract_DeathWish_BossRushEX':
+			return 350062;
+
+		case class'Hat_SnatcherContract_DeathWish_RiftCollapse_Cruise':
+			return 350064;
+
+		case class'Hat_SnatcherContract_DeathWish_EndlessTasks':
+			return 350066;
+
+		case class'Hat_SnatcherContract_DeathWish_CommunityRift_RhythmJump':
+			return 350068;
+
+		case class'Hat_SnatcherContract_DeathWish_CommunityRift_TwilightTravels':
+			return 350070;
+		
+		case class'Hat_SnatcherContract_DeathWish_CommunityRift_MountainRift':
+			return 350072;
+		
+		case class'Hat_SnatcherContract_DeathWish_Tokens_Metro':
+			return 350074;
+	}
+
+	return -1;
 }
