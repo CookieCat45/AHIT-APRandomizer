@@ -10,12 +10,12 @@ defaultproperties
 		BlockRigidBody=false
 		bAcceptsStaticDecals=false
 		bAcceptsDynamicDecals=false
-		MaxDrawDistance=6000
+		MaxDrawDistance = 99900;
 		LightEnvironment=m_hLightEnvironment
 		bUsePrecomputedShadows=false
 		LightingChannels=(Static=FALSE,Dynamic=TRUE)
 		Rotation=(Roll=-8192)
-		Scale=6
+		Scale=7
 	End Object
 	Components.Add(Mesh1);
 	RotationComponents.Add(Mesh1);

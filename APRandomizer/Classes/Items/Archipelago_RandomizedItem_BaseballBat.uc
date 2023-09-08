@@ -7,6 +7,7 @@ defaultproperties
 		PhysicsAsset = PhysicsAsset'HatInTime_Costumes3.Physics.nyakuza_baseballbat_Physics'
 		Materials(0) = None;
 		Translation = (Z=-30);
+		MaxDrawDistance = 99900;
 	End Object
 	
 	InventoryClass = class'Archipelago_Weapon_BaseballBat';

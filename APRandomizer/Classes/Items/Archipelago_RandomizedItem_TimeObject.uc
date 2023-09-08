@@ -16,6 +16,7 @@ defaultproperties
       AnimTreeTemplate=AnimTree'HatInTime_Items.AnimTrees.timeobject_animtree'
       Translation=(Z=-16.0)
 	  bUpdateKinematicBonesFromAnimation=true
+	  MaxDrawDistance = 99900;
    End Object
    Mesh2=Model;
    Components.Add(Model);

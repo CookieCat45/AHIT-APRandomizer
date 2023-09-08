@@ -35,7 +35,10 @@ defaultproperties
 	Begin Object Class=StaticMeshComponent Name=Model2
 		StaticMesh = StaticMesh'HatinTime_Items_Z.models.yarn_ui_hover';
 		Scale = 2;
+		LightEnvironment=m_hLightEnvironment;
 		Rotation = (Pitch=0);
+		MaxDrawDistance = 99000;
+		bNoSelfShadow=true;
 	End Object
 	Mesh=Model2;
 	Components.Add(Model2);

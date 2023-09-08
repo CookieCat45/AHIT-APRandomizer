@@ -7,7 +7,7 @@ defaultproperties
 		LightEnvironment=m_hLightEnvironment;
 		Translation=(Z=-22);
 		Rotation = (Pitch=-819);
-		MaxDrawDistance = 9000;
+		MaxDrawDistance = 99900;
 		Scale=0.9;
 		bNoSelfShadow=true;
 	End Object

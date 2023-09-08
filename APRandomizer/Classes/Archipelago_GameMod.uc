@@ -2303,7 +2303,7 @@ function bool IsChapterActInfoUnlocked(Hat_ChapterActInfo ChapterActInfo, option
 			
 			// If a Free Roam act is shuffled onto this act, it's a free space
 			shuffled = GetShuffledAct(RequiredChapterActInfo);
-			if (shuffled != None && IsActFreeRoam(shuffled) && shuffled.ActID != 1)
+			if (shuffled != None && IsActFreeRoam(shuffled) && IsChapterActInfoUnlocked(GetOriginalAct(shuffled)) && shuffled.ActID != 1)
 				continue;
 			
 			if (ModPackageName != "")

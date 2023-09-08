@@ -19,7 +19,7 @@ defaultproperties
 		Animations=AnimNodeSeq0
 		
 		LightEnvironment=m_hLightEnvironment
-		MaxDrawDistance = 9000;
+		MaxDrawDistance = 99900;
 		bDisableFaceFX = true;
 		bDisableAllRigidBody = true;
 		Scale=2

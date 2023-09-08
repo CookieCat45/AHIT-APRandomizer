@@ -8,7 +8,7 @@ defaultproperties
 		StaticMesh=StaticMesh'HatInTime_Items.models.healthrecovery'
 		Scale=3;
 		Translation=(Z=-2);
-		MaxDrawDistance = 2500;
+		MaxDrawDistance = 99900;
 	End Object
 	Mesh=Model2;
 	Components.Add(Model2);
@@ -26,7 +26,7 @@ defaultproperties
 		BlockRigidBody=false
 		bAcceptsStaticDecals=false
 		bAcceptsDynamicDecals=false
-		MaxDrawDistance = 3500;
+		MaxDrawDistance = 99900;
 		LightEnvironment=m_hLightEnvironment
 		
         bUsePrecomputedShadows=false

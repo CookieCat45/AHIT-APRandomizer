@@ -9,7 +9,7 @@ defaultproperties
 		BlockRigidBody=false;
 		bAcceptsStaticDecals=false;
 		bAcceptsDynamicDecals=false;
-		MaxDrawDistance = 8000;
+		MaxDrawDistance = 99900;
 		LightEnvironment=m_hLightEnvironment;
 		
         bUsePrecomputedShadows=false;

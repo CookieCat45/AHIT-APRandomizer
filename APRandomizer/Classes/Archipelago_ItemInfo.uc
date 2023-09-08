@@ -399,27 +399,27 @@ optional out class<Actor> inventoryOverride) // Item inventory class override. M
 		
 		case 300204:
 			itemName = "Zipline Unlock (The Birdhouse Path)";
-			worldClass = class'Archipelago_RandomizedItem_Misc';
+			worldClass = class'Archipelago_RandomizedItem_ZiplineUnlock';
 			return true;
 		
 		case 300205:
 			itemName = "Zipline Unlock (The Lava Cake Path)";
-			worldClass = class'Archipelago_RandomizedItem_Misc';
+			worldClass = class'Archipelago_RandomizedItem_ZiplineUnlock';
 			return true;
 		
 		case 300206:
 			itemName = "Zipline Unlock (The Windmill Path)";
-			worldClass = class'Archipelago_RandomizedItem_Misc';
+			worldClass = class'Archipelago_RandomizedItem_ZiplineUnlock';
 			return true;
 		
 		case 300207:
 			itemName = "Zipline Unlock (The Twilight Bell Path)";
-			worldClass = class'Archipelago_RandomizedItem_Misc';
+			worldClass = class'Archipelago_RandomizedItem_ZiplineUnlock';
 			return true;
 		
 		case 300003:
 			itemName = "Progressive Painting Unlock";
-			worldClass = class'Archipelago_RandomizedItem_Misc';
+			worldClass = class'Archipelago_RandomizedItem_Painting';
 			return true;
 		
 		case 300045:

@@ -7,7 +7,7 @@ defaultproperties
 		LightEnvironment=m_hLightEnvironment;
 		Translation=(Z=10);
 		Rotation = (Pitch=-8192);
-		MaxDrawDistance = 6000;
+		MaxDrawDistance = 99900;
 		Scale=5.7;
 		bAcceptsStaticDecals = false;
 		bAcceptsDynamicDecals = false;
