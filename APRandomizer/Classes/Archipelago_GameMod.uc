@@ -1240,7 +1240,8 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 				ActID = 98;
 		}
 		
-		return;
+		if (Hat_ChapterInfo(ChapterInfo).ChapterID != 2)
+			return;
 	}
 	
 	if (Hat_ChapterInfo(ChapterInfo).ChapterID == 2)
