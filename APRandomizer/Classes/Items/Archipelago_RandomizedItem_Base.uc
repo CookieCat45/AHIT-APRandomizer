@@ -13,11 +13,10 @@ var int LocationId;
 var int ItemId;
 var int ItemOwner;
 var int ItemFlags;
-var string ItemDisplayName; // Deprecated
 var Surface HUDIcon;
 var bool DoSpinEffect;
 var class<object> InventoryClass;
-var string OriginalCollectibleName; // the "Name" variable, NOT the display name!
+var string OriginalCollectibleName;
 
 var AudioComponent IdleAudioComponent;
 var ParticleSystemComponent ImportantItemParticle;

@@ -128,19 +128,16 @@ static function ESpecialItemType GetItemSpecialType(int itemId)
  * Returns the rest of the data pertaining to said ID (name, associated class, etc.) in the "out" arguments.
  */
 static function bool GetNativeItemData(int itemId, // Archipelago item ID
-optional out string itemName, // Display name
 optional out class<Actor> worldClass, // Item in the world
 optional out class<Actor> inventoryOverride) // Item inventory class override. Mainly for relics.
 {
 	switch (itemId)
 	{
 		case YarnItem:
-			itemName = "Yarn";
 			worldClass = class'Archipelago_RandomizedItem_Yarn';
 			return true;
 		
 		case TimePieceItem:
-			itemName = "Time Piece";
 			worldClass = class'Archipelago_RandomizedItem_TimeObject';
 			return true;
 		
@@ -148,109 +145,91 @@ optional out class<Actor> inventoryOverride) // Item inventory class override. M
 		// --------- RELICS -------------------------------------------------------------------------------------------- \\
 		
 		case 300006:
-			itemName = "Relic (Burger Patty)";
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_BurgerBottom';
 			return true;
 		
 		case 300007:
-			itemName = "Relic (Burger Cushion)";
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_BurgerTop';
 			return true;
 			
 		case 300008:
-			itemName = "Relic (Mountain Set)";
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_TrainTracks';
 			return true;
 			
 		case 300009:
-			itemName = "Relic (Train)";
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_Train';
 			return true;
 			
 		case 300010:
-			itemName = "Relic (UFO)";
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_UFO';
 			return true;
 			
 		case 300011:
-			itemName = "Relic (Cow)";
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_ToyCowA';
 			return true;
 			
 		case 300012:
-			itemName = "Relic (Cool Cow)";
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_ToyCowB';
 			return true;
 		
 		case 300013:
-			itemName = "Relic (Tin-foil Hat Cow)";
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_ToyCowC';
 			return true;
 			
 		case 300014:
-			itemName = "Relic (Crayon Box)";
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_CrayonBox';
 			return true;
 			
 		case 300015:
-			itemName = "Relic (Red Crayon)";
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_CrayonRed';
 			return true;
 			
 		case 300016:
-			itemName = "Relic (Blue Crayon)";
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_CrayonBlue';
 			return true;
 			
 		case 300017:
-			itemName = "Relic (Green Crayon)";
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_CrayonGreen';
 			return true;
 		
 		case 300018:
-			itemName = "Relic (Cake Stand)";
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_CakeTower';
 			return true;
 
 		case 300019:
-			itemName = "Relic (Cake)";
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_CakeA';
 			return true;
 		
 		case 300020:
-			itemName = "Relic (Cake Slice)";
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_CakeB';
 			return true;
 		
 		case 300021:
-			itemName = "Relic (Shortcake)";
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_CakeC';
 			return true;
 
 		case 300022:
-			itemName = "Relic (Necklace Bust)";
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_JewelryDisplay';
 			return true;
 		
 		case 300023:
-			itemName = "Relic (Necklace)";
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_GoldNecklace';
 			return true;
@@ -259,52 +238,42 @@ optional out class<Actor> inventoryOverride) // Item inventory class override. M
 		// -------- BADGES ----------------------------------------------------------------------------------------------- \\	
 		
 		case 300024:
-			itemName = "Projectile Badge";
 			worldClass = class'Archipelago_RandomizedItem_BadgeProjectile';
 			return true;
 			
 		case 300025:
-			itemName = "Fast Hatter Badge";
 			worldClass = class'Archipelago_RandomizedItem_BadgeHatCooldownBonus';
 			return true;
 			
 		case 300026:
-			itemName = "Hover Badge";
 			worldClass = class'Archipelago_RandomizedItem_BadgeNoFallDamage';
 			return true;
 			
 		case 300027:
-			itemName = "Hookshot Badge";
 			worldClass = class'Archipelago_RandomizedItem_BadgeHookshot';
 			return true;
 			
 		case 300028:
-			itemName = "Item Magnet Badge";
 			worldClass = class'Archipelago_RandomizedItem_BadgeSuckInOrbs';
 			return true;
 			
 		case 300029:
-			itemName = "No Bonk Badge";
 			worldClass = class'Archipelago_RandomizedItem_BadgeNoBonk';
 			return true;
 			
 		case 300030:
-			itemName = "Compass Badge";
 			worldClass = class'Archipelago_RandomizedItem_BadgeRelicFinder';
 			return true;
 			
 		case 300031:
-			itemName = "Scooter Badge";
 			worldClass = class'Archipelago_RandomizedItem_BadgeScooter';
 			return true;
 		
 		case 300038:
-			itemName = "One-Hit Hero Badge";
 			worldClass = class'Archipelago_RandomizedItem_BadgeOneHitDeath';
 			return true;
 		
 		case 300042:
-			itemName = "Camera Badge";
 			worldClass = class'Archipelago_RandomizedItem_BadgeCamera';
 			return true;
 		
@@ -312,133 +281,108 @@ optional out class<Actor> inventoryOverride) // Item inventory class override. M
 		// --------- SPECIAL/TRAPS --------------------------------------------------------------------------------------- \\
 		
 		case Pons25Item:
-			itemName = "25 Pons";
 			worldClass = class'Archipelago_RandomizedItem_Pons';
 			return true;
 			
 		case Pons50Item:
-			itemName = "50 Pons";
 			worldClass = class'Archipelago_RandomizedItem_Pons';
 			return true;
 			
 		case Pons100Item:
-			itemName = "100 Pons";
 			worldClass = class'Archipelago_RandomizedItem_Pons';
 			return true;
 			
 		case HealthPonItem:
-			itemName = "Health Pon";
 			worldClass = class'Archipelago_RandomizedItem_HealthPon';
 			return true;
 			
 		case BabyTrapItem:
-			itemName = "Baby Trap";
 			worldClass = class'Archipelago_RandomizedItem_Misc';
 			return true;
 			
 		case LaserTrapItem:
-			itemName = "Laser Trap";
 			worldClass = class'Archipelago_RandomizedItem_Misc';
 			return true;
 			
 		case ParadeTrapItem:
-			itemName = "Parade Trap";
 			worldClass = class'Archipelago_RandomizedItem_Misc';
 			return true;
 		
 		case RandomCosmeticItem:
-			itemName = "Random Cosmetic";
 			worldClass = class'Archipelago_RandomizedItem_Misc';
 			return true;
 			
 		// --------- MISC ---------------------------------------------------------------------------------------------- \\
 			
 		case 300032:
-			itemName = "Rift Token";
 			worldClass = class'Archipelago_RandomizedItem_RouletteToken';
 			return true;
 			
 		case 300033:
 			if (`AP.SlotData.BaseballBat && `AP.IsDLC2Installed())
 			{
-				itemName = "Baseball Bat";
 				worldClass = class'Archipelago_RandomizedItem_BaseballBat';
 			}
 			else
 			{
-				itemName = "Umbrella";
 				worldClass = class'Archipelago_RandomizedItem_Umbrella';
 			}
 			
 			return true;
 		
 		case 300043:
-			itemName = "Badge Pin";
 			worldClass = class'Archipelago_RandomizedItem_BadgePin';
 			return true;
 		
-		case 300200:
-			itemName = "Snatcher's Contract (The Subcon Well)";
+		case 300200: // Subcon Well
 			worldClass = class'Archipelago_RandomizedItem_Contract';
 			return true;
 		
-		case 300201:
-			itemName = "Snatcher's Contract (Toilet of Doom)";
+		case 300201: // Toilet of Doom
 			worldClass = class'Archipelago_RandomizedItem_Contract';
 			return true;
 		
-		case 300202:
-			itemName = "Snatcher's Contract (Queen Vanessa's Manor)";
-			worldClass = class'Archipelago_RandomizedItem_Contract';
-			return true;
-
-		case 300203:
-			itemName = "Snatcher's Contract (Mail Delivery Service)";
+		case 300202: // Queen Vanessa
 			worldClass = class'Archipelago_RandomizedItem_Contract';
 			return true;
 		
-		case 300204:
-			itemName = "Zipline Unlock (The Birdhouse Path)";
+		case 300203: // Mail Delivery
+			worldClass = class'Archipelago_RandomizedItem_Contract';
+			return true;
+		
+		case 300204: // Birdhouse Path
 			worldClass = class'Archipelago_RandomizedItem_ZiplineUnlock';
 			return true;
 		
-		case 300205:
-			itemName = "Zipline Unlock (The Lava Cake Path)";
+		case 300205: // Lava Cake Path
 			worldClass = class'Archipelago_RandomizedItem_ZiplineUnlock';
 			return true;
 		
-		case 300206:
-			itemName = "Zipline Unlock (The Windmill Path)";
+		case 300206: // Windmill Path
 			worldClass = class'Archipelago_RandomizedItem_ZiplineUnlock';
 			return true;
 		
-		case 300207:
-			itemName = "Zipline Unlock (The Twilight Bell Path)";
+		case 300207: // Twilight Bell Path
 			worldClass = class'Archipelago_RandomizedItem_ZiplineUnlock';
 			return true;
 		
 		case 300003:
-			itemName = "Progressive Painting Unlock";
 			worldClass = class'Archipelago_RandomizedItem_Painting';
 			return true;
 		
 		case 300045:
-			itemName = "Metro Ticket - Yellow";
 			worldClass = class'Archipelago_RandomizedItem_MetroTicketYellow';
 			return true;
 		
 		case 300046:
-			itemName = "Metro Ticket - Green";
 			worldClass = class'Archipelago_RandomizedItem_MetroTicketGreen';
 			return true;
 		
 		case 300047:
-			itemName = "Metro Ticket - Blue";
 			worldClass = class'Archipelago_RandomizedItem_MetroTicketBlue';
 			return true;
 		
 		case 300048:
-			itemName = "Metro Ticket - Pink";
 			worldClass = class'Archipelago_RandomizedItem_MetroTicketPink';
 			return true;
 		

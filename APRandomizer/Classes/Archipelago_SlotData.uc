@@ -16,8 +16,8 @@ var string Host;
 var int Port;
 var int Seed;
 var int ShopItemRandStep;
+var array<int> CheckedLocations;
 var array<int> PageLocationIDs;
-var bool TimePiecesCached;
 
 var int Goal;
 var int LogicDifficulty; // 0 = Normal, 1 = Hard, 2 = Expert

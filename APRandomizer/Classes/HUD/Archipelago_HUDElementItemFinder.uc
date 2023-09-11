@@ -201,15 +201,17 @@ function bool AreImportantItemsLeft(HUD H, optional bool traps=true)
 {
 	local int i;
 	local string mapName;
-	local array<LocationInfo> locInfoArray;
+	local Archipelago_GameMod m;
 	mapName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename();
-	locInfoArray = `AP.SlotData.LocationInfoArray;
+	m = `AP;
 	
-	for (i = 0; i < locInfoArray.Length; i++)
+	for (i = 0; i < m.SlotData.LocationInfoArray.Length; i++)
 	{
-		if (locInfoArray[i].MapName ~= mapName && locInfoArray[i].Flags != ItemFlag_Garbage && !locInfoArray[i].IsStatic)
+		if (m.SlotData.LocationInfoArray[i].MapName ~= mapName 
+		&& m.SlotData.LocationInfoArray[i].Flags != ItemFlag_Garbage 
+		&& !m.SlotData.LocationInfoArray[i].IsStatic)
 		{
-			if (!locInfoArray[i].Checked)
+			if (!m.IsLocationChecked(m.SlotData.LocationInfoArray[i].ID))
 				return true;
 		}
 	}

@@ -9,6 +9,7 @@ var Archipelago_SlotData SlotData;
 var Archipelago_ItemResender ItemResender;
 var array<class<Archipelago_ShopItem_Base > > ShopItemsPending;
 var array<Archipelago_GameData> GameData;
+var array<Hat_GhostPartyPlayerStateBase> Buddies; // Online Party co-op support
 var transient int ActMapChangeChapter;
 var transient bool ActMapChange;
 var transient bool CollectiblesShuffled;
@@ -54,11 +55,9 @@ struct immutable LocationInfo
 	var int ItemID;
 	var int Player;
 	var int Flags;
-	var bool Checked;
 	var bool IsStatic;
 	var string MapName;
 	
-	var string ItemName; // Deprecated
 	var Vector Position;
 	var class<Actor> ItemClass;
 	var class<Actor> ContainerClass;
@@ -473,7 +472,7 @@ function OnPostInitGame()
 	
 	// Bon Voyage hotfix
 	SetTimer(0.5, false, NameOf(HideItems));
-	
+
 	if (IsInSpaceship())
 	{
 		// Stop Mustache Girl tutorial cutscene (it breaks when removing the yarn)
@@ -614,6 +613,7 @@ function OnPostInitGame()
 			
 			shopInvs = class'Hat_ClassHelper'.static.GetAllObjectsExpensive("Hat_ShopInventory");
 			dummy.CollectibleClass = class'Archipelago_ShopItem_Dummy';
+			dummy.ItemCost = 99999999;
 			
 			for (i = 0; i < shopInvs.Length; i++)
 			{
@@ -968,11 +968,132 @@ function OnFullyConnected()
 	{
 		InitShopItemDisplayName(ShopItemsPending[i]);
 	}
-
+	
 	ShopItemsPending.Length = 0;
-
+	
 	// Call this just to see if we can craft a hat
 	OnYarnCollected(0);
+	
+	if (IsOnlineParty())
+	{
+		SendOnlinePartyCommand(string(SlotData.Seed)$"+"$SlotData.PlayerSlot, 'APSeedCheck', GetALocalPlayerController().Pawn);
+	}
+}
+
+event OnOnlinePartyCommand(string Command, Name CommandChannel, Hat_GhostPartyPlayerStateBase Sender)
+{
+	local Actor a;
+	local int seed, slot, i, locId;
+	local bool isLive;
+	local JsonObject locSync, actSync;
+	local array<Hat_ChapterInfo> chapterInfoArray;
+	local String hourglass, map;
+	local array<string> hourglasses;
+	local Hat_ChapterInfo chapter;
+	local Hat_ChapterActInfo act;
+	
+	if (CommandChannel == 'APSeedCheck')
+	{
+		slot = int(Split(Command, "+", true));
+		seed = int(Repl(Command, "+"$slot, ""));
+		
+		if (SlotData.Seed == seed && SlotData.PlayerSlot == slot || Command == "MatchingSeed")
+		{
+			// If we have a matching seed and slot number, add this guy to our list of valid buddies.
+			if (Buddies.Find(Sender) == -1)
+			{
+				DebugMessage("Adding Online Party buddy: " $Sender.GetDisplayName());
+				Buddies.AddItem(Sender);
+			}
+			
+			if (Command == "MatchingSeed")
+			{
+				// Sync all locations/acts
+				PartySyncLocations(SlotData.CheckedLocations, Sender);
+				
+				actSync = new class'JsonObject';
+				chapterInfoArray = class'Hat_ChapterInfo'.static.GetAllChapterInfo();
+				foreach chapterInfoArray(chapter)
+				{
+					chapter.ConditionalUpdateActList();
+					foreach chapter.ChapterActInfo(act)
+					{
+						if (act.hourglass == "" || !IsActReallyCompleted(act))
+							continue;
+						
+						hourglasses.AddItem(act.hourglass);
+					}
+				}
+				
+				PartySyncActs(hourglasses, Sender);
+				SendOnlinePartyCommand(actSync.EncodeJson(actSync), 'APActSync', GetALocalPlayerController().Pawn, Sender);
+			}
+			else 
+			{
+				// send response to let our buddy know we have a matching seed
+				SendOnlinePartyCommand("MatchingSeed", 'APSeedCheck', GetALocalPlayerController().Pawn, Sender);
+			}
+		}
+	}
+	else if (CommandChannel == 'APLocationSync')
+	{
+		locSync = class'JsonObject'.static.DecodeJson(Command);
+		isLive = locSync.GetBoolValue("IsLive");
+		map = `GameManager.GetCurrentMapFilename();
+		
+		i = 0;
+		while (locSync.GetIntValue(string(i)) > 0)
+		{
+			locId = locSync.GetIntValue(string(i));
+			if (!IsLocationChecked(locId))
+			{
+				SlotData.CheckedLocations.AddItem(locId);
+				if (IsLive && map == Sender.CurrentMapName)
+				{
+					a = LocationIdToObject(locId, class'Archipelago_RandomizedItem_Base');
+					if (a != None)
+					{
+						a.Destroy();
+					}
+					else
+					{
+						a = LocationIdToObject(locId, class'Hat_TreasureChest_Base');
+						if (a != None && !Hat_TreasureChest_Base(a).Opened
+							&& class<Hat_Collectible_StoryBookPage>(Hat_TreasureChest_Base(a).Content) == None)
+						{
+							Hat_TreasureChest_Base(a).Empty();
+						}
+					}
+				}
+				
+				DebugMessage("Syncing location" $locId $" from " $Sender.GetDisplayName());
+			}
+			
+			i++;
+		}
+	}
+	else if (CommandChannel == 'APActSync')
+	{
+		i = 0;
+		actSync = class'JsonObject'.static.DecodeJson(Command);
+
+		while (actSync.GetStringValue(string(i)) != "")
+		{
+			hourglass = actSync.GetStringValue(string(i));
+			
+			if (!HasAPBit("ActComplete_"$hourglass, 1))
+			{
+				SetAPBits("ActComplete_"$hourglass, 1);
+				DebugMessage("Syncing act" $hourglass $" from " $Sender.GetDisplayName());
+			}
+			
+			i++;
+		}
+	}
+	
+	SaveGame();
+	locSync = None;
+	actSync = None;
 }
 
 function ResendLocations()
@@ -1565,6 +1686,7 @@ function CheckShopOverride(Hat_HUD hud)
 	local ShopItemInfo shopInfo;
 	local array<class <Object> > shopInvs;
 	local Archipelago_ShopInventory_Base newShop;
+	local Hat_Loadout lo;
 	
 	if (SlotData.DeathWishOnly)
 		return;
@@ -1613,6 +1735,18 @@ function CheckShopOverride(Hat_HUD hud)
 	{
 		GetShopItemInfo(class<Archipelago_ShopItem_Base>(newShop.ItemsForSale[i].CollectibleClass), shopInfo);
 		newShop.ItemsForSale[i].ItemCost = shopInfo.PonCost;
+		
+		if (IsLocationChecked(shopInfo.ID))
+		{
+			// Someone in Online Party may have already bought this, add the collectible class so it appears as purchased
+			lo = Hat_PlayerController(GetALocalPlayerController()).MyLoadout;
+			if (!lo.HasCollectible(newShop.ItemsForSale[i].CollectibleClass))
+			{
+				lo.AddCollectible(newShop.ItemsForSale[i].CollectibleClass);
+			}
+			
+			continue;
+		}
 		
 		if (shopInfo.ID <= 0)
 			continue;
@@ -1801,7 +1935,7 @@ function OnTimePieceCollected(string Identifier)
 	if (!IsArchipelagoEnabled() || SlotData.DeathWishOnly)
 		return;
 	
-	if (InStr(Identifier, "ap_timepiece") == 0)
+	if (InStr(Identifier, "ap_timepiece") != -1)
 	{
 		if (SlotData.DeathWish && `SaveManager.GetNumberOfTimePieces() >= SlotData.DeathWishTPRequirement)
 		{
@@ -1874,11 +2008,13 @@ function OnTimePieceCollected(string Identifier)
 		}
 		
 		SetAPBits("ActComplete_"$hourglass, 1);
+		PartySyncActs_Single(hourglass);
 	}
 	else
 	{
 		DebugMessage("Completed act: " $GetChapterActInfoFromHourglass(Identifier));
 		SetAPBits("ActComplete_"$Identifier, 1);
+		PartySyncActs_Single(hourglass);
 	}
 	
 	if (hourglass == "")
@@ -2339,9 +2475,6 @@ function ShuffleCollectibles(optional bool cache)
 	local class<Object> shopInvClass;
 	local class<Archipelago_ShopItem_Base> shopItem;
 	local string mapName, bitName;
-	local array<Hat_ChapterInfo> chapterInfoArray;
-	local Hat_ChapterInfo chapter;
-	local Hat_ChapterActInfo act;
 	local Archipelago_ShopInventory_Base shopInv;
 	
 	if (CollectiblesShuffled || SlotData.DeathWishOnly || class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false))
@@ -2388,24 +2521,11 @@ function ShuffleCollectibles(optional bool cache)
 	{
 		locationArray.AddItem(SubconBushCheck1);
 		locationArray.AddItem(SubconBushCheck2);
-		
-		if (SlotData.ShuffleActContracts)
-		{
-			locationArray.AddItem(300200);
-			locationArray.AddItem(300201);
-			locationArray.AddItem(300202);
-			locationArray.AddItem(300203);
-		}
 	}
 	else if (mapName ~= "hub_spaceship")
 	{
 		// Rumbi
 		locationArray.AddItem(301000);
-	}
-	else if (mapName ~= "ship_main" && SlotData.Tasksanity)
-	{
-		for (i = 0; i < SlotData.TasksanityCheckCount; i++)
-			locationArray.AddItem(TasksanityIDStart+i);
 	}
 	
 	for (i = 0; i < ChestArray.Length; i++)
@@ -2458,31 +2578,6 @@ function ShuffleCollectibles(optional bool cache)
 			
 			if (SlotData.PageLocationIDs.Find(locId) == -1)
 				SlotData.PageLocationIDs.AddItem(locId);
-		}
-	}
-	
-	if (!SlotData.TimePiecesCached)
-	{
-		chapterInfoArray = class'Hat_ChapterInfo'.static.GetAllChapterInfo();
-		foreach chapterInfoArray(chapter)
-		{
-			if (chapter.ChapterID < 0 || chapter.ChapterID > 7)
-				continue;
-			
-			if (chapter.ChapterID == 6 && !SlotData.DLC1)
-				continue;
-			
-			if (chapter.ChapterID == 7 && !SlotData.DLC2)
-				continue;
-			
-			chapter.ConditionalUpdateActList();
-			foreach chapter.ChapterActInfo(act)
-			{
-				if (act.hourglass == "" || act.hourglass ~= "TimeRift_Cave_Tour" && (!SlotData.DLC1 || SlotData.ExcludeTour))
-					continue;
-				
-				locationArray.AddItem(GetTimePieceLocationID(act.hourglass));
-			}
 		}
 	}
 	
@@ -2573,8 +2668,11 @@ function ShuffleCollectibles(optional bool cache)
 			// Load from cache
 			for (i = 0; i < locationArray.Length; i++)
 			{
+				if (IsLocationChecked(locationArray[i]))
+					continue;
+
 				locInfo = GetLocationInfoFromID(locationArray[i]);
-				if (locInfo.ContainerClass != None || locInfo.Checked || locInfo.IsStatic
+				if (locInfo.ContainerClass != None || locInfo.IsStatic
 				|| locInfo.Position.x == 0 && locInfo.Position.y == 0 && locInfo.position.z == 0)
 					continue;
 				
@@ -2679,14 +2777,14 @@ function bool IsMapScouted(string map)
 function Archipelago_RandomizedItem_Base CreateItem(int locId, int itemId, int flags, int player, 
 	optional Hat_Collectible_Important collectible, optional Vector pos)
 {
-	local string itemName, mapName;
+	local string mapName;
 	local class<Actor> worldClass;
 	local Archipelago_RandomizedItem_Base item;
 	local int i;
 	local bool found;
 	local LocationInfo locInfo;
 	
-	if (!class'Archipelago_ItemInfo'.static.GetNativeItemData(itemId, itemName, worldClass)) // not a regular item
+	if (!class'Archipelago_ItemInfo'.static.GetNativeItemData(itemId, worldClass)) // not a regular item
 		worldClass = class'Archipelago_RandomizedItem_Misc';
 	
 	item = Archipelago_RandomizedItem_Base(Spawn(worldClass, , , collectible != None ? collectible.Location : pos, , , true));
@@ -2709,32 +2807,6 @@ function Archipelago_RandomizedItem_Base CreateItem(int locId, int itemId, int f
 	
 	if (!item.Init())
 		return None;
-					
-	if (worldClass != class'Archipelago_RandomizedItem_Misc')
-	{
-		item.ItemDisplayName = itemName;
-	}
-	else
-	{
-		switch (flags)
-		{
-			case ItemFlag_Important:
-				item.ItemDisplayName = "AP Item - Important"; 
-				break;
-				
-			case ItemFlag_ImportantSkipBalancing:
-				item.ItemDisplayName = "AP Item - Important"; 
-				break;
-			
-			case ItemFlag_Useful: 
-				item.ItemDisplayName = "AP Item - Useful"; 
-				break;
-			
-			default: 
-				item.ItemDisplayName = "AP Item"; 
-				break;
-		}
-	}
 	
 	mapName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename();
 	
@@ -2757,7 +2829,6 @@ function Archipelago_RandomizedItem_Base CreateItem(int locId, int itemId, int f
 		locInfo.Flags = flags;
 		locInfo.MapName = mapName;
 		locInfo.ItemClass = item.class;
-		locInfo.ItemName = item.ItemDisplayName;
 		locInfo.Position = item.Location;
 		SlotData.LocationInfoArray.AddItem(locInfo);
 	}
@@ -2774,7 +2845,6 @@ function Archipelago_RandomizedItem_Base CreateItemFromInfo(LocationInfo locInfo
 	item.ItemId = locInfo.ItemID;
 	item.ItemFlags = locInfo.Flags;
 	item.ItemOwner = locInfo.Player;
-	item.ItemDisplayName = locInfo.ItemName;
 	
 	if (!item.Init())
 		return None;
@@ -2784,14 +2854,7 @@ function Archipelago_RandomizedItem_Base CreateItemFromInfo(LocationInfo locInfo
 
 function bool IsLocationChecked(int id)
 {
-	local int i;
-	for (i = 0; i < SlotData.LocationInfoArray.Length; i++)
-	{
-		if (SlotData.LocationInfoArray[i].ID == id)
-			return SlotData.LocationInfoArray[i].Checked;
-	}
-	
-	return false;
+	return SlotData.CheckedLocations.Find(id) != -1;
 }
 
 function bool GetShopItemClassFromLocation(int locationId, out class<Archipelago_ShopItem_Base> outClass)
@@ -2906,7 +2969,7 @@ function InitShopItemDisplayName(class<Archipelago_ShopItem_Base> itemClass)
 	if (!GetShopItemInfo(itemClass, shopInfo))
 		return;
 	
-	if (class'Archipelago_ItemInfo'.static.GetNativeItemData(shopInfo.ItemID, , worldClass))
+	if (class'Archipelago_ItemInfo'.static.GetNativeItemData(shopInfo.ItemID, worldClass))
 	{
 		itemClass.static.SetHUDIcon(class<Archipelago_RandomizedItem_Base>(worldClass).default.HUDIcon);
 	}
@@ -3074,14 +3137,13 @@ function OnPreBreakableBreak(Actor Breakable, Pawn Breaker)
 				DebugMessage(message);
 			}
 			
-			locInfo = GetLocationInfoFromID(ObjectToLocationId(b));
-			if (locInfo.Checked)
+			if (IsLocationChecked(ObjectToLocationId(b)))
 				return;
 			
+			locInfo = GetLocationInfoFromID(ObjectToLocationId(b));
 			spawnClass = locInfo.ItemClass;
 			item = Archipelago_RandomizedItem_Base(Spawn(spawnClass,,,b.Location + vect(0,0,50),,,true));
 			item.LocationId = locInfo.ID;
-			item.ItemDisplayName = locInfo.ItemName;
 			item.ItemFlags = locInfo.Flags;
 			item.ItemOwner = locInfo.Player;
 			item.Init();
@@ -3203,6 +3265,12 @@ function OnCollectibleSpawned(Object collectible)
 			
 			if (Actor(collectible).Owner.IsA('Hat_Goodie_Vault_Base'))
 			{
+				if (IsLocationChecked(ObjectToLocationId(Actor(collectible).Owner)))
+				{
+					Actor(collectible).Destroy();
+					return;
+				}
+				
 				locInfo = GetLocationInfoFromID(ObjectToLocationId(Actor(collectible).Owner));
 				
 				// failsafe
@@ -3213,16 +3281,9 @@ function OnCollectibleSpawned(Object collectible)
 					return;
 				}
 				
-				if (locInfo.Checked)
-				{
-					Actor(collectible).Destroy();
-					return;
-				}
-				
 				spawnClass = locInfo.ItemClass;
 				item = Archipelago_RandomizedItem_Base(Spawn(spawnClass,,,Actor(collectible).Location, Actor(collectible).Rotation,,true));
 				item.LocationId = locInfo.ID;
-				item.ItemDisplayName = locInfo.ItemName;
 				item.ItemFlags = locInfo.Flags;
 				item.ItemOwner = locInfo.Player;
 				item.Init();
@@ -3414,18 +3475,17 @@ function int GetHatYarnCost(class<Hat_Ability> hatClass)
 		
 		case class'Hat_Ability_FoxMask':
 			return SlotData.DwellerYarnCost;
-
+		
 		case class'Hat_Ability_TimeStop':
 			return SlotData.TimeStopYarnCost;
 	}
-
+	
 	return 0;
 }
 
 function SendLocationCheck(int id, optional bool scout, optional bool hint)
 {
 	local string jsonMessage;
-	local int i;
 	
 	if (!IsFullyConnected())
 	{
@@ -3444,25 +3504,8 @@ function SendLocationCheck(int id, optional bool scout, optional bool hint)
 	{
 		jsonMessage = "[{\"cmd\":\"LocationChecks\",\"locations\":[" $id $"]}]";
 		DebugMessage("Sending location ID: " $id);
-		
-		for (i = 0; i < SlotData.LocationInfoArray.Length; i++)
-		{
-			if (SlotData.LocationInfoArray[i].ID == id)
-			{
-				SlotData.LocationInfoArray[i].Checked = true;
-				
-				/*
-				if (SlotData.PlayerSlot != SlotData.LocationInfoArray[i].Player)
-				{
-					ScreenMessage("Sent " $SlotData.LocationInfoArray[i].ItemName 
-						$" to " $PlayerIdToName(SlotData.LocationInfoArray[i].Player), 'Warning');
-				}
-				*/
-				
-				break;
-			}
-		}
-		
+		SlotData.CheckedLocations.AddItem(id);
+		PartySyncLocations_Single(id, , true);
 		SaveGame();
 	}
 	else
@@ -3483,7 +3526,7 @@ function SendLocationCheck(int id, optional bool scout, optional bool hint)
 function SendMultipleLocationChecks(array<int> locationArray, optional bool scout, optional bool hint)
 {
 	local string jsonMessage;
-	local int i, j;
+	local int i;
 	
 	if (!IsFullyConnected())
 	{
@@ -3505,31 +3548,13 @@ function SendMultipleLocationChecks(array<int> locationArray, optional bool scou
 		{
 			jsonMessage $= locationArray[i];
 			DebugMessage("Sending location ID: " $locationArray[i]);
+			SlotData.CheckedLocations.AddItem(locationArray[i]);
 			
 			if (i+1 < locationArray.Length)
-			{
 				jsonMessage $= ",";
-			}
-			
-			for (j = 0; j < SlotData.LocationInfoArray.Length; j++)
-			{
-				if (SlotData.LocationInfoArray[j].ID == locationArray[i])
-				{
-					SlotData.LocationInfoArray[j].Checked = true;
-
-					/*
-					if (SlotData.PlayerSlot != SlotData.LocationInfoArray[j].Player)
-					{
-						ScreenMessage("Sent " $SlotData.LocationInfoArray[j].ItemName 
-							$" to " $PlayerIdToName(SlotData.LocationInfoArray[j].Player), 'Warning');
-					}
-					*/
-					
-					break;
-				}
-			}
 		}
 		
+		PartySyncLocations(locationArray, , true);
 		SaveGame();
 	}
 	else
@@ -3954,6 +3979,66 @@ function bool IsDLC2Installed(optional bool AndEnabled)
 	return class'Hat_GameDLCInfo'.static.IsGameDLCInfoInstalled(class'Hat_GameDLCInfo_DLC2') && (!AndEnabled || SlotData.DLC2);
 }
 
+function bool IsOnlineParty()
+{
+	return class'Hat_GhostPartyPlayerStateBase'.static.ConfigGetUseOnlineFunctionality();
+}
+
+function PartySyncLocations(array<int> locIds, optional Hat_GhostPartyPlayerStateBase Receiver, optional bool IsLive)
+{
+	local JsonObject locSync;
+	local int i;
+	
+	if (!IsOnlineParty())
+		return;
+
+	locSync = new class'JsonObject';
+	for (i = 0; i < locIds.Length; i++)
+	{
+		locSync.SetIntValue(string(i), locIds[i]);
+	}
+	
+	if (IsLive)
+	{
+		locSync.SetBoolValue("IsLive", true);
+	}
+	
+	SendOnlinePartyCommand(locSync.EncodeJson(locSync), 'APLocationSync', GetALocalPlayerController().Pawn, Receiver);
+	locSync = None;
+}
+
+function PartySyncActs(array<string> hourglasses, optional Hat_GhostPartyPlayerStateBase Receiver)
+{
+	local JsonObject actSync;
+	local int i;
+
+	if (!IsOnlineParty())
+		return;
+	
+	actSync = new class'JsonObject';
+	for (i = 0; i < hourglasses.Length; i++)
+	{
+		actSync.SetStringValue(string(i), hourglasses[i]);
+	}
+	
+	SendOnlinePartyCommand(actSync.EncodeJson(actSync), 'APActSync', GetALocalPlayerController().Pawn, Receiver);
+	actSync = None;
+}
+
+function PartySyncLocations_Single(int locId, optional Hat_GhostPartyPlayerStateBase Receiver, optional bool IsLive)
+{
+	local array<int> dummy;
+	dummy.AddItem(locId);
+	PartySyncLocations(dummy, Receiver, IsLive);
+}
+
+function PartySyncActs_Single(string hourglass, optional Hat_GhostPartyPlayerStateBase Receiver)
+{
+	local array<string> dummy;
+	dummy.AddItem(hourglass);
+	PartySyncActs(dummy, Receiver);
+}
+
 function bool IsArchipelagoEnabled()
 {
 	if (IsInTitlescreen() || IsCurrentPatch())
@@ -4023,7 +4108,12 @@ function bool IsActReallyCompleted(Hat_ChapterActInfo act)
 				
 				if (shuffled != None && shuffled.hourglass == "")
 				{
-					SetAPBits("ActComplete_"$act.hourglass, 1);
+					if (!HasAPBit("ActComplete"$act.hourglass, 1))
+					{
+						SetAPBits("ActComplete_"$act.hourglass, 1);
+						PartySyncActs_Single(act.hourglass);
+					}
+					
 					return true;
 				}
 			}
@@ -4246,6 +4336,18 @@ function int ObjectToLocationId(Object obj)
 	return id;
 }
 
+function Actor LocationIdToObject(int id, optional class<Actor> TargetClass)
+{
+	local Actor a;
+	foreach DynamicActors(class'Actor', a)
+	{
+		if (ObjectToLocationId(a) == id && (TargetClass == None || a.Class == TargetClass || ClassIsChildOf(a.class, TargetClass)))
+			return a;
+	}
+	
+	return None;
+}
+
 function UnlockAlmostEverything()
 {
 	local Hat_SaveGame save;
@@ -4280,11 +4382,11 @@ function UnlockAlmostEverything()
 	save.GiveTimePiece("Metro_Intro", false);
 	
 	// all hats
-	lo.AddBackpack(class'Hat_Loadout'.static.MakeBackpackItem(class'Hat_Ability_Sprint'));
-	lo.AddBackpack(class'Hat_Loadout'.static.MakeBackpackItem(class'Hat_Ability_Chemical'));
-	lo.AddBackpack(class'Hat_Loadout'.static.MakeBackpackItem(class'Hat_Ability_StatueFall'));
-	lo.AddBackpack(class'Hat_Loadout'.static.MakeBackpackItem(class'Hat_Ability_FoxMask'));
-	lo.AddBackpack(class'Hat_Loadout'.static.MakeBackpackItem(class'Hat_Ability_TimeStop'));
+	lo.AddBackpack(class'Hat_Loadout'.static.MakeLoadoutItem(class'Hat_Ability_Sprint'));
+	lo.AddBackpack(class'Hat_Loadout'.static.MakeLoadoutItem(class'Hat_Ability_Chemical'));
+	lo.AddBackpack(class'Hat_Loadout'.static.MakeLoadoutItem(class'Hat_Ability_StatueFall'));
+	lo.AddBackpack(class'Hat_Loadout'.static.MakeLoadoutItem(class'Hat_Ability_FoxMask'));
+	lo.AddBackpack(class'Hat_Loadout'.static.MakeLoadoutItem(class'Hat_Ability_TimeStop'));
 	
 	// umbrella
 	if (SlotData.BaseballBat)

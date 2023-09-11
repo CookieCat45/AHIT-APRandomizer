@@ -586,10 +586,8 @@ function ParseJSON(string json)
 						{
 							if (m.SlotData.LocationInfoArray[a].ID == locId)
 							{
-								if (m.SlotData.LocationInfoArray[a].Checked)
-								{
+								if (m.IsLocationChecked(locId))
 									missingLocs.AddItem(locId);
-								}
 								
 								break;
 							}
@@ -833,28 +831,7 @@ function OnLocationInfoCommand(string json)
 			locInfo.ContainerClass = container.class;
 			locInfo.IsStatic = false;
 			
-			if (!class'Archipelago_ItemInfo'.static.GetNativeItemData(itemId, locInfo.ItemName, locInfo.ItemClass))
-			{
-				switch (flags)
-				{
-					case ItemFlag_Important:
-						locInfo.ItemName = "AP Item - Important"; 
-						break;
-						
-					case ItemFlag_ImportantSkipBalancing:
-						locInfo.ItemName = "AP Item - Important"; 
-						break;
-					
-					case ItemFlag_Useful: 
-						locInfo.ItemName = "AP Item - Useful"; 
-						break;
-					
-					default: 
-						locInfo.ItemName = "AP Item"; 
-						break;
-				}
-			}
-			
+			class'Archipelago_ItemInfo'.static.GetNativeItemData(itemId, locInfo.ItemClass);
 			m.SlotData.LocationInfoArray.AddItem(locInfo);
 			continue;
 		}
@@ -887,28 +864,7 @@ function OnLocationInfoCommand(string json)
 			locInfo.ContainerClass = None;
 			locInfo.IsStatic = !m.IsLocationIDPage(locId);
 			
-			if (!class'Archipelago_ItemInfo'.static.GetNativeItemData(itemId, locInfo.ItemName, locInfo.ItemClass))
-			{
-				switch (flags)
-				{
-					case ItemFlag_Important:
-						locInfo.ItemName = "AP Item - Important"; 
-						break;
-						
-					case ItemFlag_ImportantSkipBalancing:
-						locInfo.ItemName = "AP Item - Important"; 
-						break;
-					
-					case ItemFlag_Useful: 
-						locInfo.ItemName = "AP Item - Useful"; 
-						break;
-					
-					default: 
-						locInfo.ItemName = "AP Item"; 
-						break;
-				}
-			}
-			
+			class'Archipelago_ItemInfo'.static.GetNativeItemData(itemId, locInfo.ItemClass);
 			m.SlotData.LocationInfoArray.AddItem(locInfo);
 		}
 	}
@@ -918,9 +874,8 @@ function OnLocationInfoCommand(string json)
 		m.SetAPBits("MapScouted_"$Locs(mapName), 1);
 	}
 	
-	m.SlotData.TimePiecesCached = true; // will always be done first time, so just always set to true after this point
 	m.SaveGame();
-	
+
 	jsonObj = None;
 	jsonChild = None;
 }
@@ -994,7 +949,6 @@ function GrantItem(int itemId, int playerId)
 {
 	local class<Actor> worldClass, invOverride;
 	local class<Hat_SnatcherContract_Act> contract;
-	local string itemName;
 	local Archipelago_RandomizedItem_Base item;
 	local Pawn player;
 	local ESpecialItemType special;
@@ -1002,7 +956,7 @@ function GrantItem(int itemId, int playerId)
 	local Hat_SaveGame save;
 	local Hat_MetroTicketGate gate;
 	
-	if (class'Archipelago_ItemInfo'.static.GetNativeItemData(itemId, itemName, worldClass, invOverride))
+	if (class'Archipelago_ItemInfo'.static.GetNativeItemData(itemId, worldClass, invOverride))
 	{
 		player = GetALocalPlayerController().Pawn;
 		item = Spawn(class<Archipelago_RandomizedItem_Base>(worldClass), , , player.Location, , , true);
