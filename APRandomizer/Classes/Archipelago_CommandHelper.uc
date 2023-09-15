@@ -39,11 +39,6 @@ exec function ap_say(string message)
 	`AP.Client.SendBinaryMessage("[" $class'JsonObject'.static.EncodeJson(json) $"]");
 }
 
-exec function ap_open_dw_map()
-{
-	Hat_HUD(Hat_PlayerController(Pawn.Controller).MyHUD).OpenHUD(class'Archipelago_HUDMenuDeathWish');
-}
-
 exec function ap_connect()
 {
 	if (`AP.Client == None)
@@ -145,9 +140,4 @@ exec function ap_closest_actors(float radius)
 		
 		m.DebugMessage("ACTOR: " $a.Name $ ", DISTANCE: " $distance);
 	}
-}
-
-exec function ap_show_seedinfo()
-{
-	`AP.ShowSeedInfoMenu();
 }

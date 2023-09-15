@@ -53,28 +53,39 @@ function bool Render(HUD H)
     }
     else
     {
-        text = "Yarn: " $mod.GetAPBits("TotalYarnCollected") $"/" $mod.GetHatYarnCost(mod.GetNextHat());
+        if (!mod.SlotData.HatItems)
+        {
+            text = "Yarn: " $mod.GetAPBits("TotalYarnCollected") $"/" $mod.GetHatYarnCost(mod.GetNextHat());
+        }
+        else
+        {
+            H.Canvas.SetDrawColor(25, 25, 25, 255);
+            text = "Yarn: N/A";
+        }
     }
     
     DrawBorderedText(H.Canvas, text, x, y, 0.7, true);
     
-    offsetY += H.Canvas.ClipY * 0.1;
-    for (i = 1; i <= 5; i++)
+    if (!mod.SlotData.HatItems)
     {
-        if (i > 1)
-            offsetX += H.Canvas.ClipX * 0.08;
-        else
-            offsetX += H.Canvas.ClipX * 0.02;
-        
-        if (index > i)
+        offsetY += H.Canvas.ClipY * 0.1;
+        for (i = 1; i <= 5; i++)
         {
-            H.Canvas.SetDrawColor(255, 255, 255, 255);
-            DrawCenter(H, x+offsetX, y+offsetY, scale*0.1, scale*0.1, mod.GetHatByIndex(i).default.HUDIcon);
-        }
-        else
-        {
-            H.Canvas.SetDrawColor(100, 100, 100, 255);
-            DrawBorderedText(H.Canvas, "?", x+offsetX, y+offsetY, 0.7, true);
+            if (i > 1)
+                offsetX += H.Canvas.ClipX * 0.08;
+            else
+                offsetX += H.Canvas.ClipX * 0.02;
+            
+            if (index > i)
+            {
+                H.Canvas.SetDrawColor(255, 255, 255, 255);
+                DrawCenter(H, x+offsetX, y+offsetY, scale*0.1, scale*0.1, mod.GetHatByIndex(i).default.HUDIcon);
+            }
+            else
+            {
+                H.Canvas.SetDrawColor(100, 100, 100, 255);
+                DrawBorderedText(H.Canvas, "?", x+offsetX, y+offsetY, 0.7, true);
+            }
         }
     }
     

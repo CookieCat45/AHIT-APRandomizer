@@ -4,6 +4,10 @@ class Archipelago_GameMod extends GameMod
 	dependson(Archipelago_GameData)
 	config(Mods);
 
+// IMPORTANT!! If you add or remove *ANYTHING* in the Archipelago_SlotData class, INCREMENT THIS NUMBER!
+// Not doing so can and will break existing save files for seeds!!!
+const SlotDataVersion = 2;
+
 var Archipelago_TcpLink Client;
 var Archipelago_SlotData SlotData;
 var Archipelago_ItemResender ItemResender;
@@ -136,7 +140,7 @@ function SaveGame()
 	if (SlotData != None && SlotData.Initialized)
 	{
 		if (class'Engine'.static.BasicSaveObject(SlotData, 
-		"APSlotData/slot_data"$`SaveManager.GetCurrentSaveData().CreationTimeStamp, false, 1, true))
+		"APSlotData/slot_data"$`SaveManager.GetCurrentSaveData().CreationTimeStamp, false, SlotDataVersion, true))
 		{
 			DebugMessage("Saved slot data to file successfully!");
 		}
@@ -310,7 +314,7 @@ event PreBeginPlay()
 	SlotData = new class'Archipelago_SlotData';
 	path = "APSlotData/slot_data"$`SaveManager.GetCurrentSaveData().CreationTimeStamp;
 	
-	if (class'Engine'.static.BasicLoadObject(SlotData, path, false, 1))
+	if (class'Engine'.static.BasicLoadObject(SlotData, path, false, SlotDataVersion))
 	{
 		SlotData.Initialized = true;
 		UpdateChapterInfo();
@@ -1129,6 +1133,7 @@ function LoadSlotData(JsonObject json)
 	SlotData.CTRSprint = json.GetBoolValue("CTRWithSprint");
 	SlotData.DeathLink = json.GetBoolValue("death_link");
 	SlotData.Seed = json.GetIntValue("SeedNumber");
+	SlotData.HatItems = json.GetBoolValue("HatItems");
 	
 	SlotData.CompassBadgeMode = json.GetIntValue("CompassBadgeMode");
 	
@@ -1690,7 +1695,7 @@ function CheckShopOverride(Hat_HUD hud)
 	
 	if (SlotData.DeathWishOnly)
 		return;
-
+	
 	shopInvs = class'Hat_ClassHelper'.static.GetAllScriptClasses("Archipelago_ShopInventory_Base");
 	shop = Hat_HUDMenuShop(hud.GetHUD(class'Hat_HUDMenuShop'));
 	merchant = shop.MerchantActor;
@@ -3367,7 +3372,7 @@ function OnYarnCollected(optional int amount=1)
 	SetAPBits("TotalYarnCollected", count);
 	`GameManager.AddBadgePoints(amount);
 	
-	if (!SlotData.Initialized || SlotData.DeathWishOnly)
+	if (!SlotData.Initialized || SlotData.DeathWishOnly || SlotData.HatItems)
 		return;
 	
 	foreach DynamicActors(class'Hat_PlayerController', pc)

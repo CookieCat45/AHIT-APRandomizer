@@ -30,6 +30,7 @@ var bool ShuffleSubconPaintings;
 var bool CTRSprint;
 var bool UmbrellaLogic;
 var bool DeathLink;
+var bool HatItems;
 
 var bool DLC1;
 var bool Tasksanity;

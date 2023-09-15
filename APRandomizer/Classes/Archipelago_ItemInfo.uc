@@ -141,6 +141,27 @@ optional out class<Actor> inventoryOverride) // Item inventory class override. M
 			worldClass = class'Archipelago_RandomizedItem_TimeObject';
 			return true;
 		
+		// Hats for HatItems setting
+		case 300049:
+			worldClass = class'Archipelago_RandomizedItem_Sprint';
+			return true;
+		
+		case 300050:
+			worldClass = class'Archipelago_RandomizedItem_Chemical';
+			return true;
+
+		case 300051:
+			worldClass = class'Archipelago_RandomizedItem_Ice';
+			return true;
+		
+		case 300052:
+			worldClass = class'Archipelago_RandomizedItem_Dweller';
+			return true;
+		
+		case 300053:
+			worldClass = class'Archipelago_RandomizedItem_TimeStop';
+			return true;
+		
 		
 		// --------- RELICS -------------------------------------------------------------------------------------------- \\
 		
