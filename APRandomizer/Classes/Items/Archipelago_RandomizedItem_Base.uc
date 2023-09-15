@@ -100,6 +100,10 @@ simulated function bool OnCollected(Actor Collector)
 				
 				autoEquip = (count < `SaveManager.GetNumberOfBadgeSlots());
 			}
+			else if (class'Hat_Loadout'.static.IsClassHat(InventoryClass))
+			{
+				autoEquip = false;
+			}
 			
 			if (!loadout.AddBackpack(item, autoEquip, true, Hat_Player(Collector)) && !loadout.AddCollectible(InventoryClass))
 			{

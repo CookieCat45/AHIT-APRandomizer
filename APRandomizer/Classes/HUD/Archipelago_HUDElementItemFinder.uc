@@ -270,7 +270,7 @@ function bool CanReachLocation(int id, HUD H)
 	
 	if (`GameManager.IsCurrentChapter(1))
 	{
-		cannon = act == 4 || act == 5 || act == 6 || act == 7;
+		cannon = act == 4 || act == 5 || act == 6 && CanHitObjects() || act == 7;
 	}
 	
 	// Chest behind Mafia HQ
