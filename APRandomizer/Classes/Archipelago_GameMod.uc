@@ -319,7 +319,7 @@ event PreBeginPlay()
 		SlotData.Initialized = true;
 		UpdateChapterInfo();
 	}
-
+	
 	if (!IsInSpaceship())
 	{
 		if (`GameManager.GetCurrentMapFilename() ~= "subconforest")
@@ -443,6 +443,9 @@ function OnPostInitGame()
 	local array<Object> shopInvs;
 	local Hat_BonfireBarrier barrier;
 	local Hat_SandStationHorn_Base horn;
+	local array<class<Object > > DeathWishes;
+	local class<Hat_SnatcherContract_DeathWish> dw;
+	local class<Hat_CosmeticItemQualityInfo> flair;
 	
 	if (IsCurrentPatch())
 		return;
@@ -726,6 +729,24 @@ function OnPostInitGame()
 					horn.IsActivated = true;
 					horn.PostTargetUnlocks();
 				}
+			}
+		}
+		
+		DeathWishes = class'Hat_ClassHelper'.static.GetAllScriptClasses("Hat_SnatcherContract_DeathWish");
+		for (i = 0; i < DeathWishes.Length; i++)
+		{
+			dw = class<Hat_SnatcherContract_DeathWish>(DeathWishes[i]);
+			if (dw.default.CompletionReward == None)
+				continue;
+				
+			flair = class<Hat_CosmeticItemQualityInfo>(dw.default.CompletionReward);
+			if (flair == None)
+				continue;
+			
+			// Remove Death Wish flair rewards if we don't have the base hat, since the game doesn't bother checking if you have it.
+			if (!class'Hat_Loadout'.static.BackpackHasInventory(flair.static.GetBaseCosmeticItemWeApplyTo()))
+			{
+				ConsoleCommand("set "$dw $" CompletionReward None");
 			}
 		}
 	}
@@ -1941,21 +1962,7 @@ function OnTimePieceCollected(string Identifier)
 		return;
 	
 	if (InStr(Identifier, "ap_timepiece") != -1)
-	{
-		if (SlotData.DeathWish && `SaveManager.GetNumberOfTimePieces() >= SlotData.DeathWishTPRequirement)
-		{
-			if (!class'Hat_SaveBitHelper'.static.HasLevelBit("DeathWish_intro", 1, `GameManager.HubMapName))
-			{
-				ScreenMessage("***DEATH WISH has been unlocked! Check your pause menu in the Spaceship!***", 'Warning');
-				ScreenMessage("***DEATH WISH has been unlocked! Check your pause menu in the Spaceship!***", 'Warning');
-				ScreenMessage("***DEATH WISH has been unlocked! Check your pause menu in the Spaceship!***", 'Warning');
-			}
-			
-			class'Hat_SaveBitHelper'.static.SetLevelBits("DeathWish_intro", 1, `GameManager.HubMapName);
-		}
-		
 		return;
-	}
 	
 	`SaveManager.GetCurrentSaveData().RemoveTimePiece(Identifier);
 	
@@ -2111,7 +2118,7 @@ function ResetEverything()
 	local array<Hat_ChapterInfo> chapterInfoArray;
 	local Hat_ChapterInfo chapter;
 	local Hat_ChapterActInfo act;
-	
+
 	chapterInfoArray = class'Hat_ChapterInfo'.static.GetAllChapterInfo();
 	foreach chapterInfoArray(chapter)
 	{

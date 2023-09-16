@@ -12,8 +12,10 @@ var transient int EmptyCount;
 var transient bool FirstReceivedItems;
 var transient bool GameDataLoaded;
 var transient array<Archipelago_GameData> GamesToCache;
+var transient int GameCacheCount;
 
 const MaxSentMessageLength = 246;
+const GameCacheLimit = 4; // How many games to cache at a time to reduce stutter lag
 
 event PostBeginPlay()
 {
@@ -37,6 +39,7 @@ function Connect()
 	if (FullyConnected || ConnectingToAP || LinkState == STATE_Connecting)
 		return;
 	
+	// Event mode breaks if a message is bigger than 255 bytes. Manual mode is needed to get around this.
 	ReceiveMode = RMODE_Manual;
 	LinkMode = MODE_Line;
 	
@@ -158,7 +161,7 @@ function ConnectToAP()
 event Tick(float d)
 {
 	local byte byteMessage[255];
-	local int count, i, a, k, bracket;
+	local int count, i, a, k, bracket, attempts;
 	local string character, pong, msg, nullChar;
 	local bool b, validMsg;
 	
@@ -167,18 +170,19 @@ event Tick(float d)
 	if (LinkState != STATE_Connected || LinkMode != MODE_Binary)
 		return;
 	
-	// Messages from the AP server are not null-terminated, so it must be done this way.
 	// We can only read 255 bytes from the socket at a time.
-	// Also Unrealscript doesn't like [] in JSON.
-	if (IsDataPending())
+	// IsDataPending ALWAYS returns true if we're connected, even if there isn't any data pending on the socket
+	while (EmptyCount <= 5 && attempts <= 20)
 	{
-		// IsDataPending seems to almost always return true even if no data is pending after a msg is sent, 
-		// so to check for the end of a message, we simply count how many times we've read 0 bytes of data
+		attempts++;
 		count = ReadBinary(255, byteMessage);
+		
 		if (count <= 0)
 		{
 			if (ParsingMessage)
 				EmptyCount++;
+			
+			break;
 		}
 		else
 		{
@@ -192,13 +196,12 @@ event Tick(float d)
 					// UnrealScript doesn't allow null characters in strings, so we need to do this crap
 					if (byteMessage[i] == byte(0))
 					{
-						`AP.DebugMessage("Null character in pong");
 						if (nullChar != "")
 						{
 							msg $= nullChar;
 							continue;
 						}
-
+						
 						for (a = 33; a <= 255; a++)
 						{
 							b = false;
@@ -262,7 +265,7 @@ event Tick(float d)
 	
 	if (ParsingMessage)
 	{
-		if (EmptyCount >= 5)
+		if (EmptyCount > 5)
 		{
 			// We've got a JSON message, parse it
 			msg = "";
@@ -308,7 +311,7 @@ function ParseJSON(string json)
 {
 	local bool b;
 	local Name msgType;
-	local int i, a, count, split, pos, locId, count1, count2;
+	local int i, a, count, split, pos, locId, count1, count2, limit;
 	local array<int> missingLocs;
 	local string s, text, num, json2, game, checksum, player;
 	local JsonObject jsonObj, jsonChild, games, myGame, mappings, textObj;
@@ -391,41 +394,44 @@ function ParseJSON(string json)
 			b = true;
 			game = "";
 			
-			for (i = 0; i < Len(json2); i++)
+			if (GamesToCache.Length == 0)
 			{
-				if (!b && Mid(json2, i, 2) == "\",") // start of game name string
+				for (i = 0; i < Len(json2); i++)
 				{
-					b = true;
-				}
-				else if (b && Mid(json2, i, 2) == "\":") // end of game name string
-				{
-					m.DebugMessage("Found game: " $game);
-					data = new class'Archipelago_GameData';
-					class'Engine'.static.BasicLoadObject(data, "APGameData/"$game, false, 1);
-					
-					// do we need to update the data for this game, or create it?
-					checksum = games.GetStringValue(game);
-					if (data.Game == "" || data.Checksum != checksum)
+					if (!b && Mid(json2, i, 2) == "\",") // start of game name string
 					{
-						data.Game = game;
-						data.Checksum = checksum;
-						GamesToCache.AddItem(data);
+						b = true;
 					}
-					else
+					else if (b && Mid(json2, i, 2) == "\":") // end of game name string
 					{
-						m.GameData.AddItem(data);
+						m.DebugMessage("Found game: " $game);
+						data = new class'Archipelago_GameData';
+						class'Engine'.static.BasicLoadObject(data, "APGameData/"$game, false, 1);
+						
+						// do we need to update the data for this game, or create it?
+						checksum = games.GetStringValue(game);
+						if (data.Game == "" || data.Checksum != checksum)
+						{
+							data.Game = game;
+							data.Checksum = checksum;
+							GamesToCache.AddItem(data);
+						}
+						else
+						{
+							m.GameData.AddItem(data);
+						}
+						
+						game = "";
+						b = false;
 					}
-					
-					game = "";
-					b = false;
-				}
-				else if (b)
-				{
-					s = Mid(json2, i, 1);
-					
-					if (s != "\"" && s != "{" && s != "}" && s != ",")
+					else if (b)
 					{
-						game $= Mid(json2, i, 1);
+						s = Mid(json2, i, 1);
+						
+						if (s != "\"" && s != "{" && s != "}" && s != ",")
+						{
+							game $= Mid(json2, i, 1);
+						}
 					}
 				}
 			}
@@ -433,9 +439,18 @@ function ParseJSON(string json)
 			if (GamesToCache.Length > 0)
 			{
 				json2 = "[{\"cmd\":\"GetDataPackage\",\"games\":[";
-				for (i = 0; i < GamesToCache.Length; i++)
+				for (i = GameCacheCount; i < GamesToCache.Length; i++)
 				{
 					json2 $= "\""$GamesToCache[i].Game$"\"";
+					limit++;
+					
+					// impose a limit because reading from too many games at once causes colossal stutters
+					if (limit >= GameCacheLimit)
+					{
+						json2 $= "]}]";
+						break;
+					}
+					
 					if (i < GamesToCache.Length-1)
 					{
 						json2 $= ",";
@@ -443,10 +458,12 @@ function ParseJSON(string json)
 					else
 					{
 						json2 $= "]}]";
+						break;
 					}
 				}
 				
 				m.ScreenMessage("Reading new game location/item data...");
+				m.ScreenMessage("*** PLEASE DO NOT CLOSE THE GAME EVEN IF IT STOPS RESPONDING, IT MAY STUTTER MULTIPLE TIMES DEPENDING ON THE SIZE OF THE MULTI ***", 'Warning');
 				SendBinaryMessage(json2);
 			}
 			else
@@ -470,7 +487,7 @@ function ParseJSON(string json)
 				break;
 			}
 			
-			for (i = 0; i < GamesToCache.Length; i++)
+			for (i = GameCacheCount; i < GamesToCache.Length; i++)
 			{
 				myGame = games.GetObject(GamesToCache[i].Game);
 				if (myGame == None)
@@ -539,9 +556,47 @@ function ParseJSON(string json)
 				
 				class'Engine'.static.BasicSaveObject(GamesToCache[i], "APGameData/"$GamesToCache[i].Game, false, 1);
 				m.GameData.AddItem(GamesToCache[i]);
+				GameCacheCount++;
+
+				limit++;
+				if (limit >= GameCacheLimit)
+					break;
 			}
 			
-			GameDataLoaded = true;
+			json2 = "[{\"cmd\":\"GetDataPackage\",\"games\":[";
+			limit = 0;
+			for (i = GameCacheCount; i < GamesToCache.Length; i++)
+			{
+				json2 $= "\""$GamesToCache[i].Game$"\"";
+				limit++;
+				
+				// impose a limit because reading from too many games at once causes colossal stutters
+				if (limit >= GameCacheLimit)
+				{
+					json2 $= "]}]";
+					break;
+				}
+				
+				if (i < GamesToCache.Length-1)
+				{
+					json2 $= ",";
+				}
+				else
+				{
+					json2 $= "]}]";
+					break;
+				}
+			}
+			
+			if (limit > 0)
+			{
+				SendBinaryMessage(json2);
+			}
+			else
+			{
+				GameDataLoaded = true;
+			}
+			
 			break;
 		
 		case "Connected":
@@ -1064,6 +1119,18 @@ function GrantTimePiece(int playerId)
 	{
 		m.UpdateActUnlocks();
 		m.UpdatePowerPanels();
+
+		if (m.SlotData.DeathWish && `SaveManager.GetNumberOfTimePieces() >= m.SlotData.DeathWishTPRequirement)
+		{
+			if (!class'Hat_SaveBitHelper'.static.HasLevelBit("DeathWish_intro", 1, `GameManager.HubMapName))
+			{
+				m.ScreenMessage("***DEATH WISH has been unlocked! Check your pause menu in the Spaceship!***", 'Warning');
+				m.ScreenMessage("***DEATH WISH has been unlocked! Check your pause menu in the Spaceship!***", 'Warning');
+				m.ScreenMessage("***DEATH WISH has been unlocked! Check your pause menu in the Spaceship!***", 'Warning');
+			}
+			
+			class'Hat_SaveBitHelper'.static.SetLevelBits("DeathWish_intro", 1, `GameManager.HubMapName);
+		}
 	}
 }
 
@@ -1333,13 +1400,10 @@ function OnBouncedCommand(string json)
 // the optional boolean is for recursion, do not use it
 function SendBinaryMessage(string message, optional bool continuation, optional bool pong, optional string nullChar="")
 {
-	local Archipelago_GameMod m;
 	local byte byteMessage[255];
 	local string buffer;
 	local int length, offset, keyIndex, i, totalSent;
 	local int maskKey[4];
-	
-	m = `AP;
 	
 	for (i = 0; i < 4; i++)
 	{
@@ -1407,7 +1471,6 @@ function SendBinaryMessage(string message, optional bool continuation, optional 
 		// null character
 		if (pong && nullChar != "" && Mid(buffer, i-offset, 1) == nullChar)
 		{
-			m.DebugMessage("Adding null byte");
 			byteMessage[i] = byte(0) ^ maskKey[keyIndex];
 		}
 		else

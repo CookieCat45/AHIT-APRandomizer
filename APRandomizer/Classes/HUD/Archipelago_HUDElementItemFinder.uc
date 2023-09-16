@@ -306,6 +306,17 @@ function bool CanReachLocation(int id, HUD H)
 		return act == 6;
 	}
 	
+	// Manor rooftop item
+	if (id == 325466)
+	{
+		if (difficulty >= 2)
+		{
+			return !m.SlotData.ShuffleSubconPaintings || m.GetPaintingUnlocks() >= 1 || CanHitObjects(true); 
+		}
+		
+		return (!m.SlotData.ShuffleSubconPaintings || m.SlotData.KnowledgeTricks && nobonk || m.GetPaintingUnlocks() >= 1) && CanHitObjects(true);
+	}
+	
 	if (mapName ~= "DeadBirdStudio")
 	{
 		if (act == 6 || !CanHitObjects(false))
@@ -326,25 +337,14 @@ function bool CanReachLocation(int id, HUD H)
 	{
 		paintingUnlock = m.GetPaintingUnlocks();
 		
-		if (paintingUnlock >= 1 && VillagePaintingLocs.Find(id) != -1 && (difficulty < 2 || id != 325466))
-			return m.SlotData.KnowledgeTricks && nobonk || difficulty >= 2;
+		if (VillagePaintingLocs.Find(id) != -1)
+			return paintingUnlock >= 1 || m.SlotData.KnowledgeTricks && nobonk || difficulty >= 2;
 		
-		if (paintingUnlock >= 2 && SwampPaintingLocs.Find(id) != -1)
-			return m.SlotData.KnowledgeTricks && nobonk || difficulty >= 2;
+		if (SwampPaintingLocs.Find(id) != -1)
+			return paintingUnlock >= 2 || m.SlotData.KnowledgeTricks && nobonk || difficulty >= 2;
 		
-		if (paintingUnlock >= 3 && CourtyardPaintingLocs.Find(id) != -1)
-			return m.SlotData.KnowledgeTricks || difficulty >= 2;
-	}
-	
-	// Manor rooftop item
-	if (id == 325466)
-	{
-		if (difficulty >= 2)
-		{
-			return !m.SlotData.ShuffleSubconPaintings || m.GetPaintingUnlocks() >= 1; 
-		}
-		
-		return CanHitObjects(true);
+		if (CourtyardPaintingLocs.Find(id) != -1)
+			return paintingUnlock >= 3 || m.SlotData.KnowledgeTricks || difficulty >= 2;
 	}
 	
 	if (mapName ~= "alpsandsails")
