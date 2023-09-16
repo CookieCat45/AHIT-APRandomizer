@@ -563,11 +563,14 @@ function OnPostInitGame()
 			if (SlotData.DeathWishOnly || class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false))
 			{
 				if (class<Hat_Collectible_Important>(chest.Content) != None)
-				{
 					chest.Empty();
-					chest.Content = None;
-				}
 				
+				continue;
+			}
+			
+			if (IsLocationChecked(ObjectToLocationId(chest)))
+			{
+				chest.Empty();
 				continue;
 			}
 			
@@ -2682,7 +2685,7 @@ function ShuffleCollectibles(optional bool cache)
 			{
 				if (IsLocationChecked(locationArray[i]))
 					continue;
-
+				
 				locInfo = GetLocationInfoFromID(locationArray[i]);
 				if (locInfo.ContainerClass != None || locInfo.IsStatic
 				|| locInfo.Position.x == 0 && locInfo.Position.y == 0 && locInfo.position.z == 0)

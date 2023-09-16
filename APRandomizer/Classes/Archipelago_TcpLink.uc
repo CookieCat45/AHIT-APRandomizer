@@ -622,10 +622,9 @@ function ParseJSON(string json)
 			
 			// If we have checked locations that haven't been sent for some reason, send them now
 			pos = InStr(json, "\"missing_locations\":[");
-			pos += len("\"missing_locations\":[");
-			
 			if (pos != -1)
 			{
+				pos += len("\"missing_locations\":[");
 				num = "";
 				
 				for (i = pos; i < len(json); i++)
@@ -646,6 +645,35 @@ function ParseJSON(string json)
 								
 								break;
 							}
+						}
+						
+						num = "";
+					}
+					else if (s != "," && s != "[")
+					{
+						num $= s;
+					}
+				}
+			}
+			
+			pos = InStr(json, "\"checked_locations\":[");
+			if (pos != -1)
+			{
+				pos += len("\"checked_locations\":[");
+				num = "";
+				
+				for (i = pos; i < len(json); i++)
+				{
+					s = Mid(json, i, 1);
+					if (s == "]")
+						break;
+					
+					if (len(num) > 0 && s == ",")
+					{
+						locId = int(num);
+						if (!m.IsLocationChecked(locId) && missingLocs.Find(locId) == -1)
+						{
+							m.SlotData.CheckedLocations.AddItem(locId);
 						}
 						
 						num = "";
@@ -852,10 +880,17 @@ function OnLocationInfoCommand(string json)
 			locId = m.ObjectToLocationId(collectible);
 			if (m.IsLocationCached(locId))
 				continue;
-
+			
 			if (locId == jsonChild.GetIntValue("location"))
 			{
 				m.DebugMessage("Replacing item: "$collectible $", Location ID: "$locId);
+				
+				if (m.IsLocationChecked(locId))
+				{
+					collectible.Destroy();
+					isItem = true;
+					break;
+				}
 				
 				m.CreateItem(locId, 
 					jsonChild.GetIntValue("item"),
@@ -893,6 +928,9 @@ function OnLocationInfoCommand(string json)
 		
 		if (locId == m.CameraBadgeCheck1 || locId == m.CameraBadgeCheck2)
 		{
+			if (m.IsLocationChecked(locId))
+				continue;
+
 			item = m.CreateItem(locId, 
 				jsonChild.GetIntValue("item"),
 				jsonChild.GetIntValue("flags"),
