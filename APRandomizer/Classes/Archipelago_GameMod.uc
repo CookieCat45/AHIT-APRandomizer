@@ -4,14 +4,11 @@ class Archipelago_GameMod extends GameMod
 	dependson(Archipelago_GameData)
 	config(Mods);
 
-// IMPORTANT!! If you add or remove *ANYTHING* in the Archipelago_SlotData class, INCREMENT THIS NUMBER!
-// Not doing so can and will break existing save files for seeds!!!
 const SlotDataVersion = 2;
 
 var Archipelago_TcpLink Client;
 var Archipelago_SlotData SlotData;
 var Archipelago_ItemResender ItemResender;
-var array<class<Archipelago_ShopItem_Base > > ShopItemsPending;
 var array<Archipelago_GameData> GameData;
 var array<Hat_GhostPartyPlayerStateBase> Buddies; // Online Party co-op support
 var transient int ActMapChangeChapter;
@@ -409,7 +406,7 @@ event PreBeginPlay()
 event PostBeginPlay()
 {
 	Super.PostBeginPlay();
-
+	
 	if (!IsArchipelagoEnabled())
 		return;
 	
@@ -446,6 +443,7 @@ function OnPostInitGame()
 	local array<class<Object > > DeathWishes;
 	local class<Hat_SnatcherContract_DeathWish> dw;
 	local class<Hat_CosmeticItemQualityInfo> flair;
+	local Hat_ImpactInteract_Breakable_ChemicalBadge crate;
 	
 	if (IsCurrentPatch())
 		return;
@@ -501,7 +499,7 @@ function OnPostInitGame()
 				npc.ShutDown();
 			}
 		}
-		
+
 		SetTimer(0.01, false, NameOf(SpawnDecorationStands));
 		
 		// When returning to hub from levels in act rando, the player may get softlocked behind chapter doors, prevent this
@@ -545,149 +543,158 @@ function OnPostInitGame()
 		OpenBedroomDoor();
 		`SetMusicParameterInt('FirstChapterUnlockSilence', 0);
 	}
-	else
+	
+	// We need to do this early, before connecting, otherwise the game
+	// might empty the chest on us if it has an important item in vanilla.
+	// Example of this happening is the Hookshot Badge chest in the Subcon Well.
+	// This will also prevent the player from possibly nabbing vanilla chest contents as well.
+	foreach DynamicActors(class'Hat_TreasureChest_Base', chest)
 	{
-		// We need to do this early, before connecting, otherwise the game
-		// might empty the chest on us if it has an important item in vanilla.
-		// Example of this happening is the Hookshot Badge chest in the Subcon Well.
-		// This will also prevent the player from possibly nabbing vanilla chest contents as well.
-		foreach DynamicActors(class'Hat_TreasureChest_Base', chest)
+		if (chest.Opened || class<Hat_Collectible_Important>(chest.Content) == None
+			&& class<Hat_Collectible_StoryBookPage>(chest.Content) == None)
+			continue;
+		
+		if (chest.IsA('Hat_TreasureChest_GiftBox'))
+			continue;
+		
+		if (SlotData.DeathWishOnly || class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false))
 		{
-			if (chest.Opened || class<Hat_Collectible_Important>(chest.Content) == None
-				&& class<Hat_Collectible_StoryBookPage>(chest.Content) == None)
-				continue;
-			
-			if (chest.IsA('Hat_TreasureChest_GiftBox'))
-				continue;
-			
-			if (SlotData.DeathWishOnly || class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false))
-			{
-				if (class<Hat_Collectible_Important>(chest.Content) != None)
-					chest.Empty();
-				
-				continue;
-			}
-			
-			if (IsLocationChecked(ObjectToLocationId(chest)))
-			{
+			if (class<Hat_Collectible_Important>(chest.Content) != None)
 				chest.Empty();
+			
+			continue;
+		}
+		
+		if (IsLocationChecked(ObjectToLocationId(chest)))
+		{
+			chest.Empty();
+			continue;
+		}
+		
+		ChestArray.AddItem(chest);
+		
+		if (class<Hat_Collectible_StoryBookPage>(chest.Content) == None
+		&& class<Hat_Collectible_TreasureBit>(chest.Content) == None)
+		{
+			chest.Content = class'Hat_Collectible_EnergyBit';
+		}
+	}
+	
+	foreach DynamicActors(class'Hat_ImpactInteract_Breakable_ChemicalBadge', crate)
+	{
+		for (i = 0; i < crate.Rewards.Length; i++)
+		{
+			if (class<Hat_Collectible_Important>(crate.Rewards[i]) != None)
+			{
+				// don't allow crate to remove its own rewards
+				crate.Rewards[i] = class'Archipelago_RandomizedItem_Base';
+			}
+		}
+	}
+	
+	if (SlotData.BadgeSellerItemCount <= 0 || SlotData.DeathWishOnly)
+	{
+		foreach DynamicActors(class'Hat_NPC', npc)
+		{
+			if (npc.IsA('Hat_NPC_BadgeSalesman'))
+				npc.ShutDown();
+		}
+	}
+	
+	mapName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename();
+	realMapName = `GameManager.GetCurrentMapFilename();
+	
+	// Fix for Rock the Boat
+	if (realMapName ~= "ship_sinking")
+		mapName = "ship_sinking";
+	
+	if (IsMapScouted(mapName))
+		SetTimer(0.4, false, NameOf(ShuffleCollectibles2));
+	
+	if (InStr(realMapName, "mafia_town") != -1)
+	{
+		DeleteCameraParticle();
+	}
+	else if (realMapName ~= "alpsandsails" && SlotData.ShuffleZiplines && !class'Hat_SnatcherContract_DeathWish_Speedrun_Illness'.static.IsActive())
+	{
+		SetTimer(0.8, true, NameOf(UpdateZiplineUnlocks));
+	}
+	else if (realMapName ~= "dlc_metro")
+	{
+		CleanUpMetro();
+		
+		// so the shopkeeper doesn't say "we're sold out" when the player has the ticket
+		foreach DynamicActors(class'Hat_MetroTicketBooth_Base', booth)
+		{
+			booth.WasBought = false;
+			booth.UnlockView = None;
+		}
+		
+		shopInvs = class'Hat_ClassHelper'.static.GetAllObjectsExpensive("Hat_ShopInventory");
+		dummy.CollectibleClass = class'Archipelago_ShopItem_Dummy';
+		dummy.ItemCost = 99999999;
+		
+		for (i = 0; i < shopInvs.Length; i++)
+		{
+			if (Archipelago_ShopInventory_Base(shopInvs[i]) != None
+			|| Hat_ShopInventory_MetroFood(shopInvs[i]) != None)
 				continue;
-			}
-			
-			ChestArray.AddItem(chest);
-			
-			if (class<Hat_Collectible_StoryBookPage>(chest.Content) == None
-			&& class<Hat_Collectible_TreasureBit>(chest.Content) == None)
-			{
-				chest.Content = class'Hat_Collectible_EnergyBit';
-			}
+		
+			Hat_ShopInventory(shopInvs[i]).ItemsForSale.AddItem(dummy);
 		}
 		
-		if (SlotData.BadgeSellerItemCount <= 0 || SlotData.DeathWishOnly)
+		foreach DynamicActors(class'Hat_NPC', npc)
 		{
-			foreach DynamicActors(class'Hat_NPC', npc)
-			{
-				if (npc.IsA('Hat_NPC_BadgeSalesman'))
-					npc.ShutDown();
-			}
+			if (npc.IsA('Hat_NPC_NyakuzaShop'))
+				ConsoleCommand("set " $npc.Name $" SoldOut false");
 		}
-		
-		mapName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename();
-		realMapName = `GameManager.GetCurrentMapFilename();
-		
-		// Fix for Rock the Boat
-		if (realMapName ~= "ship_sinking")
-			mapName = "ship_sinking";
-		
-		if (IsMapScouted(mapName))
-			SetTimer(0.4, false, NameOf(ShuffleCollectibles2));
-		
-		if (InStr(realMapName, "mafia_town") != -1)
+	}
+	else if (realMapName ~= "subconforest")
+	{
+		// If act rando or contracts are shuffled, remove these act transitions for the well/manor if we don't enter from the proper act.
+		// This forces the player to find the act/contracts in order to enter them
+		if (SlotData.ActRando || SlotData.ShuffleActContracts)
 		{
-			DeleteCameraParticle();
-		}
-		else if (realMapName ~= "alpsandsails" && SlotData.ShuffleZiplines && !class'Hat_SnatcherContract_DeathWish_Speedrun_Illness'.static.IsActive())
-		{
-			SetTimer(0.8, true, NameOf(UpdateZiplineUnlocks));
-		}
-		else if (realMapName ~= "dlc_metro")
-		{
-			CleanUpMetro();
+			DebugMessage("Disabling trigger volumes...");
 			
-			// so the shopkeeper doesn't say "we're sold out" when the player has the ticket
-			foreach DynamicActors(class'Hat_MetroTicketBooth_Base', booth)
+			foreach AllActors(class'TriggerVolume', trigger)
 			{
-				booth.WasBought = false;
-				booth.UnlockView = None;
-			}
-			
-			shopInvs = class'Hat_ClassHelper'.static.GetAllObjectsExpensive("Hat_ShopInventory");
-			dummy.CollectibleClass = class'Archipelago_ShopItem_Dummy';
-			dummy.ItemCost = 99999999;
-			
-			for (i = 0; i < shopInvs.Length; i++)
-			{
-				if (Archipelago_ShopInventory_Base(shopInvs[i]) != None
-				|| Hat_ShopInventory_MetroFood(shopInvs[i]) != None)
-					continue;
-			
-				Hat_ShopInventory(shopInvs[i]).ItemsForSale.AddItem(dummy);
-			}
-			
-			foreach DynamicActors(class'Hat_NPC', npc)
-			{
-				if (npc.IsA('Hat_NPC_NyakuzaShop'))
-					ConsoleCommand("set " $npc.Name $" SoldOut false");
-			}
-		}
-		else if (realMapName ~= "subconforest")
-		{
-			// If act rando or contracts are shuffled, remove these act transitions for the well/manor if we don't enter from the proper act.
-			// This forces the player to find the act/contracts in order to enter them
-			if (SlotData.ActRando || SlotData.ShuffleActContracts)
-			{
-				DebugMessage("Disabling trigger volumes...");
-				
-				foreach AllActors(class'TriggerVolume', trigger)
+				if (trigger.Name == 'TriggerVolume_26' && `GameManager.GetCurrentAct() != 2
+				|| trigger.Name == 'TriggerVolume_20' && `GameManager.GetCurrentAct() != 4)
 				{
-					if (trigger.Name == 'TriggerVolume_26' && `GameManager.GetCurrentAct() != 2
-					|| trigger.Name == 'TriggerVolume_20' && `GameManager.GetCurrentAct() != 4)
+					DebugMessage("Disabling trigger volume: "$trigger.Name);
+					trigger.ShutDown();
+				}
+				
+				// If contracts are shuffled, disable the bag trap trigger if we already checked the Subcon Well contract
+				if (SlotData.ShuffleActContracts && trigger.Name == 'TriggerVolume_4')
+				{
+					if (SlotData.CheckedContracts.Find(class'Hat_SnatcherContract_IceWall') != -1)
 					{
 						DebugMessage("Disabling trigger volume: "$trigger.Name);
 						trigger.ShutDown();
 					}
-					
-					// If contracts are shuffled, disable the bag trap trigger if we already checked the Subcon Well contract
-					if (SlotData.ShuffleActContracts && trigger.Name == 'TriggerVolume_4')
-					{
-						if (SlotData.CheckedContracts.Find(class'Hat_SnatcherContract_IceWall') != -1)
-						{
-							DebugMessage("Disabling trigger volume: "$trigger.Name);
-							trigger.ShutDown();
-						}
-					}
 				}
-			}
-			
-			if (SlotData.ShuffleSubconPaintings)
-			{
-				foreach DynamicActors(class'Hat_SubconPainting', painting)
-				{
-					if (SlotData.UnlockedPaintings.Find(painting.Name) == -1)
-					{
-						painting.SetHidden(true);
-						painting.SetCollision(false, false);
-					}
-				}
-			}
-			
-			// Kismet edits here
-			WorldInfo.GetGameSequence().FindSeqObjectsByClass(class'Hat_SeqAct_ClearContractObjective', true, seqObjects);
-			for (i = 0; i < seqObjects.Length; i++)
-			{
-				Hat_SeqAct_ClearContractObjective(seqObjects[i]).ContractClass = None;
 			}
 		}
+		
+		if (SlotData.ShuffleSubconPaintings)
+		{
+			foreach DynamicActors(class'Hat_SubconPainting', painting)
+			{
+				if (!HasAPBit(string(painting.Name), 1))
+				{
+					painting.SetHidden(true);
+					painting.SetCollision(false, false);
+				}
+			}
+		}
+	}
+	
+	WorldInfo.GetGameSequence().FindSeqObjectsByClass(class'Hat_SeqAct_ClearContractObjective', true, seqObjects);
+	for (i = 0; i < seqObjects.Length; i++)
+	{
+		Hat_SeqAct_ClearContractObjective(seqObjects[i]).ContractClass = None;
 	}
 	
 	if (SlotData.DeathWish)
@@ -952,15 +959,12 @@ function OpenConnectBubble(optional float delay=0.0)
 
 function KeepConnectionAlive()
 {
-	local JsonObject json;
+	local string message;
 	if (!IsFullyConnected())
 		return;
 	
-	json = new class'JsonObject';
-	json.SetStringValue("cmd", "Bounce");
-	json.SetIntValue("slot", SlotData.PlayerSlot);
-	client.SendBinaryMessage(EncodeJson2(json));
-	json = None;
+	message = "[{\"cmd\":\"Bounce\",\"slots\":["$SlotData.PlayerSlot$"]}]";
+	client.SendBinaryMessage(message);
 }
 
 // Called by client the moment a "Connected" packet is received from the Archipelago server.
@@ -975,7 +979,7 @@ function OnPreConnected()
 function OnFullyConnected()
 {
 	local int i;
-
+	
 	SetTimer(0.5, false, NameOf(ShuffleCollectibles));
 	UpdateChapterInfo();
 	
@@ -992,12 +996,11 @@ function OnFullyConnected()
 		SetTimer(0.5, false, NameOf(ResendLocations));
 	}
 	
-	for (i = 0; i < ShopItemsPending.Length; i++)
+	for (i = 0; i < SlotData.ShopItemList.Length; i++)
 	{
-		InitShopItemDisplayName(ShopItemsPending[i]);
+		if (SlotData.ShopItemList[i].ItemClass.default.DisplayName == "Unknown Item")
+			InitShopItemDisplayName(SlotData.ShopItemList[i].ItemClass);
 	}
-	
-	ShopItemsPending.Length = 0;
 	
 	// Call this just to see if we can craft a hat
 	OnYarnCollected(0);
@@ -1006,6 +1009,8 @@ function OnFullyConnected()
 	{
 		SendOnlinePartyCommand(string(SlotData.Seed)$"+"$SlotData.PlayerSlot, 'APSeedCheck', GetALocalPlayerController().Pawn);
 	}
+	
+	SetTimer(60.0, true, NameOf(KeepConnectionAlive));
 }
 
 event OnOnlinePartyCommand(string Command, Name CommandChannel, Hat_GhostPartyPlayerStateBase Sender)
@@ -1039,7 +1044,6 @@ event OnOnlinePartyCommand(string Command, Name CommandChannel, Hat_GhostPartyPl
 				// Sync all locations/acts
 				PartySyncLocations(SlotData.CheckedLocations, Sender);
 				
-				actSync = new class'JsonObject';
 				chapterInfoArray = class'Hat_ChapterInfo'.static.GetAllChapterInfo();
 				foreach chapterInfoArray(chapter)
 				{
@@ -1054,7 +1058,6 @@ event OnOnlinePartyCommand(string Command, Name CommandChannel, Hat_GhostPartyPl
 				}
 				
 				PartySyncActs(hourglasses, Sender);
-				SendOnlinePartyCommand(actSync.EncodeJson(actSync), 'APActSync', GetALocalPlayerController().Pawn, Sender);
 			}
 			else 
 			{
@@ -1104,7 +1107,7 @@ event OnOnlinePartyCommand(string Command, Name CommandChannel, Hat_GhostPartyPl
 	{
 		i = 0;
 		actSync = class'JsonObject'.static.DecodeJson(Command);
-
+		
 		while (actSync.GetStringValue(string(i)) != "")
 		{
 			hourglass = actSync.GetStringValue(string(i));
@@ -1113,6 +1116,12 @@ event OnOnlinePartyCommand(string Command, Name CommandChannel, Hat_GhostPartyPl
 			{
 				SetAPBits("ActComplete_"$hourglass, 1);
 				DebugMessage("Syncing act" $hourglass $" from " $Sender.GetDisplayName());
+			}
+			
+			act = GetChapterActInfoFromHourglass(hourglass);
+			if (act != None && IsPurpleRift(act))
+			{
+				`SaveManager.GetCurrentSaveData().UnlockSecretLevel(hourglass);
 			}
 			
 			i++;
@@ -1764,6 +1773,10 @@ function CheckShopOverride(Hat_HUD hud)
 	{
 		GetShopItemInfo(class<Archipelago_ShopItem_Base>(newShop.ItemsForSale[i].CollectibleClass), shopInfo);
 		newShop.ItemsForSale[i].ItemCost = shopInfo.PonCost;
+		if (shopInfo.ItemClass.default.DisplayName == "Unknown Item")
+		{
+			InitShopItemDisplayName(shopInfo.ItemClass);
+		}
 		
 		if (IsLocationChecked(shopInfo.ID))
 		{
@@ -1784,7 +1797,9 @@ function CheckShopOverride(Hat_HUD hud)
 		{
 			if (shopInfo.ItemFlags == ItemFlag_Important || shopInfo.ItemFlags == ItemFlag_ImportantSkipBalancing)
 			{
-				hintIds.AddItem(shopInfo.ID);
+				if (hintIds.Find(shopInfo.ID) == -1)
+					hintIds.AddItem(shopInfo.ID);
+
 				SetShopInfoAsHinted(shopInfo);
 			}
 		}
@@ -2105,7 +2120,7 @@ function UpdateChapterInfo()
 	}
 	
 	UpdateActUnlocks();
-
+	
 	if (IsInSpaceship() && !class'Hat_SeqCond_IsMuMission'.static.IsFinaleMuMission() 
 		&& !class'Hat_SaveBitHelper'.static.HasActBit("thefinale_ending", 1))
 	{
@@ -2167,7 +2182,7 @@ function ResetEverything()
 					case "TimeRift_Water_Alp_Goats": // The Twilight Bell
 						act.RequiredActID.AddItem(15);
 						break;
-
+					
 					case "TimeRift_Water_Cruise_Slide": // Balcony
 						act.RequiredActID.AddItem(3);
 						break;
@@ -2346,11 +2361,11 @@ function UpdatePowerPanels()
 			
 			if (panel.Telescope != None)
 				panel.Telescope.SetUnlocked(true);
-
+			
 			continue;
 		}
 		
-		if (!IsPowerPanelActivated2(panel) && panel.CanBeUnlocked() 
+		if (SlotData.Initialized && !IsPowerPanelActivated2(panel) && panel.CanBeUnlocked() 
 		&& panel.InteractPoint == None && (panel.RuntimeMat == None || !panel.RuntimeMat.GetScalarParameterValue('Unlocked', val) || val == 0))
 		{
 			panel.InteractPoint = Spawn(class'Hat_InteractPoint',panel,,panel.Location + Vector(panel.Rotation)*10 + vect(0,0,1)*20,panel.Rotation,,true);
@@ -2358,7 +2373,7 @@ function UpdatePowerPanels()
 			
 			if (panel.RuntimeMat != None)
 				panel.RuntimeMat.SetScalarParameterValue('Unlockable', 1);
-
+			
 			panel.ElectricityParticle[0].SetActive(true);
 			panel.ElectricityParticle[1].SetActive(true);
 			panel.ReadyToActivateParticle.SetActive(true);
@@ -2579,7 +2594,7 @@ function ShuffleCollectibles(optional bool cache)
 			
 			for (i = 0; i < Hat_ImpactInteract_Breakable_ChemicalBadge(a).Rewards.Length; i++)
 			{
-				if (class<Hat_Collectible_Important>(Hat_ImpactInteract_Breakable_ChemicalBadge(a).Rewards[i]) != None)
+				if (class<Archipelago_RandomizedItem_Base>(Hat_ImpactInteract_Breakable_ChemicalBadge(a).Rewards[i]) != None)
 				{
 					locationArray.AddItem(ObjectToLocationId(a));
 					break;
@@ -2656,10 +2671,7 @@ function ShuffleCollectibles(optional bool cache)
 				continue;
 			
 			if (IsShopItemCached(shopItem))
-			{
-				ShopItemsPending.AddItem(shopItem);
 				continue;
-			}
 			
 			shopLocationArray.AddItem(shopItem.default.LocationID);
 		}
@@ -3134,7 +3146,7 @@ function OnPreBreakableBreak(Actor Breakable, Pawn Breaker)
 		
 		for (i = 0; i < b.Rewards.Length; i++)
 		{
-			if (class<Hat_Collectible_Important>(b.Rewards[i]) == None)
+			if (class<Archipelago_RandomizedItem_Base>(b.Rewards[i]) == None)
 				continue;
 			
 			b.Rewards.RemoveItem(b.Rewards[i]);
@@ -3153,9 +3165,18 @@ function OnPreBreakableBreak(Actor Breakable, Pawn Breaker)
 			}
 			
 			if (IsLocationChecked(ObjectToLocationId(b)))
+			{
 				return;
+			}
 			
 			locInfo = GetLocationInfoFromID(ObjectToLocationId(b));
+			if (locInfo.ID == 0)
+			{
+				// failsafe
+				SendLocationCheck(ObjectToLocationId(b));
+				return;
+			}
+
 			spawnClass = locInfo.ItemClass;
 			item = Archipelago_RandomizedItem_Base(Spawn(spawnClass,,,b.Location + vect(0,0,50),,,true));
 			item.LocationId = locInfo.ID;
@@ -3280,8 +3301,12 @@ function OnCollectibleSpawned(Object collectible)
 			
 			if (Actor(collectible).Owner.IsA('Hat_Goodie_Vault_Base'))
 			{
+				class'Hat_SaveBitHelper'.static.RemoveLevelBit(
+					class'Hat_SaveBitHelper'.static.GetBitId(Actor(collectible).Owner, 0), 1);
+				
 				if (IsLocationChecked(ObjectToLocationId(Actor(collectible).Owner)))
 				{
+					SendLocationCheck(ObjectToLocationId(Actor(collectible).Owner));
 					Actor(collectible).Destroy();
 					return;
 				}
@@ -4076,7 +4101,7 @@ function bool IsCurrentPatch()
 
 function bool IsInTitlescreen()
 {
-	return `GameManager.GetCurrentMapFilename() ~= `GameManager.TitleScreenMapName || `SaveManager.GetCurrentSaveData() == None;
+	return `GameManager.GetCurrentMapFilename() ~= `GameManager.TitleScreenMapName;
 }
 
 // Archipelago requires JSON messages to be encased in []

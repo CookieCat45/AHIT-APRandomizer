@@ -311,6 +311,7 @@ function bool CanReachLocation(int id, HUD H)
 	{
 		if (difficulty >= 2)
 		{
+			// Manor hovering without the fire wall down and without being able to hit bells is way too rough.
 			return !m.SlotData.ShuffleSubconPaintings || m.GetPaintingUnlocks() >= 1 || CanHitObjects(true); 
 		}
 		
@@ -332,19 +333,6 @@ function bool CanReachLocation(int id, HUD H)
 	{
 		if (!hookshot)
 			return id == 305321 || id == 304313;
-	}
-	else if (m.SlotData.ShuffleSubconPaintings && mapName ~= "subconforest")
-	{
-		paintingUnlock = m.GetPaintingUnlocks();
-		
-		if (VillagePaintingLocs.Find(id) != -1)
-			return paintingUnlock >= 1 || m.SlotData.KnowledgeTricks && nobonk || difficulty >= 2;
-		
-		if (SwampPaintingLocs.Find(id) != -1)
-			return paintingUnlock >= 2 || m.SlotData.KnowledgeTricks && nobonk || difficulty >= 2;
-		
-		if (CourtyardPaintingLocs.Find(id) != -1)
-			return paintingUnlock >= 3 || m.SlotData.KnowledgeTricks || difficulty >= 2;
 	}
 	
 	if (mapName ~= "alpsandsails")
@@ -396,7 +384,7 @@ function bool CanReachLocation(int id, HUD H)
 		id == 304456 ||
 		id == 304457 ||
 		id == 304606 ||
-		id == 303481 && lo.BackpackHasInventory(class'Hat_Ability_Hookshot') ||
+		id == 303481 && hookshot ||
 		id == 304607 && lo.BackpackHasInventory(class'Hat_Ability_StatueFall') ||
 		id == 304212 ||
 		id == 302003 ||
@@ -406,8 +394,8 @@ function bool CanReachLocation(int id, HUD H)
 		id == 305218; 
 	}
 	
-	if (id == 323734
-	|| id == 336497)
+	if (id == 323734 && (!m.SlotData.ShuffleSubconPaintings || m.GetPaintingUnlocks() >= 2 || m.SlotData.KnowledgeTricks && nobonk || difficulty >= 2)
+		|| id == 336497)
 	{
 		if (CanSDJ())
 			return true;
@@ -424,6 +412,20 @@ function bool CanReachLocation(int id, HUD H)
 	
 	if (BrewingHatRequiredLocs.Find(id) != -1 && !lo.BackpackHasInventory(class'Hat_Ability_Chemical'))
 		return false;
+	
+	if (m.SlotData.ShuffleSubconPaintings && mapName ~= "subconforest")
+	{
+		paintingUnlock = m.GetPaintingUnlocks();
+		
+		if (VillagePaintingLocs.Find(id) != -1)
+			return paintingUnlock >= 1 || m.SlotData.KnowledgeTricks && nobonk || difficulty >= 2;
+		
+		if (SwampPaintingLocs.Find(id) != -1)
+			return paintingUnlock >= 2 || m.SlotData.KnowledgeTricks && nobonk || difficulty >= 2;
+		
+		if (CourtyardPaintingLocs.Find(id) != -1)
+			return paintingUnlock >= 3 || m.SlotData.KnowledgeTricks && (nobonk || paintingUnlock >= 1) || difficulty >= 2;
+	}
 	
 	// Nyakuza Metro
 	if (id == 305111)

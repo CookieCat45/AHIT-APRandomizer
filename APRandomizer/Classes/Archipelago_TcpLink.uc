@@ -73,7 +73,7 @@ function TimedOut()
 {
 	if (!FullyConnected && !ConnectingToAP)
 	{
-		`AP.ScreenMessage("Connection attempt to " $`AP.SlotData.Host$":" $`AP.SlotData.Port $" timed out");
+		`AP.ScreenMessage("Connection attempt to " $`AP.SlotData.Host$":" $`AP.SlotData.Port $" timed out. Try changing port with ap_set_port <port> in the console?");
 		ClearTimer(NameOf(Connect));
 		Close();
 	}
@@ -311,10 +311,10 @@ function ParseJSON(string json)
 {
 	local bool b;
 	local Name msgType;
-	local int i, a, count, split, pos, locId, count1, count2, limit;
+	local int i, a, count, pos, locId, count1, count2, limit;
 	local array<int> missingLocs;
 	local string s, text, num, json2, game, checksum, player;
-	local JsonObject jsonObj, jsonChild, games, myGame, mappings, textObj;
+	local JsonObject jsonObj, jsonChild, games, myGame, mappings, textObj, sync;
 	local Archipelago_GameMod m;
 	local Archipelago_GameData data;
 	local LocationMap locMapping;
@@ -344,13 +344,6 @@ function ParseJSON(string json)
 	if (InStr(json, "Connected") != -1)
 	{
 		m.ReplOnce(json, "slot", "my_slot", json);
-		
-		// Also dumb, but seems to fix crashing problems, hopefully.
-		split = InStr(json, ",{\"cmd\":\"ReceivedItems\"");
-		if (split != -1)
-		{
-			json = Repl(json, Mid(json, split), "", false);
-		}
 	}
 	
 	m.DebugMessage("[ParseJSON] Reformatted command: " $json);
@@ -615,11 +608,6 @@ function ParseJSON(string json)
 				m.LoadSlotData(jsonChild);
 			}
 			
-			// Initialize our player's names
-			m.ReplOnce(json, "players", "players_0", json, true);
-			b = true;
-			count = 0;
-			
 			// If we have checked locations that haven't been sent for some reason, send them now
 			pos = InStr(json, "\"missing_locations\":[");
 			if (pos != -1)
@@ -691,27 +679,53 @@ function ParseJSON(string json)
 				m.SendMultipleLocationChecks(missingLocs);
 			}
 			
-			while (b)
+			//if (!m.SlotData.PlayerNamesInitialized)
+			if (true) // avoid breaking saves, for now
 			{
-				if (m.ReplOnce(json, ",{", ",\"players_"$count+1 $"\":{", s, false))
+				// Initialize our player's names
+				m.ReplOnce(json, "players", "players_0", json, true);
+				b = true;
+				count = 0;
+				
+				while (b)
 				{
-					json = s;
-					count++;
+					if (m.ReplOnce(json, ",{", ",\"players_"$count+1 $"\":{", s, false))
+					{
+						json = s;
+						count++;
+					}
+					else
+					{
+						b = false;
+					}
 				}
-				else
+				
+				jsonObj = class'JsonObject'.static.DecodeJson(json);
+				for (i = 0; i <= count; i++)
 				{
-					b = false;
+					jsonChild = jsonObj.GetObject("players_"$i);
+					if (jsonChild == None)
+						continue;
+						
+					m.SlotData.PlayerNames[jsonChild.GetIntValue("slot")] = jsonChild.GetStringValue("alias");
+					if (jsonChild.GetIntValue("slot") == m.SlotData.PlayerSlot)
+					{
+						m.SlotData.SlotName = jsonChild.GetStringValue("alias");
+					}
 				}
+				
+				//m.SlotData.PlayerNamesInitialized = true;
 			}
 			
-			jsonObj = class'JsonObject'.static.DecodeJson(json);
-			for (i = 0; i <= count; i++)
+			sync = new class'JsonObject';
+			sync.SetStringValue("cmd", "Sync");
+			SendBinaryMessage(m.EncodeJson2(sync));
+			sync = None;
+			
+			if (m.SlotData.DeathLink)
 			{
-				jsonChild = jsonObj.GetObject("players_"$i);
-				if (jsonChild == None)
-					continue;
-					
-				m.SlotData.PlayerNames[jsonChild.GetIntValue("slot")] = jsonChild.GetStringValue("alias");
+				json2 = "[{\"cmd\": \"ConnectUpdate\", \"tags\": [\"DeathLink\"]}]";
+				SendBinaryMessage(json2);
 			}
 			
 			// Fully connected
@@ -968,14 +982,14 @@ function OnLocationInfoCommand(string json)
 	}
 	
 	m.SaveGame();
-
+	
 	jsonObj = None;
 	jsonChild = None;
 }
 
-function OnReceivedItemsCommand(string json, optional bool connection)
+function OnReceivedItemsCommand(string json, optional bool full)
 {
-	local int count, index, total, i, start;
+	local int count, serverIndex, index, total, i, start;
 	local string s;
 	local JsonObject jsonObj, jsonChild;
 	local bool b;
@@ -1002,10 +1016,11 @@ function OnReceivedItemsCommand(string json, optional bool connection)
 	m.DebugMessage("Receiving items... "$json);
 	jsonObj = class'JsonObject'.static.DecodeJson(json);
 	index = m.GetAPBits("LastItemIndex");
+	serverIndex = jsonObj.GetIntValue("index");
 	
 	// This means we are reconnecting to a previous session, and the server is giving us our entire list of items,
 	// so we need to begin from the next new item in our list or don't give anything otherwise
-	if (connection)
+	if (full || serverIndex == 0 && index > 0)
 	{
 		if (index > count)
 		{
@@ -1215,25 +1230,25 @@ function UnlockPaintings()
 	{
 		// Village
 		case 1:
-			m.SlotData.UnlockedPaintings.AddItem('Hat_SubconPainting_Yellow_5');
-			m.SlotData.UnlockedPaintings.AddItem('Hat_SubconPainting_Yellow_6');
-			m.SlotData.UnlockedPaintings.AddItem('Hat_SubconPainting_Yellow_7');
-			m.SlotData.UnlockedPaintings.AddItem('Hat_SubconPainting_Yellow_8');
+			m.SetAPBits("Hat_SubconPainting_Yellow_5", 1);
+			m.SetAPBits("Hat_SubconPainting_Yellow_6", 1);
+			m.SetAPBits("Hat_SubconPainting_Yellow_7", 1);
+			m.SetAPBits("Hat_SubconPainting_Yellow_8", 1);
 			break;
 		
 		// Swamp
 		case 2:
-			m.SlotData.UnlockedPaintings.AddItem('Hat_SubconPainting_Blue_2');
-			m.SlotData.UnlockedPaintings.AddItem('Hat_SubconPainting_Blue_6');
+			m.SetAPBits("Hat_SubconPainting_Blue_2", 1);
+			m.SetAPBits("Hat_SubconPainting_Blue_6", 1);
 			break;
 		
 		// Courtyard
 		case 3:
-			m.SlotData.UnlockedPaintings.AddItem('Hat_SubconPainting_Green_0');
-			m.SlotData.UnlockedPaintings.AddItem('Hat_SubconPainting_Green_1');
-			m.SlotData.UnlockedPaintings.AddItem('Hat_SubconPainting_Green_2');
-			m.SlotData.UnlockedPaintings.AddItem('Hat_SubconPainting_Green_3');
-			m.SlotData.UnlockedPaintings.AddItem('Hat_SubconPainting_Green_4');
+			m.SetAPBits("Hat_SubconPainting_Green_0", 1);
+			m.SetAPBits("Hat_SubconPainting_Green_1", 1);
+			m.SetAPBits("Hat_SubconPainting_Green_2", 1);
+			m.SetAPBits("Hat_SubconPainting_Green_3", 1);
+			m.SetAPBits("Hat_SubconPainting_Green_4", 1);
 			break;
 		
 		default:
@@ -1244,7 +1259,7 @@ function UnlockPaintings()
 	{
 		foreach DynamicActors(class'Hat_SubconPainting', painting)
 		{
-			if (m.SlotData.UnlockedPaintings.Find(painting.Name) != -1)
+			if (m.HasAPBit(string(painting.Name), 1))
 			{
 				painting.SetHidden(false);
 				painting.SetCollision(true, true);

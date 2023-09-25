@@ -170,6 +170,18 @@ simulated function OnCollectedDisappear(Actor a)
 	DoCollectEffects(a);
 }
 
+simulated function DoCollectEffects(Actor a)
+{
+	local Hat_Player ply;
+    if (CollectSound != None && ((WorldInfo != None && WorldInfo.NetMode == NM_Standalone) || Role == Role_Authority))
+		PlaySound(CollectSound, false, false, false);
+	ply = Hat_Player(GetPlayerFromActor(a));
+    if (ply != None && CollectParticle != None)
+	{
+		ply.DoCollectEffects(self,CollectParticle,Location);
+	}
+}
+
 function bool ShouldDoSpinEffect()
 {
 	return DoSpinEffect && (!IsOwnItem() || WasFromServer());

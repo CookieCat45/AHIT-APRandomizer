@@ -43,14 +43,16 @@ function bool Tick(HUD H, float d)
 {
     local Hat_HUDMenuControllerKeyboardInput kb;
     
-    if (Hat_HUD(H).IsGamepad() && m_hBubbleTalker != None)
+    if (m_hBubbleTalker != None)
     {
         // IsClosed being true means user pressed accept button
         kb = Hat_HUDMenuControllerKeyboardInput(Hat_HUD(H).GetHUD(class'Hat_HUDMenuControllerKeyboardInput'));
-        if (kb != None && kb.IsClosed)
+        if (kb != None && (kb.IsClosed || !Hat_HUD(H).IsGamepad()))
         {
+            if (kb.IsClosed)
+                OnEnter(H);
+                
             kb.CloseHUD(H);
-            OnEnter(H);
         }
     }
     

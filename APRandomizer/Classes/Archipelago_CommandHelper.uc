@@ -4,23 +4,22 @@ class Archipelago_CommandHelper extends Hat_PlayerInput;
 
 exec function ap_set_connection_info(string ip, int port)
 {
-	if (`AP.Client == None)
-	{
-		`AP.CreateClient();
-	}
-	
 	`AP.SlotData.Host = ip;
 	`AP.SlotData.Port = port;
 	`AP.SaveGame();
 	`AP.ScreenMessage("Set target host to: "$ip $":" $port);
 }
 
+exec function ap_set_port(int port)
+{
+	`AP.SlotData.Port = port;
+	`AP.SaveGame();
+	`AP.ScreenMessage("Set port to: "$port);
+}
+
 exec function ap_show_connection_info()
 {
-	if (`AP.Client != None)
-	{
-		`AP.ScreenMessage("Current target host: "$`AP.SlotData.Host $":" $`AP.SlotData.Port);
-	}
+	`AP.ScreenMessage("Current target host: "$`AP.SlotData.Host $":" $`AP.SlotData.Port);
 }
 
 exec function ap_say(string message)
@@ -41,10 +40,7 @@ exec function ap_say(string message)
 
 exec function ap_connect()
 {
-	if (`AP.Client == None)
-		`AP.CreateClient();
-	
-	if (`AP.IsFullyConnected())
+	if (`AP.IsFullyConnected() || `AP.Client == None)
 		return;
 	
 	`AP.Client.Connect();

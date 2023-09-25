@@ -1,11 +1,13 @@
 class Archipelago_SlotData extends Object
     dependson(Archipelago_ItemInfo);
 
+// IMPORTANT!! If you add or remove *ANYTHING* in this class, increment the SlotDataVersion value in Archipelago_GameMod!
 var transient bool Initialized;
 var array<ShuffledAct> ShuffledActList;
 var array<LocationInfo> LocationInfoArray;
 var array<ShopItemInfo> ShopItemList;
 var array<string> PlayerNames;
+//var bool PlayerNamesInitialized;
 
 var bool ConnectedOnce;
 
@@ -83,7 +85,7 @@ var array< class<Hat_SnatcherContract_Act> > ObtainedContracts;
 var array< class<Hat_SnatcherContract_Act> > TakenContracts;
 var array< class<Hat_SnatcherContract_Act> > CheckedContracts;
 
-var array<Name> UnlockedPaintings;
+var array<Name> UnlockedPaintings; // Deprecated, staying until next slot data update to preserve saves
 
 // hat stitch order
 var EHatType Hat1;
