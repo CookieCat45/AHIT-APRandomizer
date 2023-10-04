@@ -33,6 +33,7 @@ function bool IsDeathWishAvailable(class<Hat_SnatcherContract_DeathWish> DeathWi
 {
 	local bool result;
 	local int locId, index;
+	local array<int> locIds;
 	local class<Hat_SnatcherContract_DeathWish> prevDw;
 	
 	if (mod.SlotData.DeathWishShuffle)
@@ -84,10 +85,10 @@ function bool IsDeathWishAvailable(class<Hat_SnatcherContract_DeathWish> DeathWi
 			DeathWish.static.ForceUnlockObjective(1);
 			DeathWish.static.ForceUnlockObjective(2);
 			
-			mod.SendLocationCheck(locId);
-			if (mod.SlotData.BonusRewards)
+			locIds.AddItem(locId);
+			if (mod.SlotData.BonusRewards && mod.SlotData.CheckedLocations.Find(locId+1) == -1)
 			{
-				mod.SendLocationCheck(locId+1);
+				locIds.AddItem(locId+1);
 			}
 		}
 		else if (DeathWish.static.IsContractComplete() && mod.SlotData.ExcludedBonuses.Find(DeathWish) != -1)
@@ -95,15 +96,20 @@ function bool IsDeathWishAvailable(class<Hat_SnatcherContract_DeathWish> DeathWi
 			DeathWish.static.ForceUnlockObjective(1);
 			DeathWish.static.ForceUnlockObjective(2);
 			
-			if (mod.SlotData.BonusRewards)
+			if (mod.SlotData.BonusRewards && mod.SlotData.CheckedLocations.Find(locId+1) == -1)
 			{
-				mod.SendLocationCheck(locId+1);
+				locIds.AddItem(locId+1);
 			}
 		}
 	}
 	else if (mod.SlotData.DeathWishShuffle)
 	{
 		UnavailableDWCache.AddItem(DeathWish);
+	}
+	
+	if (locIds.Length > 0)
+	{
+		mod.SendMultipleLocationChecks(locIds);
 	}
 	
 	return result;

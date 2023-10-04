@@ -5,6 +5,19 @@ class Archipelago_BubbleTalker_InputText extends Hat_BubbleTalker_InputText;
 function bool InputKey( int ControllerId, name Key, EInputEvent EventType, float AmountDepressed = 1.f, bool bGamepad = FALSE )
 {
 	local string s;
+	local Hat_HUD hud;
+	local Archipelago_HUDElementBubble bubble;
+	
+	if (Key == 'Enter' || Key == 'Return')
+	{
+		hud = Hat_HUD(Hat_PlayerController(`AP.GetALocalPlayerController()).MyHUD);
+		bubble = Archipelago_HUDElementBubble(hud.GetHUD(class'Archipelago_HUDElementBubble'));
+		if (bubble != None)
+		{
+			bubble.OnEnter(hud);
+			return true;
+		}
+	}
 	
 	if (Key == 'LeftShift' || (!bGamepad && Key == 'Hat_Player_Ability'))
 	{

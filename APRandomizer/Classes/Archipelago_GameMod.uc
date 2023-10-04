@@ -4,7 +4,7 @@ class Archipelago_GameMod extends GameMod
 	dependson(Archipelago_GameData)
 	config(Mods);
 
-const SlotDataVersion = 2;
+const SlotDataVersion = 3;
 
 var Archipelago_TcpLink Client;
 var Archipelago_SlotData SlotData;
@@ -23,7 +23,6 @@ var config int DebugMode;
 var config int DisableInjection;
 var config int VerboseLogging;
 var config int DisableAutoConnect;
-var config int WSSMode;
 var config int FilterSelfJoins;
 var const editconst Vector SpaceshipSpawnLocation;
 
@@ -315,6 +314,15 @@ event PreBeginPlay()
 	{
 		SlotData.Initialized = true;
 		UpdateChapterInfo();
+	}
+	
+	if (SlotData.Initialized)
+	{
+		if (SlotData.Goal != 1)
+		{
+			// never play ending if our goal isn't Finale
+			class'Hat_SaveBitHelper'.static.SetActBits("thefinale_ending", 0);
+		}
 	}
 	
 	if (!IsInSpaceship())
@@ -761,6 +769,12 @@ function OnPostInitGame()
 		}
 	}
 	
+	if (class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false))
+	{
+		foreach DynamicActors(class'Hat_TimeRiftPortal', portal)
+			portal.Destroy();
+	}
+	
 	if (SlotData.UmbrellaLogic)
 	{
 		ReplaceUnarmedWeapon();
@@ -822,7 +836,7 @@ function OnPostLevelIntro()
 {
 	if (!IsArchipelagoEnabled())
 		return;
-
+	
 	if (`GameManager.GetCurrentMapFilename() ~= "dlc_metro")
 		SetTimer(0.1, false, NameOf(CleanUpMetro));
 }
@@ -905,41 +919,6 @@ function CheckForNewContracts()
 	}
 }
 
-function OpenSlotNameBubble(optional float delay=0.0)
-{
-	local Archipelago_HUDElementBubble bubble;
-	local Hat_HUD hud;
-	
-	if (delay > 0.0)
-	{
-		SetTimer(delay, false, NameOf(OpenSlotNameBubble));
-		return;
-	}
-	
-	hud = Hat_HUD(Hat_PlayerController(GetALocalPlayerController()).MyHUD);
-	bubble = Archipelago_HUDElementBubble(hud.OpenHUD(class'Archipelago_HUDElementBubble'));
-	bubble.BubbleType = BubbleType_SlotName;
-	bubble.OpenInputText(hud, "Please enter your slot name. If you are using a controller, hold the X button for capital letters.", 
-	class'Hat_ConversationType_Regular', 'a', 25);
-}
-
-function OpenPasswordBubble(optional float delay=0.0)
-{
-	local Archipelago_HUDElementBubble bubble;
-	local Hat_HUD hud;
-	
-	if (delay > 0.0)
-	{
-		SetTimer(delay, false, NameOf(OpenPasswordBubble));
-		return;
-	}
-	
-	hud = Hat_HUD(Hat_PlayerController(GetALocalPlayerController()).MyHUD);
-	bubble = Archipelago_HUDElementBubble(hud.OpenHUD(class'Archipelago_HUDElementBubble'));
-	bubble.BubbleType = BubbleType_Password;
-	bubble.OpenInputText(hud, "Please enter password (if there is none, just left-click or press Y if on controller).", class'Hat_ConversationType_Regular', 'a', 25);
-}
-
 function OpenConnectBubble(optional float delay=0.0)
 {
 	local Archipelago_HUDElementBubble bubble;
@@ -953,8 +932,7 @@ function OpenConnectBubble(optional float delay=0.0)
 	
 	hud = Hat_HUD(Hat_PlayerController(GetALocalPlayerController()).MyHUD);
 	bubble = Archipelago_HUDElementBubble(hud.OpenHUD(class'Archipelago_HUDElementBubble'));
-	bubble.BubbleType = BubbleType_Connect;
-	bubble.OpenInputText(hud, "Please enter IP:Port. If you are using a controller, - may be used in place of :", class'Hat_ConversationType_Regular', 'a', 25);
+	bubble.OpenInputText(hud, "Please enter the IP:Port provided by the proxy. If you do not have a proxy, consult the setup guide.", class'Hat_ConversationType_Regular', 'a', 25);
 }
 
 function KeepConnectionAlive()
@@ -1008,6 +986,16 @@ function OnFullyConnected()
 	if (IsOnlineParty())
 	{
 		SendOnlinePartyCommand(string(SlotData.Seed)$"+"$SlotData.PlayerSlot, 'APSeedCheck', GetALocalPlayerController().Pawn);
+	}
+	
+	if (SlotData.ShuffleActContracts)
+	{
+		// The bag trap in Subcon Forest perma-locks if player has Subcon Well contract. Send the location if we enter Act 1 with it.
+		if (SlotData.ObtainedContracts.Find(class'Hat_SnatcherContract_IceWall') != -1 && !IsLocationChecked(300200) 
+		&& `GameManager.GetCurrentMapFilename() == "subconforest" && `GameManager.IsCurrentAct(1))
+		{
+			SendLocationCheck(300200);
+		}
 	}
 	
 	SetTimer(60.0, true, NameOf(KeepConnectionAlive));
@@ -1156,14 +1144,13 @@ function LoadSlotData(JsonObject json)
 	SlotData.ConnectedOnce = true;
 	SlotData.Goal = json.GetIntValue("EndGoal");
 	SlotData.LogicDifficulty = json.GetIntValue("LogicDifficulty");
-	SlotData.KnowledgeTricks = json.GetBoolValue("KnowledgeChecks");
 	SlotData.ActRando = json.GetBoolValue("ActRandomizer");
 	SlotData.ShuffleStorybookPages = json.GetBoolValue("ShuffleStorybookPages");
 	SlotData.ShuffleActContracts = json.GetBoolValue("ShuffleActContracts");
 	SlotData.ShuffleZiplines = json.GetBoolValue("ShuffleAlpineZiplines");
 	SlotData.UmbrellaLogic = json.GetBoolValue("UmbrellaLogic");
 	SlotData.ShuffleSubconPaintings = json.GetBoolValue("ShuffleSubconPaintings");
-	SlotData.CTRSprint = json.GetBoolValue("CTRWithSprint");
+	SlotData.CTRLogic = json.GetIntValue("CTRLogic");
 	SlotData.DeathLink = json.GetBoolValue("death_link");
 	SlotData.Seed = json.GetIntValue("SeedNumber");
 	SlotData.HatItems = json.GetBoolValue("HatItems");
@@ -1754,6 +1741,18 @@ function CheckShopOverride(Hat_HUD hud)
 	if (merchant.IsA('Hat_NPC_MetroTicketBooth_Base'))
 		shop.PurchaseDelegates.Length = 0;
 	
+	for (i = 0; i < shop.ShopInventory.ItemsForSale.Length; i++)
+	{
+		if (shop.ShopInventory.ItemsForSale[i].CollectibleClass == class'Hat_Weapon_Nyakuza_BaseballBat')
+		{
+			// In the case that a Nyakuza thug rolls with 0 items for sale he will sell his default items, which are all cosmetic.
+			// But we can't let the player get a free weapon by purchasing the Nyakuza bat.
+			// The game already won't allow the player to purchase flairs for hats they don't have, so that's covered.
+			shop.ShopInventory.ItemsForSale.Remove(i, 1);
+			i--;
+		}
+	}
+	
 	for (i = 0; i < shopInvs.Length; i++)
 	{
 		if (class<Archipelago_ShopInventory_Base>(shopInvs[i]).default.ShopNPC != None
@@ -2246,12 +2245,12 @@ function UpdateActUnlocks()
 function bool IsActCompletable(Hat_ChapterActInfo act, Hat_Loadout lo, optional bool basement)
 {
 	local int difficulty;
-	local bool canHit, canHitMaskBypass, hookshot, umbrella, sdj, nobonk;
-
+	local bool canHit, canHitMaskBypass, hookshot, umbrella, sdj;
+	
 	if (SlotData.DeathWishOnly)
 		return true;
 	
-	difficulty = SlotData.LogicDifficulty; // 0 = Normal, 1 = Hard, 2 = Expert
+	difficulty = SlotData.LogicDifficulty; // -1 = Normal, 0 = Moderate, 1 = Hard, 2 = Expert
 	
 	// Can hit objects, has Umbrella or Brewing Hat, only for umbrella logic
 	canHit = !SlotData.UmbrellaLogic || class'Archipelago_HUDElementItemFinder'.static.CanHitObjects();
@@ -2264,7 +2263,6 @@ function bool IsActCompletable(Hat_ChapterActInfo act, Hat_Loadout lo, optional 
 				|| lo.BackpackHasInventory(class'Archipelago_Weapon_BaseballBat', true);
 	
 	sdj = class'Archipelago_HUDElementItemFinder'.static.CanSDJ();
-	nobonk = lo.BackpackHasInventory(class'Hat_Ability_NoBonk');
 	
 	if (basement)
 	{
@@ -2277,12 +2275,25 @@ function bool IsActCompletable(Hat_ChapterActInfo act, Hat_Loadout lo, optional 
 			return umbrella;
 		
 		case "DeadBirdStudio":
-			return canHit;
+			return difficulty >= 2 || canHit;
 		
 		case "Cruise_Boarding": case "Cruise_WaterRift_Slide": case "TimeRift_Water_Subcon_Hookshot": case "trainwreck_selfdestruct":
 			return hookshot;
 		
 		case "Metro_Escape":
+			if (difficulty >= 2)
+				return true;
+			
+			if (difficulty >= 1)
+				return lo.BackpackHasInventory(class'Hat_Ability_Chemical');
+			
+			if (difficulty >= 0)
+				return lo.BackpackHasInventory(class'Hat_Ability_StatueFall')
+				&& lo.BackpackHasInventory(class'Hat_Ability_Chemical')
+				&& lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteA')
+				&& lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteC')
+				&& lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteD');
+			
 			return hookshot
 				&& lo.BackpackHasInventory(class'Hat_Ability_StatueFall')
 				&& lo.BackpackHasInventory(class'Hat_Ability_Chemical')
@@ -2291,13 +2302,13 @@ function bool IsActCompletable(Hat_ChapterActInfo act, Hat_Loadout lo, optional 
 				&& lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteD');
 		
 		case "chapter2_toiletboss":
-			if (difficulty < 2 && SlotData.ShuffleSubconPaintings && GetPaintingUnlocks() < 1)
+			if (difficulty < 2 && SlotData.ShuffleSubconPaintings && GetPaintingUnlocks() <= 0)
 				return false;
 			
-			return (hookshot || difficulty >= 1 && sdj && nobonk || difficulty >= 2) && canHit;
+			return hookshot && canHit;
 		
 		case "vanessa_manor_attic":
-			if (SlotData.ShuffleSubconPaintings && GetPaintingUnlocks() < 1)
+			if (difficulty < 2 && SlotData.ShuffleSubconPaintings && GetPaintingUnlocks() <= 0)
 				return false;
 			
 			return canHitMaskBypass || difficulty >= 2;
@@ -2306,34 +2317,43 @@ function bool IsActCompletable(Hat_ChapterActInfo act, Hat_Loadout lo, optional 
 			return !SlotData.ShuffleSubconPaintings || GetPaintingUnlocks() >= 1;
 		
 		case "subcon_cave":
-			if (SlotData.ShuffleSubconPaintings && GetPaintingUnlocks() < 1)
+			if (difficulty < 2 && SlotData.ShuffleSubconPaintings && GetPaintingUnlocks() <= 0)
 				return false;
 			
-			return difficulty >= 2 && nobonk || hookshot && canHit;
+			if (difficulty < 0 && !canHit)
+				return false;
+			
+			return difficulty >= 2 || hookshot;
 		
 		case "TheFinale_FinalBoss":
-			return hookshot && lo.BackpackHasInventory(class'Hat_Ability_FoxMask');
+			return (difficulty >= 1 || hookshot) && lo.BackpackHasInventory(class'Hat_Ability_FoxMask');
 		
 		case "Spaceship_WaterRift_Gallery":
-			return difficulty >= 1 || lo.BackpackHasInventory(class'Hat_Ability_Chemical');
+			return difficulty >= 0 || lo.BackpackHasInventory(class'Hat_Ability_Chemical');
 		
 		case "Cruise_Sinking":
-			return difficulty >= 1 || lo.BackpackHasInventory(class'Hat_Ability_StatueFall');
+			return difficulty >= 0 || lo.BackpackHasInventory(class'Hat_Ability_StatueFall');
 		
 		case "AlpineSkyline_Finale":
 			return hookshot &&
 				(!SlotData.ShuffleZiplines || HasZipline(Zipline_Birdhouse) && HasZipline(Zipline_LavaCake) && HasZipline(Zipline_Windmill));
 		
 		case "TimeRift_Water_AlpineSkyline_Cats":
-			return sdj || lo.BackpackHasInventory(class'Hat_Ability_StatueFall');
+			return difficulty >= 2 || sdj || lo.BackpackHasInventory(class'Hat_Ability_StatueFall');
 		
 		case "TimeRift_Water_Alp_Goats":
 			return lo.BackpackHasInventory(class'Hat_Ability_FoxMask')
 				|| difficulty >= 1 && lo.BackpackHasInventory(class'Hat_Ability_Sprint') && lo.BackpackHasInventory(class'Hat_Badge_Scooter');
 		
 		case "harbor_impossible_race":
-			return lo.BackpackHasInventory(class'Hat_Ability_TimeStop')
-				|| SlotData.CTRSprint && lo.BackpackHasInventory(class'Hat_Ability_Sprint');
+			if (SlotData.CTRLogic >= 3)
+				return true;
+			
+			if (SlotData.CTRLogic <= 0)
+				return lo.BackpackHasInventory(class'Hat_Ability_TimeStop');
+			
+			return lo.BackpackHasInventory(class'Hat_Ability_TimeStop') 
+			|| SlotData.CTRLogic >= 1 && lo.BackpackHasInventory(class'Hat_Ability_Sprint') && (SlotData.CTRLogic == 2 || lo.BackpackHasInventory(class'Hat_Badge_Scooter'));
 		
 		case "subcon_maildelivery":
 			return lo.BackpackHasInventory(class'Hat_Ability_Sprint');
@@ -4292,7 +4312,7 @@ function string LocationIDToName(int id)
 				return GameData[i].LocationMappings[a].Location;
 		}
 	}
-
+	
 	return "Unknown Location";
 }
 
@@ -4381,8 +4401,18 @@ function Actor LocationIdToObject(int id, optional class<Actor> TargetClass)
 	local Actor a;
 	foreach DynamicActors(class'Actor', a)
 	{
-		if (ObjectToLocationId(a) == id && (TargetClass == None || a.Class == TargetClass || ClassIsChildOf(a.class, TargetClass)))
+		if (TargetClass == class'Archipelago_RandomizedItem_Base')
+		{
+			if (a.Class == TargetClass || ClassIsChildOf(a.class, TargetClass))
+			{
+				if (Archipelago_RandomizedItem_Base(a).LocationID == id)
+					return a;
+			}
+		}
+		else if (ObjectToLocationId(a) == id && (TargetClass == None || a.Class == TargetClass || ClassIsChildOf(a.class, TargetClass)))
+		{
 			return a;
+		}
 	}
 	
 	return None;

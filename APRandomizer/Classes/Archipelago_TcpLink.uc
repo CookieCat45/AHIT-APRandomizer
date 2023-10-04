@@ -8,8 +8,8 @@ var transient bool ParsingMessage;
 var transient bool ConnectingToAP;
 var transient bool FullyConnected;
 var transient bool Refused;
+var transient bool Reconnecting;
 var transient int EmptyCount;
-var transient bool FirstReceivedItems;
 var transient bool GameDataLoaded;
 var transient array<Archipelago_GameData> GamesToCache;
 var transient int GameCacheCount;
@@ -30,7 +30,7 @@ event PostBeginPlay()
 	}
 	else
 	{
-		`AP.OpenSlotNameBubble(1.0);
+		`AP.OpenConnectBubble(1.0);
 	}
 }
 
@@ -73,7 +73,15 @@ function TimedOut()
 {
 	if (!FullyConnected && !ConnectingToAP)
 	{
-		`AP.ScreenMessage("Connection attempt to " $`AP.SlotData.Host$":" $`AP.SlotData.Port $" timed out. Try changing port with ap_set_port <port> in the console?");
+		if (`AP.SlotData.ConnectedOnce)
+		{
+			`AP.ScreenMessage("Connection attempt timed out. Try changing port with ap_set_port <port> in the console?");
+		}
+		else
+		{
+			`AP.ScreenMessage("Connection attempt timed out.");
+		}
+		
 		ClearTimer(NameOf(Connect));
 		Close();
 	}
@@ -95,9 +103,8 @@ event Opened()
 	ClearTimer(NameOf(Connect));
 	
 	crlf = chr(13)$chr(10);
-	
 	`AP.DebugMessage("Opened connection, sending HTTP request...");
-	// send HTTP request to server to upgrade to websocket connection
+	
 	SendText("GET / HTTP/1.1" $crlf
 	$"Host: " $`AP.SlotData.Host $crlf
 	$"Connection: keep-alive, Upgrade" $crlf
@@ -105,8 +112,8 @@ event Opened()
 	$"Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" $crlf
 	$"Sec-WebSocket-Version: 13" $crlf
 	$"Accept: /" $crlf);
-	
 	LinkMode = MODE_Binary;
+	
 	`AP.DebugMessage("Waiting for RoomInfo packet...");
 }
 
@@ -314,7 +321,7 @@ function ParseJSON(string json)
 	local int i, a, count, pos, locId, count1, count2, limit;
 	local array<int> missingLocs;
 	local string s, text, num, json2, game, checksum, player;
-	local JsonObject jsonObj, jsonChild, games, myGame, mappings, textObj, sync;
+	local JsonObject jsonObj, jsonChild, games, myGame, mappings, textObj;
 	local Archipelago_GameMod m;
 	local Archipelago_GameData data;
 	local LocationMap locMapping;
@@ -597,7 +604,8 @@ function ParseJSON(string json)
 			
 			if (!ShouldFilterSelfJoins())
 				m.ScreenMessage("Successfully connected to " $m.SlotData.Host $":"$m.SlotData.Port);
-			
+
+			Reconnecting = false;
 			m.SlotData.PlayerSlot = jsonObj.GetIntValue("my_slot");
 			FullyConnected = true;
 			ConnectingToAP = false;
@@ -717,11 +725,6 @@ function ParseJSON(string json)
 				//m.SlotData.PlayerNamesInitialized = true;
 			}
 			
-			sync = new class'JsonObject';
-			sync.SetStringValue("cmd", "Sync");
-			SendBinaryMessage(m.EncodeJson2(sync));
-			sync = None;
-			
 			if (m.SlotData.DeathLink)
 			{
 				json2 = "[{\"cmd\": \"ConnectUpdate\", \"tags\": [\"DeathLink\"]}]";
@@ -804,8 +807,7 @@ function ParseJSON(string json)
 		
 		
 		case "ReceivedItems":
-			OnReceivedItemsCommand(json, !FirstReceivedItems);
-			FirstReceivedItems = true;
+			OnReceivedItemsCommand(json);
 			break;
 		
 		
@@ -818,6 +820,42 @@ function ParseJSON(string json)
 			OnBouncedCommand(json);
 			break;
 			
+		
+		case "RoomUpdate":
+			// Paste-a la CTRL+Vista baby.
+			// Please help me.
+			pos = InStr(json, "\"checked_locations\":[");
+			if (pos != -1)
+			{
+				pos += len("\"checked_locations\":[");
+				num = "";
+				
+				for (i = pos; i < len(json); i++)
+				{
+					s = Mid(json, i, 1);
+					if (s == "]")
+						break;
+					
+					if (len(num) > 0 && s == ",")
+					{
+						locId = int(num);
+						if (!m.IsLocationChecked(locId))
+						{
+							m.SlotData.CheckedLocations.AddItem(locId);
+						}
+						
+						num = "";
+					}
+					else if (s != "," && s != "[")
+					{
+						num $= s;
+					}
+				}
+			}
+			
+			m.SaveGame();
+			break;
+		
 			
 		default:
 			break;
@@ -987,7 +1025,7 @@ function OnLocationInfoCommand(string json)
 	jsonChild = None;
 }
 
-function OnReceivedItemsCommand(string json, optional bool full)
+function OnReceivedItemsCommand(string json)
 {
 	local int count, serverIndex, index, total, i, start;
 	local string s;
@@ -1020,7 +1058,7 @@ function OnReceivedItemsCommand(string json, optional bool full)
 	
 	// This means we are reconnecting to a previous session, and the server is giving us our entire list of items,
 	// so we need to begin from the next new item in our list or don't give anything otherwise
-	if (full || serverIndex == 0 && index > 0)
+	if (serverIndex == 0 && index > 0)
 	{
 		if (index > count)
 		{
@@ -1548,14 +1586,10 @@ event Closed()
 {
 	if (!Refused)
 	{
-		//if (!`AP.SlotData.ConnectedOnce)
-		//{
-		//	`AP.ScreenMessage("Connection was closed. Try connecting via Archipelago WSS Proxy if you're connecting to the beta (24242) site.");
-		//}
-		if (!ShouldFilterSelfJoins())
-		{
+		if (`AP.SlotData.ConnectedOnce)
 			`AP.ScreenMessage("Connection was closed. Reconnecting in 5 seconds...");
-		}
+
+		Refused = false;
 	}
 	
 	CurrentMessage.Length = 0;
@@ -1563,7 +1597,7 @@ event Closed()
 	ParsingMessage = false;
 	FullyConnected = false;
 	ConnectingToAP = false;
-	FirstReceivedItems = false;
+	Reconnecting = true;
 	
 	if (`AP.SlotData.ConnectedOnce)
 	{
@@ -1571,7 +1605,7 @@ event Closed()
 	}
 	else
 	{
-		`AP.OpenSlotNameBubble(1.0);
+		`AP.OpenConnectBubble(1.0);
 	}
 }
 
@@ -1581,17 +1615,12 @@ event Destroyed()
 	Super.Destroyed();
 }
 
-function bool IsWSSProxyMode()
-{
-	return bool(`AP.WSSMode);
-}
-
 function bool ShouldFilterSelfJoins()
 {
-	if (bool(`AP.FilterSelfJoins))
-		return `AP.SlotData.ConnectedOnce;
+	if (Reconnecting)
+		return false;
 	
-	return false;
+	return `AP.SlotData.ConnectedOnce;
 }
 
 defaultproperties

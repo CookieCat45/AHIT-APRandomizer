@@ -19,6 +19,61 @@ var array<int> VillagePaintingLocs;
 var array<int> SwampPaintingLocs;
 var array<int> CourtyardPaintingLocs;
 
+function OnOpenHUD(HUD H, optional String command)
+{
+	local Archipelago_GameMod m;
+	local int difficulty;
+	
+	Super.OnOpenHUD(H, command);
+	m = `AP;
+	difficulty = m.SlotData.LogicDifficulty;
+	if (difficulty >= 0)
+	{
+		// Birdhouse without Brewers
+		BrewingHatRequiredLocs.RemoveItem(335756);
+		BrewingHatRequiredLocs.RemoveItem(336497);
+		BrewingHatRequiredLocs.RemoveItem(334758);
+		BrewingHatRequiredLocs.RemoveItem(335885);
+		BrewingHatRequiredLocs.RemoveItem(335886);
+		BrewingHatRequiredLocs.RemoveItem(335492);
+		
+		// The Birdhouse - Dweller Platforms Relic without Dwellers
+		DwellerMaskRequiredLocs.RemoveItem(336497);
+
+		// Rock the Boat without Ice
+		IceHatRequiredLocs.RemoveItem(304049);
+		
+		// Clock Tower + Ruined Tower with nothing
+		HookshotRequiredLocs.RemoveItem(303481);
+		IceHatRequiredLocs.RemoveItem(304607);
+	}
+	
+	if (difficulty >= 1)
+	{
+		// Dweller Floating Rocks
+		DwellerMaskRequiredLocs.RemoveItem(324464);
+	}
+	
+	if (difficulty >= 2)
+	{
+		// Mafia Town - Above Boats and Subcon Well without Hookshot
+		HookshotRequiredLocs.RemoveItem(305218);
+		HookshotRequiredLocs.RemoveItem(324311);
+
+		// Some Subcon locations without Hookshot
+		HookshotRequiredLocs.RemoveItem(324766);
+		HookshotRequiredLocs.RemoveItem(324856);
+		
+		// Twilight Bell without Dwellers
+		DwellerMaskRequiredLocs.RemoveItem(334434);
+		DwellerMaskRequiredLocs.RemoveItem(336478);
+		DwellerMaskRequiredLocs.RemoveItem(335826);
+		
+		// Some Subcon locations without Dwellers
+		DwellerMaskRequiredLocs.RemoveItem(324766);
+	}
+}
+
 function UpdateClosestMarker(HUD H)
 {
 	local Archipelago_RandomizedItem_Base item;
@@ -101,16 +156,16 @@ function UpdateClosestMarker(HUD H)
 		UpdateClosestMarker_Actor(H, page, closest_distance, bestindx);
 	}
 	
-	hasBrewing = class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Chemical');
+	hasBrewing = class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Chemical', true);
 	if (hasBrewing)
 	{
 		foreach H.PlayerOwner.DynamicActors(class'Hat_ImpactInteract_Breakable_ChemicalBadge', b)
 		{
 			valid = false;
-
+			
 			for (i = 0; i < b.Rewards.Length; i++)
 			{
-				if (class<Hat_Collectible_Important>(b.Rewards[i]) != None)	
+				if (class<Archipelago_RandomizedItem_Base>(b.Rewards[i]) != None)	
 				{
 					valid = true;
 					break;
@@ -278,20 +333,13 @@ function bool CanReachLocation(int id, HUD H)
 	{
 		return cannon;
 	}
-	else if ((id == 303481 || id == 304607) && m.SlotData.KnowledgeTricks)
-	{
-		if (act == 5 || act == 6 || act == 7)
-		{
-			return act == 6 && CanHitObjects() || true;
-		}
-	}
 	
 	// Subcon boss arena chest
 	if (id == 323735)
 	{
 		if (difficulty >= 2)
 			return true;
-
+		
 		if (difficulty >= 1)
 		{
 			if (CanSDJ() && lo.BackpackHasInventory(class'Hat_Ability_NoBonk'))
@@ -309,18 +357,21 @@ function bool CanReachLocation(int id, HUD H)
 	// Manor rooftop item
 	if (id == 325466)
 	{
-		if (difficulty >= 2)
+		if (difficulty >= 0)
 		{
-			// Manor hovering without the fire wall down and without being able to hit bells is way too rough.
-			return !m.SlotData.ShuffleSubconPaintings || m.GetPaintingUnlocks() >= 1 || CanHitObjects(true); 
+			return true;
 		}
 		
-		return (!m.SlotData.ShuffleSubconPaintings || m.SlotData.KnowledgeTricks && nobonk || m.GetPaintingUnlocks() >= 1) && CanHitObjects(true);
+		return (!m.SlotData.ShuffleSubconPaintings || m.GetPaintingUnlocks() >= 1) && CanHitObjects(true);
 	}
 	
 	if (mapName ~= "DeadBirdStudio")
 	{
-		if (act == 6 || !CanHitObjects(false))
+		if (difficulty >= 2)
+		{
+			return true;
+		}
+		else if (act == 6 || !CanHitObjects(false))
 		{
 			return id == 304874 || id == 305024 || id == 305248 || id == 305247;
 		}
@@ -339,11 +390,22 @@ function bool CanReachLocation(int id, HUD H)
 	{
 		finale = class'Hat_SeqCond_IsAlpineFinale'.static.IsAlpineFinale();
 		
+		// Wait until intro is complete (intro is skipped in Illness)
 		if (!class'Hat_SaveBitHelper'.static.HasLevelBit("Actless_FreeRoam_Intro_Complete", 1, "AlpsAndSails") && !finale)
 			return false;
 		
 		if (!hookshot)
 			return id == 334855 || id == 334856;
+		
+		if (finale)
+		{
+			// Only these locations can be reached in Illness
+			if (id != 334855 && id != 334856 && id != 335911 
+			&& id != 335756 && id != 336311 && id != 334760 && id != 334776)
+			{
+				return false;
+			}
+		}
 		
 		if (m.SlotData.ShuffleZiplines)
 		{
@@ -359,12 +421,15 @@ function bool CanReachLocation(int id, HUD H)
 			if (BellPathLocs.Find(id) != -1 && !m.HasZipline(Zipline_Bell))
 				return false;
 		}
+	}
+	
+	// Mystifying Time Mesa buttons
+	if (id == 337058)
+	{
+		if (difficulty >= 0)
+			return true;
 		
-		if (finale)
-		{
-			return id == 334855 || id == 334856 || id == 335911 
-			|| id == 335756 || id == 336311 || id == 334760 || id == 334776;
-		}
+		return lo.BackpackHasInventory(class'Hat_Ability_TimeStop') || lo.BackpackHasInventory(class'Hat_Ability_Sprint');
 	}
 	
 	// HUMT
@@ -394,10 +459,10 @@ function bool CanReachLocation(int id, HUD H)
 		id == 305218; 
 	}
 	
-	if (id == 323734 && (!m.SlotData.ShuffleSubconPaintings || m.GetPaintingUnlocks() >= 2 || m.SlotData.KnowledgeTricks && nobonk || difficulty >= 2)
-		|| id == 336497)
+	// Subcon long tree climb chest/Dweller platforming tree B
+	if ((id == 323734 || id == 324855) && (!m.SlotData.ShuffleSubconPaintings || m.GetPaintingUnlocks() >= 2 || difficulty >= 0 && nobonk || difficulty >= 2))
 	{
-		if (CanSDJ())
+		if (difficulty >= 2 || CanSDJ())
 			return true;
 	}
 	
@@ -418,13 +483,13 @@ function bool CanReachLocation(int id, HUD H)
 		paintingUnlock = m.GetPaintingUnlocks();
 		
 		if (VillagePaintingLocs.Find(id) != -1)
-			return paintingUnlock >= 1 || m.SlotData.KnowledgeTricks && nobonk || difficulty >= 2;
+			return paintingUnlock >= 1 || difficulty >= 0;
 		
 		if (SwampPaintingLocs.Find(id) != -1)
-			return paintingUnlock >= 2 || m.SlotData.KnowledgeTricks && nobonk || difficulty >= 2;
+			return paintingUnlock >= 2 || difficulty >= 0 && nobonk || difficulty >= 2;
 		
 		if (CourtyardPaintingLocs.Find(id) != -1)
-			return paintingUnlock >= 3 || m.SlotData.KnowledgeTricks && (nobonk || paintingUnlock >= 1) || difficulty >= 2;
+			return paintingUnlock >= 3 || difficulty >= 0 && (nobonk || paintingUnlock >= 1) || difficulty >= 2;
 	}
 	
 	// Nyakuza Metro
@@ -436,7 +501,7 @@ function bool CanReachLocation(int id, HUD H)
 	}
 	else if (id == 305110)
 	{
-		if (m.SlotData.KnowledgeTricks && hookshot)
+		if (difficulty >= 0)
 			return true;
 		
 		// Pink or yellow+blue ticket
@@ -446,9 +511,9 @@ function bool CanReachLocation(int id, HUD H)
 	}
 	else if (id == 304106)
 	{
-		if (m.SlotData.KnowledgeTricks && hookshot)
+		if (difficulty >= 0)
 			return true;
-
+		
 		// Pink or yellow+blue AND Time Stop
 		return (lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteD')
 			|| lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteA')
@@ -481,6 +546,7 @@ defaultproperties
 	IceHatRequiredLocs[1] = 304831;
 	IceHatRequiredLocs[2] = 304829;
 	IceHatRequiredLocs[3] = 304979;
+	IceHatRequiredLocs[4] = 304049;
 	
 	HookshotRequiredLocs[0] = 305218;
 	HookshotRequiredLocs[1] = 303481;
@@ -497,6 +563,7 @@ defaultproperties
 	HookshotRequiredLocs[12] = 305819;
 	HookshotRequiredLocs[13] = 305110;
 	HookshotRequiredLocs[14] = 304106;
+	HookshotRequiredLocs[15] = 324311;
 	
 	DwellerMaskRequiredLocs[0] = 324767;
 	DwellerMaskRequiredLocs[1] = 324464;
@@ -560,7 +627,6 @@ defaultproperties
 	VillagePaintingLocs[6] = 323728;
 	VillagePaintingLocs[7] = 323730;
 	VillagePaintingLocs[8] = 324465;
-	VillagePaintingLocs[9] = 325466;
 
 	SwampPaintingLocs[0] = 324710;
 	SwampPaintingLocs[1] = 325079;

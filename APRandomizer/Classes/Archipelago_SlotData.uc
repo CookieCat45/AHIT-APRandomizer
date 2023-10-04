@@ -7,7 +7,7 @@ var array<ShuffledAct> ShuffledActList;
 var array<LocationInfo> LocationInfoArray;
 var array<ShopItemInfo> ShopItemList;
 var array<string> PlayerNames;
-//var bool PlayerNamesInitialized;
+var bool PlayerNamesInitialized;
 
 var bool ConnectedOnce;
 
@@ -22,14 +22,13 @@ var array<int> CheckedLocations;
 var array<int> PageLocationIDs;
 
 var int Goal;
-var int LogicDifficulty; // 0 = Normal, 1 = Hard, 2 = Expert
-var bool KnowledgeTricks;
+var int LogicDifficulty; // -1 = Normal, 0 = Moderate, 1 = Hard, 2 = Expert
 var bool ActRando;
 var bool ShuffleStorybookPages;
 var bool ShuffleActContracts;
 var bool ShuffleZiplines;
 var bool ShuffleSubconPaintings;
-var bool CTRSprint;
+var int CTRLogic;
 var bool UmbrellaLogic;
 var bool DeathLink;
 var bool HatItems;
@@ -84,8 +83,6 @@ var array<Hat_ChapterActInfo> LockedBlueRifts;
 var array< class<Hat_SnatcherContract_Act> > ObtainedContracts;
 var array< class<Hat_SnatcherContract_Act> > TakenContracts;
 var array< class<Hat_SnatcherContract_Act> > CheckedContracts;
-
-var array<Name> UnlockedPaintings; // Deprecated, staying until next slot data update to preserve saves
 
 // hat stitch order
 var EHatType Hat1;
