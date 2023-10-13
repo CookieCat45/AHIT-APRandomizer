@@ -3,6 +3,7 @@ class Archipelago_RandomizedItem_TimeStop extends Archipelago_RandomizedItem_Bas
 defaultproperties
 {
     InventoryClass = class'Hat_Ability_TimeStop';
+	HUDIcon = Texture2D'HatInTime_Hud_ItemIcons.Hats.widow_hat';
     Begin Object Class=StaticMeshComponent Name=Mesh0
 		StaticMesh = StaticMesh'HatInTime_Costumes.models.time_stop_hat_static'
 		bOnlyOwnerSee=false

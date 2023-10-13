@@ -39,7 +39,7 @@ function OnOpenHUD(HUD H, optional String command)
 		
 		// The Birdhouse - Dweller Platforms Relic without Dwellers
 		DwellerMaskRequiredLocs.RemoveItem(336497);
-
+		
 		// Rock the Boat without Ice
 		IceHatRequiredLocs.RemoveItem(304049);
 		
@@ -105,7 +105,7 @@ function UpdateClosestMarker(HUD H)
 	if (m.IsInSpaceship() && !m.HasAPBit("RumbiYarn", 1))
 	{
 		// Point to Rumbi, most players don't realize that she is a check.
-		if ((!m.SlotData.UmbrellaLogic || CanHitObjects(false)) && `SaveManager.GetNumberOfTimePieces() >= 4)
+		if (CanHitObjects() && `SaveManager.GetNumberOfTimePieces() >= 4)
 		{
 			foreach H.PlayerOwner.DynamicActors(class'Actor', a)
 			{
@@ -325,7 +325,7 @@ function bool CanReachLocation(int id, HUD H)
 	
 	if (`GameManager.IsCurrentChapter(1))
 	{
-		cannon = act == 4 || act == 5 || act == 6 && CanHitObjects() || act == 7;
+		cannon = act == 4 || act == 5 || act == 6 && CanHitObjects(false, true) || act == 7;
 	}
 	
 	// Chest behind Mafia HQ
@@ -342,8 +342,7 @@ function bool CanReachLocation(int id, HUD H)
 		
 		if (difficulty >= 1)
 		{
-			if (CanSDJ() && lo.BackpackHasInventory(class'Hat_Ability_NoBonk'))
-				return true;
+			return !m.SlotData.ShuffleSubconPaintings || m.GetPaintingUnlocks() >= 1;
 		}
 		
 		if (act == 3)
@@ -352,6 +351,12 @@ function bool CanReachLocation(int id, HUD H)
 		}
 		
 		return act == 6;
+	}
+	
+	if (mapName ~= "subconforest" && act == 6)
+	{
+		if (difficulty <= 0)
+			return false;
 	}
 	
 	// Manor rooftop item
@@ -371,7 +376,7 @@ function bool CanReachLocation(int id, HUD H)
 		{
 			return true;
 		}
-		else if (act == 6 || !CanHitObjects(false))
+		else if (act == 6 || !CanHitObjects())
 		{
 			return id == 304874 || id == 305024 || id == 305248 || id == 305247;
 		}
@@ -524,10 +529,16 @@ function bool CanReachLocation(int id, HUD H)
 	return true;
 }
 
-static function bool CanHitObjects(optional bool MaskBypass)
+static function bool CanHitObjects(optional bool MaskBypass, optional bool UmbrellaOnly)
 {
 	if (!`AP.SlotData.UmbrellaLogic)
 		return true;
+	
+	if (UmbrellaOnly)
+	{
+		return class'Hat_Loadout'.static.BackpackHasInventory(class'Archipelago_Weapon_Umbrella', true)
+		|| class'Hat_Loadout'.static.BackpackHasInventory(class'Archipelago_Weapon_BaseballBat', true);
+	}
 	
 	return class'Hat_Loadout'.static.BackpackHasInventory(class'Archipelago_Weapon_Umbrella', true)
 	|| class'Hat_Loadout'.static.BackpackHasInventory(class'Archipelago_Weapon_BaseballBat', true)

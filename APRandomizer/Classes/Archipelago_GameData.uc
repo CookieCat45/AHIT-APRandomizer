@@ -3,15 +3,16 @@ class Archipelago_GameData extends Object;
 var string Game;
 var string Checksum;
 
+// IDs from other games have to be strings because UnrealScript only supports 32 bit integers
 struct immutable LocationMap
 {
-    var int ID;
+    var string ID;
     var string Location;
 };
 
 struct immutable ItemMap
 {
-    var int ID;
+    var string ID;
     var string Item;
 };
 

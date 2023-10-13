@@ -406,7 +406,7 @@ function ParseJSON(string json)
 					{
 						m.DebugMessage("Found game: " $game);
 						data = new class'Archipelago_GameData';
-						class'Engine'.static.BasicLoadObject(data, "APGameData/"$game, false, 1);
+						class'Engine'.static.BasicLoadObject(data, "APGameData/"$game, false, 2);
 						
 						// do we need to update the data for this game, or create it?
 						checksum = games.GetStringValue(game);
@@ -511,7 +511,7 @@ function ParseJSON(string json)
 						{
 							// Found an item
 							m.DebugMessage("Found item: " $s $", game: " $GamesToCache[i].Game);
-							itemMapping.ID = mappings.GetIntValue(s);
+							itemMapping.ID = mappings.GetStringValue(s);
 							itemMapping.Item = s;
 							GamesToCache[i].ItemMappings.AddItem(itemMapping);
 							s = "";
@@ -541,7 +541,7 @@ function ParseJSON(string json)
 						{
 							// Found a location
 							m.DebugMessage("Found location: " $s $", game: " $GamesToCache[i].Game);
-							locMapping.ID = mappings.GetIntValue(s);
+							locMapping.ID = mappings.GetStringValue(s);
 							locMapping.Location = s;
 							GamesToCache[i].LocationMappings.AddItem(locMapping);
 							b = false;
@@ -554,7 +554,7 @@ function ParseJSON(string json)
 					}
 				}
 				
-				class'Engine'.static.BasicSaveObject(GamesToCache[i], "APGameData/"$GamesToCache[i].Game, false, 1);
+				class'Engine'.static.BasicSaveObject(GamesToCache[i], "APGameData/"$GamesToCache[i].Game, false, 2);
 				m.GameData.AddItem(GamesToCache[i]);
 				GameCacheCount++;
 
@@ -778,11 +778,11 @@ function ParseJSON(string json)
 						break;
 					
 					case "item_id":
-						text $= m.ItemIDToName(int(textObj.GetStringValue("text")));
+						text $= m.ItemIDToName(textObj.GetStringValue("text"));
 						break;
 					
 					case "location_id":
-						text $= m.LocationIDToName(int(textObj.GetStringValue("text")));
+						text $= m.LocationIDToName(textObj.GetStringValue("text"));
 						break;
 					
 					default:
@@ -873,8 +873,8 @@ function OnLocationInfoCommand(string json)
 {
 	local LocationInfo locInfo;
 	local bool isItem;
-	local int i, locId, count, itemId, flags;
-	local string s, mapName;
+	local int i, locId, count, flags;
+	local string s, mapName, itemId;
 	local JsonObject jsonObj, jsonChild;
 	local Archipelago_RandomizedItem_Base item;
 	local Hat_Collectible_Important collectible;
@@ -913,7 +913,7 @@ function OnLocationInfoCommand(string json)
 			if (!m.GetShopItemInfo(shopItemClass))
 			{
 				m.CreateShopItemInfo(shopItemClass, 
-					jsonChild.GetIntValue("item"),
+					jsonChild.GetStringValue("item"),
 					jsonChild.GetIntValue("flags"),
 					jsonChild.GetIntValue("player"));
 			}
@@ -945,7 +945,7 @@ function OnLocationInfoCommand(string json)
 				}
 				
 				m.CreateItem(locId, 
-					jsonChild.GetIntValue("item"),
+					jsonChild.GetStringValue("item"),
 					jsonChild.GetIntValue("flags"),
 					jsonChild.GetIntValue("player"),
 					collectible);
@@ -962,7 +962,7 @@ function OnLocationInfoCommand(string json)
 		locId = jsonChild.GetIntValue("location");
 		if (m.IsLocationIDContainer(locId, container))
 		{
-			itemId = jsonChild.GetIntValue("item");
+			itemId = jsonChild.GetStringValue("item");
 			flags = jsonChild.GetIntValue("flags");
 			
 			locInfo.ID = locId;
@@ -984,7 +984,7 @@ function OnLocationInfoCommand(string json)
 				continue;
 
 			item = m.CreateItem(locId, 
-				jsonChild.GetIntValue("item"),
+				jsonChild.GetStringValue("item"),
 				jsonChild.GetIntValue("flags"),
 				jsonChild.GetIntValue("player"),
 				,
@@ -998,7 +998,7 @@ function OnLocationInfoCommand(string json)
 		else
 		{
 			// Time piece/page/etc
-			itemId = jsonChild.GetIntValue("item");
+			itemId = jsonChild.GetStringValue("item");
 			flags = jsonChild.GetIntValue("flags");
 			
 			locInfo.ID = locId;
@@ -1080,6 +1080,7 @@ function OnReceivedItemsCommand(string json)
 		jsonChild = jsonObj.GetObject("items_"$i);
 		if (jsonChild != None)
 		{
+			// this should absolutely never be a 64 bit integer, so we can safely pass as an int
 			GrantItem(jsonChild.GetIntValue("item"), jsonChild.GetIntValue("player"));
 			total++;
 		}
@@ -1102,7 +1103,7 @@ function GrantItem(int itemId, int playerId)
 	local Hat_SaveGame save;
 	local Hat_MetroTicketGate gate;
 	
-	if (class'Archipelago_ItemInfo'.static.GetNativeItemData(itemId, worldClass, invOverride))
+	if (class'Archipelago_ItemInfo'.static.GetNativeItemData(string(itemId), worldClass, invOverride))
 	{
 		player = GetALocalPlayerController().Pawn;
 		item = Spawn(class<Archipelago_RandomizedItem_Base>(worldClass), , , player.Location, , , true);
@@ -1488,7 +1489,6 @@ function OnBouncedCommand(string json)
 	jsonChild = None;
 }
 
-// the optional boolean is for recursion, do not use it
 function SendBinaryMessage(string message, optional bool continuation, optional bool pong, optional string nullChar="")
 {
 	local byte byteMessage[255];

@@ -57,6 +57,7 @@ var array<class<Hat_SnatcherContract_DeathWish> > PerfectedDeathWishes;
 var array<class<Hat_SnatcherContract_DeathWish> > ExcludedContracts;
 var array<class<Hat_SnatcherContract_DeathWish> > ExcludedBonuses;
 
+var bool StartWithCompassBadge;
 var int CompassBadgeMode;
 
 var int Chapter1Cost;

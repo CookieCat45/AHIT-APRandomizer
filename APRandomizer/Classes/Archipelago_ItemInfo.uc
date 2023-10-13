@@ -58,18 +58,18 @@ enum EZiplineType
 	Zipline_Bell,
 };
 
-const YarnItem = 300001;
-const TimePieceItem = 300002;
+const YarnItem = 2000300001;
+const TimePieceItem = 2000300002;
 
-const Pons25Item = 300034;
-const Pons50Item = 300035;
-const Pons100Item = 300036;
-const HealthPonItem = 300037;
+const Pons25Item = 2000300034;
+const Pons50Item = 2000300035;
+const Pons100Item = 2000300036;
+const HealthPonItem = 2000300037;
 
-const BabyTrapItem = 300039;
-const LaserTrapItem = 300040;
-const ParadeTrapItem = 300041;
-const RandomCosmeticItem = 300044;
+const BabyTrapItem = 2000300039;
+const LaserTrapItem = 2000300040;
+const ParadeTrapItem = 2000300041;
+const RandomCosmeticItem = 2000300044;
 
 static function int GetYarnItemID()
 {
@@ -127,11 +127,11 @@ static function ESpecialItemType GetItemSpecialType(int itemId)
  * Returns true if the item ID belongs to A Hat in Time.
  * Returns the rest of the data pertaining to said ID (name, associated class, etc.) in the "out" arguments.
  */
-static function bool GetNativeItemData(int itemId, // Archipelago item ID
+static function bool GetNativeItemData(string itemId, // Archipelago item ID
 optional out class<Actor> worldClass, // Item in the world
 optional out class<Actor> inventoryOverride) // Item inventory class override. Mainly for relics.
 {
-	switch (itemId)
+	switch (int(itemId))
 	{
 		case YarnItem:
 			worldClass = class'Archipelago_RandomizedItem_Yarn';
@@ -142,115 +142,115 @@ optional out class<Actor> inventoryOverride) // Item inventory class override. M
 			return true;
 		
 		// Hats for HatItems setting
-		case 300049:
+		case 2000300049:
 			worldClass = class'Archipelago_RandomizedItem_Sprint';
 			return true;
 		
-		case 300050:
+		case 2000300050:
 			worldClass = class'Archipelago_RandomizedItem_Chemical';
 			return true;
 
-		case 300051:
+		case 2000300051:
 			worldClass = class'Archipelago_RandomizedItem_Ice';
 			return true;
 		
-		case 300052:
+		case 2000300052:
 			worldClass = class'Archipelago_RandomizedItem_Dweller';
 			return true;
 		
-		case 300053:
+		case 2000300053:
 			worldClass = class'Archipelago_RandomizedItem_TimeStop';
 			return true;
 		
 		
 		// --------- RELICS -------------------------------------------------------------------------------------------- \\
 		
-		case 300006:
+		case 2000300006:
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_BurgerBottom';
 			return true;
 		
-		case 300007:
+		case 2000300007:
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_BurgerTop';
 			return true;
 			
-		case 300008:
+		case 2000300008:
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_TrainTracks';
 			return true;
 			
-		case 300009:
+		case 2000300009:
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_Train';
 			return true;
 			
-		case 300010:
+		case 2000300010:
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_UFO';
 			return true;
 			
-		case 300011:
+		case 2000300011:
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_ToyCowA';
 			return true;
 			
-		case 300012:
+		case 2000300012:
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_ToyCowB';
 			return true;
 		
-		case 300013:
+		case 2000300013:
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_ToyCowC';
 			return true;
 			
-		case 300014:
+		case 2000300014:
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_CrayonBox';
 			return true;
 			
-		case 300015:
+		case 2000300015:
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_CrayonRed';
 			return true;
 			
-		case 300016:
+		case 2000300016:
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_CrayonBlue';
 			return true;
 			
-		case 300017:
+		case 2000300017:
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_CrayonGreen';
 			return true;
 		
-		case 300018:
+		case 2000300018:
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_CakeTower';
 			return true;
 
-		case 300019:
+		case 2000300019:
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_CakeA';
 			return true;
 		
-		case 300020:
+		case 2000300020:
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_CakeB';
 			return true;
 		
-		case 300021:
+		case 2000300021:
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_CakeC';
 			return true;
 
-		case 300022:
+		case 2000300022:
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_JewelryDisplay';
 			return true;
 		
-		case 300023:
+		case 2000300023:
 			worldClass = class'Archipelago_RandomizedItem_Decoration';
 			inventoryOverride = class'Hat_Collectible_Decoration_GoldNecklace';
 			return true;
@@ -258,43 +258,43 @@ optional out class<Actor> inventoryOverride) // Item inventory class override. M
 			
 		// -------- BADGES ----------------------------------------------------------------------------------------------- \\	
 		
-		case 300024:
+		case 2000300024:
 			worldClass = class'Archipelago_RandomizedItem_BadgeProjectile';
 			return true;
 			
-		case 300025:
+		case 2000300025:
 			worldClass = class'Archipelago_RandomizedItem_BadgeHatCooldownBonus';
 			return true;
 			
-		case 300026:
+		case 2000300026:
 			worldClass = class'Archipelago_RandomizedItem_BadgeNoFallDamage';
 			return true;
 			
-		case 300027:
+		case 2000300027:
 			worldClass = class'Archipelago_RandomizedItem_BadgeHookshot';
 			return true;
 			
-		case 300028:
+		case 2000300028:
 			worldClass = class'Archipelago_RandomizedItem_BadgeSuckInOrbs';
 			return true;
 			
-		case 300029:
+		case 2000300029:
 			worldClass = class'Archipelago_RandomizedItem_BadgeNoBonk';
 			return true;
 			
-		case 300030:
+		case 2000300030:
 			worldClass = class'Archipelago_RandomizedItem_BadgeRelicFinder';
 			return true;
 			
-		case 300031:
+		case 2000300031:
 			worldClass = class'Archipelago_RandomizedItem_BadgeScooter';
 			return true;
 		
-		case 300038:
+		case 2000300038:
 			worldClass = class'Archipelago_RandomizedItem_BadgeOneHitDeath';
 			return true;
 		
-		case 300042:
+		case 2000300042:
 			worldClass = class'Archipelago_RandomizedItem_BadgeCamera';
 			return true;
 		
@@ -335,11 +335,11 @@ optional out class<Actor> inventoryOverride) // Item inventory class override. M
 			
 		// --------- MISC ---------------------------------------------------------------------------------------------- \\
 			
-		case 300032:
+		case 2000300032:
 			worldClass = class'Archipelago_RandomizedItem_RouletteToken';
 			return true;
 			
-		case 300033:
+		case 2000300033:
 			if (`AP.SlotData.BaseballBat && `AP.IsDLC2Installed())
 			{
 				worldClass = class'Archipelago_RandomizedItem_BaseballBat';
@@ -351,59 +351,59 @@ optional out class<Actor> inventoryOverride) // Item inventory class override. M
 			
 			return true;
 		
-		case 300043:
+		case 2000300043:
 			worldClass = class'Archipelago_RandomizedItem_BadgePin';
 			return true;
 		
-		case 300200: // Subcon Well
+		case 2000300200: // Subcon Well
 			worldClass = class'Archipelago_RandomizedItem_Contract';
 			return true;
 		
-		case 300201: // Toilet of Doom
+		case 2000300201: // Toilet of Doom
 			worldClass = class'Archipelago_RandomizedItem_Contract';
 			return true;
 		
-		case 300202: // Queen Vanessa
+		case 2000300202: // Queen Vanessa
 			worldClass = class'Archipelago_RandomizedItem_Contract';
 			return true;
 		
-		case 300203: // Mail Delivery
+		case 2000300203: // Mail Delivery
 			worldClass = class'Archipelago_RandomizedItem_Contract';
 			return true;
 		
-		case 300204: // Birdhouse Path
+		case 2000300204: // Birdhouse Path
 			worldClass = class'Archipelago_RandomizedItem_ZiplineUnlock';
 			return true;
 		
-		case 300205: // Lava Cake Path
+		case 2000300205: // Lava Cake Path
 			worldClass = class'Archipelago_RandomizedItem_ZiplineUnlock';
 			return true;
 		
-		case 300206: // Windmill Path
+		case 2000300206: // Windmill Path
 			worldClass = class'Archipelago_RandomizedItem_ZiplineUnlock';
 			return true;
 		
-		case 300207: // Twilight Bell Path
+		case 2000300207: // Twilight Bell Path
 			worldClass = class'Archipelago_RandomizedItem_ZiplineUnlock';
 			return true;
 		
-		case 300003:
+		case 2000300003:
 			worldClass = class'Archipelago_RandomizedItem_Painting';
 			return true;
 		
-		case 300045:
+		case 2000300045:
 			worldClass = class'Archipelago_RandomizedItem_MetroTicketYellow';
 			return true;
 		
-		case 300046:
+		case 2000300046:
 			worldClass = class'Archipelago_RandomizedItem_MetroTicketGreen';
 			return true;
 		
-		case 300047:
+		case 2000300047:
 			worldClass = class'Archipelago_RandomizedItem_MetroTicketBlue';
 			return true;
 		
-		case 300048:
+		case 2000300048:
 			worldClass = class'Archipelago_RandomizedItem_MetroTicketPink';
 			return true;
 		
@@ -419,16 +419,16 @@ static function int GetContractID(class<Hat_SnatcherContract_Act> contract)
 	switch (contract)
 	{
 		case class'Hat_SnatcherContract_IceWall':
-			return 300200;
+			return 2000300200;
 		
 		case class'Hat_SnatcherContract_Toilet':
-			return 300201;
+			return 2000300201;
 		
 		case class'Hat_SnatcherContract_Vanessa':
-			return 300202;
+			return 2000300202;
 		
 		case class'Hat_SnatcherContract_MailDelivery':
-			return 300203;
+			return 2000300203;
 
 		default:
 			return 0;
@@ -439,16 +439,16 @@ static function class<Hat_SnatcherContract_Act> GetContractFromID(int id)
 {
 	switch (id)
 	{
-		case 300200:
+		case 2000300200:
 			return class'Hat_SnatcherContract_IceWall';
 		
-		case 300201:
+		case 2000300201:
 			return class'Hat_SnatcherContract_Toilet';
 		
-		case 300202:
+		case 2000300202:
 			return class'Hat_SnatcherContract_Vanessa';
 		
-		case 300203:
+		case 2000300203:
 			return class'Hat_SnatcherContract_MailDelivery';
 
 		default:
@@ -462,118 +462,118 @@ static function int GetDeathWishLocationID(class<Hat_SnatcherContract_DeathWish>
 	switch (contract)
 	{
 		case class'Hat_SnatcherContract_DeathWish_HeatingUpHarder':
-			return 350000;
+			return 2000350000;
 		
 		case class'Hat_SnatcherContract_DeathWish_KillEverybody':
-			return 350002;
+			return 2000350002;
 		
 		case class'Hat_SnatcherContract_DeathWish_BackFromSpace':
-			return 350004;
+			return 2000350004;
 		
 		case class'Hat_SnatcherContract_DeathWish_PonFrenzy':
-			return 350006;
+			return 2000350006;
 		
 		case class'Hat_SnatcherContract_DeathWish_RiftCollapse_MafiaTown':
-			return 350008;
+			return 2000350008;
 		
 		case class'Hat_SnatcherContract_DeathWish_Speedrun_MafiaAlien':
-			return 350010;
+			return 2000350010;
 		
 		case class'Hat_SnatcherContract_DeathWish_NoAPresses_MafiaAlien':
-			return 350012;
+			return 2000350012;
 
 		case class'Hat_SnatcherContract_DeathWish_MovingVault':
-			return 350014;
+			return 2000350014;
 
 		case class'Hat_SnatcherContract_DeathWish_MafiaBossEX':
-			return 350016;
+			return 2000350016;
 		
 		case class'Hat_SnatcherContract_DeathWish_Tokens_MafiaTown':
-			return 350018;
+			return 2000350018;
 	
 		case class'Hat_SnatcherContract_DeathWish_DeadBirdStudioMoreGuards':
-			return 350020;
+			return 2000350020;
 
 		case class'Hat_SnatcherContract_DeathWish_DifficultParade':
-			return 350022;
+			return 2000350022;
 
 		case class'Hat_SnatcherContract_DeathWish_RiftCollapse_Birds':
-			return 350024;
+			return 2000350024;
 		
 		case class'Hat_SnatcherContract_DeathWish_TrainRushShortTime':
-			return 350026;
+			return 2000350026;
 		
 		case class'Hat_SnatcherContract_DeathWish_BirdBossEX':
-			return 350028;
+			return 2000350028;
 
 		case class'Hat_SnatcherContract_DeathWish_Tokens_Birds':
-			return 350030;
+			return 2000350030;
 		
 		case class'Hat_SnatcherContract_DeathWish_NoAPresses':
-			return 350032;
+			return 2000350032;
 	
 		case class'Hat_SnatcherContract_DeathWish_Speedrun_SubWell':
-			return 350034;
+			return 2000350034;
 
 		case class'Hat_SnatcherContract_DeathWish_RiftCollapse_Subcon':
-			return 350036;
+			return 2000350036;
 	
 		case class'Hat_SnatcherContract_DeathWish_BossRush':
-			return 350038;
+			return 2000350038;
 
 		case class'Hat_SnatcherContract_DeathWish_SurvivalOfTheFittest':
-			return 350040;
+			return 2000350040;
 		
 		case class'Hat_SnatcherContract_DeathWish_SnatcherEX':
-			return 350042;
+			return 2000350042;
 
 		case class'Hat_SnatcherContract_DeathWish_Tokens_Subcon':
-			return 350044;
+			return 2000350044;
 
 		case class'Hat_SnatcherContract_DeathWish_NiceBirdhouse':
-			return 350046;
+			return 2000350046;
 
 		case class'Hat_SnatcherContract_DeathWish_RiftCollapse_Alps':
-			return 350048;
+			return 2000350048;
 
 		case class'Hat_SnatcherContract_DeathWish_FastWindmill':
-			return 350050;
+			return 2000350050;
 
 		case class'Hat_SnatcherContract_DeathWish_Speedrun_Illness':
-			return 350052;
+			return 2000350052;
 
 		case class'Hat_SnatcherContract_DeathWish_Tokens_Alps':
-			return 350054;
+			return 2000350054;
 		
 		case class'Hat_SnatcherContract_DeathWish_CameraTourist_1':
-			return 350056;
+			return 2000350056;
 
 		case class'Hat_SnatcherContract_DeathWish_HardCastle':
-			return 350058;
+			return 2000350058;
 
 		case class'Hat_SnatcherContract_DeathWish_MuGirlEX':
-			return 350060;
+			return 2000350060;
 
 		case class'Hat_SnatcherContract_DeathWish_BossRushEX':
-			return 350062;
-
+			return 2000350062;
+		
 		case class'Hat_SnatcherContract_DeathWish_RiftCollapse_Cruise':
-			return 350064;
-
+			return 2000350064;
+		
 		case class'Hat_SnatcherContract_DeathWish_EndlessTasks':
-			return 350066;
+			return 2000350066;
 
 		case class'Hat_SnatcherContract_DeathWish_CommunityRift_RhythmJump':
-			return 350068;
+			return 2000350068;
 
 		case class'Hat_SnatcherContract_DeathWish_CommunityRift_TwilightTravels':
-			return 350070;
+			return 2000350070;
 		
 		case class'Hat_SnatcherContract_DeathWish_CommunityRift_MountainRift':
-			return 350072;
+			return 2000350072;
 		
 		case class'Hat_SnatcherContract_DeathWish_Tokens_Metro':
-			return 350074;
+			return 2000350074;
 	}
 
 	return -1;

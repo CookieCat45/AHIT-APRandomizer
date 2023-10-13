@@ -10,7 +10,7 @@ class Archipelago_RandomizedItem_Base extends Hat_Collectible
 `include(APRandomizer\Classes\Globals.uci);
 
 var int LocationId;
-var int ItemId;
+var string ItemId;
 var int ItemOwner;
 var int ItemFlags;
 var Surface HUDIcon;
@@ -105,7 +105,11 @@ simulated function bool OnCollected(Actor Collector)
 				autoEquip = false;
 			}
 			
-			if (!loadout.AddBackpack(item, autoEquip, true, Hat_Player(Collector)) && !loadout.AddCollectible(InventoryClass))
+			if (loadout.AddBackpack(item, autoEquip, true, Hat_Player(Collector)) || loadout.AddCollectible(InventoryClass))
+			{
+				OnAddedToInventory();
+			}
+			else
 			{
 				`AP.ScreenMessage("Failed to create inventory item for " $InventoryClass $", please report");
 			}
@@ -123,6 +127,11 @@ simulated function bool OnCollected(Actor Collector)
 	}
 	
 	return Super.OnCollected(Collector);
+}
+
+function OnAddedToInventory()
+{
+	`AP.SetAPBits(string(InventoryClass), 1);
 }
 
 function SetOriginalLevelBit()

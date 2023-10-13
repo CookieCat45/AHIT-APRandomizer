@@ -907,7 +907,7 @@ function bool OnClick(HUD H, bool release)
 		return true;
 	}
 	if ((CurrentSelectedHourglass.ID == ActSelectType_Act || CurrentSelectedHourglass.ID == ActSelectType_Boss) && ChapterInfo.GetActIDFromHourglass(CurrentSelectedHourglass.Hourglass) < 0) return false;
-
+	
 	actid = CurrentSelectedHourglass.ActID;
 	
 	// If the player re-selects Act 1, ask them if they're sure
