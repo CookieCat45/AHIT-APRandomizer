@@ -77,9 +77,7 @@ function OpenSeedInfo(HUD H)
 
 function bool IsPauseMenuActive(HUD H)
 {
-    local Hat_HUDMenuLoadout lo;
-    lo = Hat_HUDMenuLoadout(Hat_HUD(H).GetHUD(class'Hat_HUDMenuLoadout'));
-    return (lo != None && !lo.IsClosing(H));
+    return H.PlayerOwner.WorldInfo.Pauser != None;
 }
 
 function bool IsGamepad(HUD H)

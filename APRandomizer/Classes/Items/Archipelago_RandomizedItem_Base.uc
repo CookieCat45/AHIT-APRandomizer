@@ -162,11 +162,10 @@ simulated function OnCollectedDisappear(Actor a)
 {
 	if (!ShouldDoSpinEffect())
 	{
-		if (bNoDelete) SetHidden(true);
-		else Destroy();
+		Destroy();
 		return;
 	}
-		
+	
 	RemoveNPCManagement();
     DisappearingActor = a;
     Disappearing = true;
@@ -175,8 +174,13 @@ simulated function OnCollectedDisappear(Actor a)
     PickupActor = a;
 	SetBase(none);
 	
-    SetTimer(ItemSpinDisappearTime, false, NameOf(Destroy));
+    SetTimer(ItemSpinDisappearTime, false, NameOf(Destroy2));
 	DoCollectEffects(a);
+}
+
+function Destroy2()
+{
+	Destroy();
 }
 
 simulated function DoCollectEffects(Actor a)
@@ -263,6 +267,7 @@ defaultproperties
 	RotationAnimation = true;
 	DoSpinEffect = true;
 	bAlwaysTick = true;
+	bNoDelete = false;
 	TickOptimize = TickOptimize_Distance;
 	LocationId = 0;
 }

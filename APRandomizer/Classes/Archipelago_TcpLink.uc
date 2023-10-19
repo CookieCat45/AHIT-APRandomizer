@@ -44,7 +44,7 @@ function Connect()
 	
 	if (!ShouldFilterSelfJoins())
 	{
-		`AP.ScreenMessage("Connecting to host: " $`AP.SlotData.Host$":"$`AP.SlotData.Port);
+		`AP.ScreenMessage("Connecting to A Hat in Time AP Client (" $`AP.SlotData.Host$":"$`AP.SlotData.Port $")");
 	}
 	
     Resolve(`AP.SlotData.Host);
@@ -114,7 +114,7 @@ event Opened()
 	LinkMode = MODE_Binary;
 	
 	if (!ShouldFilterSelfJoins())
-		`AP.ScreenMessage("Connected to AP client, awaiting room information from server... (connect the AP client to the server if you haven't)");
+		`AP.ScreenMessage("Connected to AP Client, awaiting room information from server... (connect the AP client to the server if you haven't)");
 }
 
 function ConnectToAP()
@@ -600,6 +600,7 @@ function ParseJSON(string json)
 			else
 			{
 				GameDataLoaded = true;
+				`AP.ScreenMessage("Finished loading new game data");
 			}
 			
 			break;
@@ -608,8 +609,8 @@ function ParseJSON(string json)
 			m.OnPreConnected();
 			
 			if (!ShouldFilterSelfJoins())
-				m.ScreenMessage("Successfully connected to " $m.SlotData.Host $":"$m.SlotData.Port);
-
+				m.ScreenMessage("Successfully connected to AP Client (" $m.SlotData.Host $":"$m.SlotData.Port $")");
+			
 			`AP.SetAPBits("SaveFileLoad", 1);
 			
 			Reconnecting = false;
@@ -829,7 +830,7 @@ function ParseJSON(string json)
 		
 		case "RoomUpdate":
 			// Paste-a la CTRL+Vista baby.
-			// Please help me.
+			// I'm not sorry. Please help me.
 			pos = InStr(json, "\"checked_locations\":[");
 			if (pos != -1)
 			{
@@ -1175,7 +1176,7 @@ function GrantItem(int itemId, int playerId)
 	}
 	else
 	{
-		// screen message so players report problems
+		// screen message so players report
 		`AP.ScreenMessage("[GrantItem] Unknown item ID: " $itemId);
 	}
 	
