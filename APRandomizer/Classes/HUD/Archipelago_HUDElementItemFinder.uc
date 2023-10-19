@@ -29,48 +29,50 @@ function OnOpenHUD(HUD H, optional String command)
 	difficulty = m.SlotData.LogicDifficulty;
 	if (difficulty >= 0)
 	{
+		// Subcon Well without Hookshot
+		HookshotRequiredLocs.RemoveItem(2000324311);
+
 		// Birdhouse without Brewers
-		BrewingHatRequiredLocs.RemoveItem(335756);
-		BrewingHatRequiredLocs.RemoveItem(336497);
-		BrewingHatRequiredLocs.RemoveItem(334758);
-		BrewingHatRequiredLocs.RemoveItem(335885);
-		BrewingHatRequiredLocs.RemoveItem(335886);
-		BrewingHatRequiredLocs.RemoveItem(335492);
+		BrewingHatRequiredLocs.RemoveItem(2000335756);
+		BrewingHatRequiredLocs.RemoveItem(2000336497);
+		BrewingHatRequiredLocs.RemoveItem(2000334758);
+		BrewingHatRequiredLocs.RemoveItem(2000335885);
+		BrewingHatRequiredLocs.RemoveItem(2000335886);
+		BrewingHatRequiredLocs.RemoveItem(2000335492);
 		
 		// The Birdhouse - Dweller Platforms Relic without Dwellers
-		DwellerMaskRequiredLocs.RemoveItem(336497);
+		DwellerMaskRequiredLocs.RemoveItem(2000336497);
 		
 		// Rock the Boat without Ice
-		IceHatRequiredLocs.RemoveItem(304049);
+		IceHatRequiredLocs.RemoveItem(2000304049);
 		
 		// Clock Tower + Ruined Tower with nothing
-		HookshotRequiredLocs.RemoveItem(303481);
-		IceHatRequiredLocs.RemoveItem(304607);
+		HookshotRequiredLocs.RemoveItem(2000303481);
+		IceHatRequiredLocs.RemoveItem(2000304607);
 	}
 	
 	if (difficulty >= 1)
 	{
 		// Dweller Floating Rocks
-		DwellerMaskRequiredLocs.RemoveItem(324464);
+		DwellerMaskRequiredLocs.RemoveItem(2000324464);
 	}
 	
 	if (difficulty >= 2)
 	{
-		// Mafia Town - Above Boats and Subcon Well without Hookshot
-		HookshotRequiredLocs.RemoveItem(305218);
-		HookshotRequiredLocs.RemoveItem(324311);
-
+		// Mafia Town - Above Boats without Hookshot
+		HookshotRequiredLocs.RemoveItem(2000305218);
+		
 		// Some Subcon locations without Hookshot
-		HookshotRequiredLocs.RemoveItem(324766);
-		HookshotRequiredLocs.RemoveItem(324856);
+		HookshotRequiredLocs.RemoveItem(2000324766);
+		HookshotRequiredLocs.RemoveItem(2000324856);
 		
 		// Twilight Bell without Dwellers
-		DwellerMaskRequiredLocs.RemoveItem(334434);
-		DwellerMaskRequiredLocs.RemoveItem(336478);
-		DwellerMaskRequiredLocs.RemoveItem(335826);
+		DwellerMaskRequiredLocs.RemoveItem(2000334434);
+		DwellerMaskRequiredLocs.RemoveItem(2000336478);
+		DwellerMaskRequiredLocs.RemoveItem(2000335826);
 		
 		// Some Subcon locations without Dwellers
-		DwellerMaskRequiredLocs.RemoveItem(324766);
+		DwellerMaskRequiredLocs.RemoveItem(2000324766);
 	}
 }
 
@@ -280,7 +282,7 @@ function bool UpdateClosestMarker_Actor(HUD H, Actor item, out float closest_dis
 	local Vector itemloc;
 	
 	// Mafia Town secret cave location
-	if (Archipelago_RandomizedItem_Base(item) != None && Archipelago_RandomizedItem_Base(item).LocationId == 305220)
+	if (Archipelago_RandomizedItem_Base(item) != None && Archipelago_RandomizedItem_Base(item).LocationId == 2000305220)
 	{
 		itemloc = vect(-3810, 460, 660);
 	}
@@ -303,7 +305,7 @@ function bool UpdateClosestMarker_Actor(HUD H, Actor item, out float closest_dis
 
 function bool CanReachLocation(int id, HUD H)
 {
-	local bool finale, cannon, nobonk, hookshot;
+	local bool finale, cannon, hookshot;
 	local int paintingUnlock, difficulty, act;
 	local Archipelago_GameMod m;
 	local string mapName;
@@ -315,10 +317,10 @@ function bool CanReachLocation(int id, HUD H)
 	difficulty = m.SlotData.LogicDifficulty;
 	act = `GameManager.GetCurrentAct();
 	hookshot = lo.BackpackHasInventory(class'Hat_Ability_Hookshot');
-	nobonk = lo.BackpackHasInventory(class'Hat_Ability_NoBonk');
+	//nobonk = lo.BackpackHasInventory(class'Hat_Ability_NoBonk');
 	
 	// Mafia Town secret cave item
-	if (id == 305220)
+	if (id == 2000305220)
 	{
 		return act == 6 || lo.BackpackHasInventory(class'Hat_Ability_Chemical');
 	}
@@ -329,15 +331,15 @@ function bool CanReachLocation(int id, HUD H)
 	}
 	
 	// Chest behind Mafia HQ
-	if (id == 303486)
+	if (id == 2000303486)
 	{
 		return cannon;
 	}
 	
 	// Subcon boss arena chest
-	if (id == 323735)
+	if (id == 2000323735)
 	{
-		if (difficulty >= 2)
+		if (difficulty >= 2 && CanSkipPaintings())
 			return true;
 		
 		if (difficulty >= 1)
@@ -355,19 +357,19 @@ function bool CanReachLocation(int id, HUD H)
 	
 	if (mapName ~= "subconforest" && act == 6)
 	{
-		if (difficulty <= 0)
+		if (difficulty < 1)
 			return false;
 	}
 	
 	// Manor rooftop item
-	if (id == 325466)
+	if (id == 2000325466)
 	{
 		if (difficulty >= 0)
 		{
 			return true;
 		}
 		
-		return (!m.SlotData.ShuffleSubconPaintings || m.GetPaintingUnlocks() >= 1) && CanHitObjects(true);
+		return (CanSkipPaintings() || m.GetPaintingUnlocks() >= 1) && CanHitObjects(true);
 	}
 	
 	if (mapName ~= "DeadBirdStudio")
@@ -378,7 +380,7 @@ function bool CanReachLocation(int id, HUD H)
 		}
 		else if (act == 6 || !CanHitObjects())
 		{
-			return id == 304874 || id == 305024 || id == 305248 || id == 305247;
+			return id == 2000304874 || id == 2000305024 || id == 2000305248 || id == 2000305247;
 		}
 	}
 	else if (mapName ~= "dlc_metro" && act == 8)
@@ -388,7 +390,7 @@ function bool CanReachLocation(int id, HUD H)
 	else if (mapName ~= "ship_main" && act == 1)
 	{
 		if (!hookshot)
-			return id == 305321 || id == 304313;
+			return id == 2000305321 || id == 2000304313;
 	}
 	
 	if (mapName ~= "alpsandsails")
@@ -400,13 +402,13 @@ function bool CanReachLocation(int id, HUD H)
 			return false;
 		
 		if (!hookshot)
-			return id == 334855 || id == 334856;
+			return id == 2000334855 || id == 2000334856;
 		
 		if (finale)
 		{
 			// Only these locations can be reached in Illness
-			if (id != 334855 && id != 334856 && id != 335911 
-			&& id != 335756 && id != 336311 && id != 334760 && id != 334776)
+			if (id != 2000334855 && id != 2000334856 && id != 2000335911 
+			&& id != 2000335756 && id != 2000336311 && id != 2000334760 && id != 2000334776)
 			{
 				return false;
 			}
@@ -429,7 +431,7 @@ function bool CanReachLocation(int id, HUD H)
 	}
 	
 	// Mystifying Time Mesa buttons
-	if (id == 337058)
+	if (id == 2000337058)
 	{
 		if (difficulty >= 0)
 			return true;
@@ -440,32 +442,32 @@ function bool CanReachLocation(int id, HUD H)
 	// HUMT
 	if (InStr(mapName, "mafia_town") != -1 && act == 6)
 	{
-		return id == 334758 ||
-		id == 304214 ||
-		id == 303529 ||
-		id == 304610 ||
-		id == 303535 ||
-		id == 304459 ||
-		id == 304213 && hookshot ||
-		id == 304608 ||
-		id == 304462 ||
-		id == 303489 ||
-		id == 303530 ||
-		id == 304456 ||
-		id == 304457 ||
-		id == 304606 ||
-		id == 303481 && hookshot ||
-		id == 304607 && lo.BackpackHasInventory(class'Hat_Ability_StatueFall') ||
-		id == 304212 ||
-		id == 302003 ||
-		id == 302004 ||
-		id == 303532 ||
-		id == 304829 && lo.BackpackHasInventory(class'Hat_Ability_StatueFall') ||
-		id == 305218; 
+		return id == 2000334758 ||
+		id == 2000304214 ||
+		id == 2000303529 ||
+		id == 2000304610 ||
+		id == 2000303535 ||
+		id == 2000304459 ||
+		id == 2000304213 && hookshot ||
+		id == 2000304608 ||
+		id == 2000304462 ||
+		id == 2000303489 ||
+		id == 2000303530 ||
+		id == 2000304456 ||
+		id == 2000304457 ||
+		id == 2000304606 ||
+		id == 2000303481 && hookshot ||
+		id == 2000304607 && lo.BackpackHasInventory(class'Hat_Ability_StatueFall') ||
+		id == 2000304212 ||
+		id == 2000302003 ||
+		id == 2000302004 ||
+		id == 2000303532 ||
+		id == 2000304829 && lo.BackpackHasInventory(class'Hat_Ability_StatueFall') ||
+		id == 2000305218; 
 	}
 	
 	// Subcon long tree climb chest/Dweller platforming tree B
-	if ((id == 323734 || id == 324855) && (!m.SlotData.ShuffleSubconPaintings || m.GetPaintingUnlocks() >= 2 || difficulty >= 0 && nobonk || difficulty >= 2))
+	if ((id == 2000323734 || id == 2000324855) && (CanSkipPaintings() || m.GetPaintingUnlocks() >= 2))
 	{
 		if (difficulty >= 2 || CanSDJ())
 			return true;
@@ -488,23 +490,23 @@ function bool CanReachLocation(int id, HUD H)
 		paintingUnlock = m.GetPaintingUnlocks();
 		
 		if (VillagePaintingLocs.Find(id) != -1)
-			return paintingUnlock >= 1 || difficulty >= 0;
+			return paintingUnlock >= 1 || CanSkipPaintings();
 		
 		if (SwampPaintingLocs.Find(id) != -1)
-			return paintingUnlock >= 2 || difficulty >= 0 && nobonk || difficulty >= 2;
+			return paintingUnlock >= 2 || CanSkipPaintings();
 		
 		if (CourtyardPaintingLocs.Find(id) != -1)
-			return paintingUnlock >= 3 || difficulty >= 0 && (nobonk || paintingUnlock >= 1) || difficulty >= 2;
+			return paintingUnlock >= 3 || CanSkipPaintings();
 	}
 	
 	// Nyakuza Metro
-	if (id == 305111)
+	if (id == 2000305111)
 	{
 		// Green or blue ticket
 		return lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteB')
 			|| lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteC');
 	}
-	else if (id == 305110)
+	else if (id == 2000305110)
 	{
 		if (difficulty >= 0)
 			return true;
@@ -514,7 +516,7 @@ function bool CanReachLocation(int id, HUD H)
 			|| lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteA')
 			&& lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteC');
 	}
-	else if (id == 304106)
+	else if (id == 2000304106)
 	{
 		if (difficulty >= 0)
 			return true;
@@ -551,113 +553,127 @@ static function bool CanSDJ()
 	return class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Sprint') && `AP.SlotData.LogicDifficulty >= 1;
 }
 
+static function bool CanSkipPaintings()
+{
+	local Archipelago_GameMod m;
+	m = `AP;
+	
+	if (!m.SlotData.ShuffleSubconPaintings)
+		return true;
+	
+	if (m.SlotData.LogicDifficulty < 0 || m.SlotData.NoPaintingSkips)
+		return false;
+	
+	return true;
+}
+
 defaultproperties
 {
-	IceHatRequiredLocs[0] = 304607;
-	IceHatRequiredLocs[1] = 304831;
-	IceHatRequiredLocs[2] = 304829;
-	IceHatRequiredLocs[3] = 304979;
-	IceHatRequiredLocs[4] = 304049;
+	IceHatRequiredLocs[0] = 2000304607;
+	IceHatRequiredLocs[1] = 2000304831;
+	IceHatRequiredLocs[2] = 2000304829;
+	IceHatRequiredLocs[3] = 2000304979;
+	IceHatRequiredLocs[4] = 2000304049;
 	
-	HookshotRequiredLocs[0] = 305218;
-	HookshotRequiredLocs[1] = 303481;
-	HookshotRequiredLocs[2] = 304213;
-	HookshotRequiredLocs[3] = 324766;
-	HookshotRequiredLocs[4] = 324856;
-	HookshotRequiredLocs[5] = 305432;
-	HookshotRequiredLocs[6] = 305059;
-	HookshotRequiredLocs[7] = 305057;
-	HookshotRequiredLocs[8] = 305061;
-	HookshotRequiredLocs[9] = 304813;
-	HookshotRequiredLocs[10] = 305058;
-	HookshotRequiredLocs[11] = 305431;
-	HookshotRequiredLocs[12] = 305819;
-	HookshotRequiredLocs[13] = 305110;
-	HookshotRequiredLocs[14] = 304106;
-	HookshotRequiredLocs[15] = 324311;
+	HookshotRequiredLocs[0] = 2000305218;
+	HookshotRequiredLocs[1] = 2000303481;
+	HookshotRequiredLocs[2] = 2000304213;
+	HookshotRequiredLocs[3] = 2000324766;
+	HookshotRequiredLocs[4] = 2000324856;
+	HookshotRequiredLocs[5] = 2000305432;
+	HookshotRequiredLocs[6] = 2000305059;
+	HookshotRequiredLocs[7] = 2000305057;
+	HookshotRequiredLocs[8] = 2000305061;
+	HookshotRequiredLocs[9] = 2000304813;
+	HookshotRequiredLocs[10] = 2000305058;
+	HookshotRequiredLocs[11] = 2000305431;
+	HookshotRequiredLocs[12] = 2000305819;
+	HookshotRequiredLocs[13] = 2000305110;
+	HookshotRequiredLocs[14] = 2000304106;
+	HookshotRequiredLocs[15] = 2000324311;
 	
-	DwellerMaskRequiredLocs[0] = 324767;
-	DwellerMaskRequiredLocs[1] = 324464;
-	DwellerMaskRequiredLocs[2] = 324855;
-	DwellerMaskRequiredLocs[3] = 324463;
-	DwellerMaskRequiredLocs[4] = 324766;
-	DwellerMaskRequiredLocs[5] = 336497;
-	DwellerMaskRequiredLocs[6] = 336395;
-	DwellerMaskRequiredLocs[7] = 323734;
-	DwellerMaskRequiredLocs[8] = 334434;
-	DwellerMaskRequiredLocs[9] = 336478;
-	DwellerMaskRequiredLocs[10] = 335826;
-	DwellerMaskRequiredLocs[11] = 305110;
-	DwellerMaskRequiredLocs[12] = 304106;
+	DwellerMaskRequiredLocs[0] = 2000324767;
+	DwellerMaskRequiredLocs[1] = 2000324464;
+	DwellerMaskRequiredLocs[2] = 2000324855;
+	DwellerMaskRequiredLocs[3] = 2000324463;
+	DwellerMaskRequiredLocs[4] = 2000324766;
+	DwellerMaskRequiredLocs[5] = 2000336497;
+	DwellerMaskRequiredLocs[6] = 2000336395;
+	DwellerMaskRequiredLocs[7] = 2000323734;
+	DwellerMaskRequiredLocs[8] = 2000334434;
+	DwellerMaskRequiredLocs[9] = 2000336478;
+	DwellerMaskRequiredLocs[10] = 2000335826;
+	DwellerMaskRequiredLocs[11] = 2000305110;
+	DwellerMaskRequiredLocs[12] = 2000304106;
 	
-	BrewingHatRequiredLocs[0] = 305701;
-	BrewingHatRequiredLocs[1] = 334758;
-	BrewingHatRequiredLocs[2] = 335756;
-	BrewingHatRequiredLocs[3] = 336497;
-	BrewingHatRequiredLocs[4] = 336496;
-	BrewingHatRequiredLocs[5] = 335885;
-	BrewingHatRequiredLocs[6] = 335886;
-	BrewingHatRequiredLocs[7] = 335492;
+	BrewingHatRequiredLocs[0] = 2000305701;
+	BrewingHatRequiredLocs[1] = 2000334758;
+	BrewingHatRequiredLocs[2] = 2000335756;
+	BrewingHatRequiredLocs[3] = 2000336497;
+	BrewingHatRequiredLocs[4] = 2000336496;
+	BrewingHatRequiredLocs[5] = 2000335885;
+	BrewingHatRequiredLocs[6] = 2000335886;
+	BrewingHatRequiredLocs[7] = 2000335492;
 	
-	BirdhousePathLocs[0] = 335911;
-	BirdhousePathLocs[1] = 335756;
-	BirdhousePathLocs[2] = 335561;
-	BirdhousePathLocs[3] = 334831;
-	BirdhousePathLocs[4] = 334758;
-	BirdhousePathLocs[5] = 336497;
-	BirdhousePathLocs[6] = 336496;
-	BirdhousePathLocs[7] = 335885;
-	BirdhousePathLocs[8] = 335886;
-	BirdhousePathLocs[9] = 335492;
+	BirdhousePathLocs[0] = 2000335911;
+	BirdhousePathLocs[1] = 2000335756;
+	BirdhousePathLocs[2] = 2000335561;
+	BirdhousePathLocs[3] = 2000334831;
+	BirdhousePathLocs[4] = 2000334758;
+	BirdhousePathLocs[5] = 2000336497;
+	BirdhousePathLocs[6] = 2000336496;
+	BirdhousePathLocs[7] = 2000335885;
+	BirdhousePathLocs[8] = 2000335886;
+	BirdhousePathLocs[9] = 2000335492;
 	
-	LavaCakePathLocs[0] = 337058;
-	LavaCakePathLocs[1] = 336052;
-	LavaCakePathLocs[2] = 335448;
-	LavaCakePathLocs[3] = 334291;
-	LavaCakePathLocs[4] = 335417;
-	LavaCakePathLocs[5] = 335418;
-	LavaCakePathLocs[6] = 336311;
+	LavaCakePathLocs[0] = 2000337058;
+	LavaCakePathLocs[1] = 2000336052;
+	LavaCakePathLocs[2] = 2000335448;
+	LavaCakePathLocs[3] = 2000334291;
+	LavaCakePathLocs[4] = 2000335417;
+	LavaCakePathLocs[5] = 2000335418;
+	LavaCakePathLocs[6] = 2000336311;
 	
-	WindmillPathLocs[0] = 334760;
-	WindmillPathLocs[1] = 334776;
-	WindmillPathLocs[2] = 336395;
-	WindmillPathLocs[3] = 335783;
-	WindmillPathLocs[4] = 335815;
-	WindmillPathLocs[5] = 335389;
+	WindmillPathLocs[0] = 2000334760;
+	WindmillPathLocs[1] = 2000334776;
+	WindmillPathLocs[2] = 2000336395;
+	WindmillPathLocs[3] = 2000335783;
+	WindmillPathLocs[4] = 2000335815;
+	WindmillPathLocs[5] = 2000335389;
 	
-	BellPathLocs[0] = 334434;
-	BellPathLocs[1] = 336478;
-	BellPathLocs[2] = 335826;
+	BellPathLocs[0] = 2000334434;
+	BellPathLocs[1] = 2000336478;
+	BellPathLocs[2] = 2000335826;
 
-	VillagePaintingLocs[0] = 326296;
-	VillagePaintingLocs[1] = 324762;
-	VillagePaintingLocs[2] = 324763;
-	VillagePaintingLocs[3] = 324764;
-	VillagePaintingLocs[4] = 324706;
-	VillagePaintingLocs[5] = 325468;
-	VillagePaintingLocs[6] = 323728;
-	VillagePaintingLocs[7] = 323730;
-	VillagePaintingLocs[8] = 324465;
+	VillagePaintingLocs[0] = 2000326296;
+	VillagePaintingLocs[1] = 2000324762;
+	VillagePaintingLocs[2] = 2000324763;
+	VillagePaintingLocs[3] = 2000324764;
+	VillagePaintingLocs[4] = 2000324706;
+	VillagePaintingLocs[5] = 2000325468;
+	VillagePaintingLocs[6] = 2000323728;
+	VillagePaintingLocs[7] = 2000323730;
+	VillagePaintingLocs[8] = 2000324465;
 
-	SwampPaintingLocs[0] = 324710;
-	SwampPaintingLocs[1] = 325079;
-	SwampPaintingLocs[2] = 323731;
-	SwampPaintingLocs[3] = 325467;
-	SwampPaintingLocs[4] = 324462;
-	SwampPaintingLocs[5] = 325080;
-	SwampPaintingLocs[6] = 324765;
-	SwampPaintingLocs[7] = 324856;
-	SwampPaintingLocs[8] = 325478;
-	SwampPaintingLocs[9] = 323734;
+	SwampPaintingLocs[0] = 2000324710;
+	SwampPaintingLocs[1] = 2000325079;
+	SwampPaintingLocs[2] = 2000323731;
+	SwampPaintingLocs[3] = 2000325467;
+	SwampPaintingLocs[4] = 2000324462;
+	SwampPaintingLocs[5] = 2000325080;
+	SwampPaintingLocs[6] = 2000324765;
+	SwampPaintingLocs[7] = 2000324856;
+	SwampPaintingLocs[8] = 2000325478;
+	SwampPaintingLocs[9] = 2000323734;
 	
-	CourtyardPaintingLocs[0] = 325479;
-	CourtyardPaintingLocs[1] = 324767;
-	CourtyardPaintingLocs[2] = 324464;
-	CourtyardPaintingLocs[3] = 324709;
-	CourtyardPaintingLocs[4] = 324855;
-	CourtyardPaintingLocs[5] = 325473;
-	CourtyardPaintingLocs[6] = 325472;
-	CourtyardPaintingLocs[7] = 325082;
-	CourtyardPaintingLocs[8] = 324463;
-	CourtyardPaintingLocs[9] = 324766;
+	CourtyardPaintingLocs[0] = 2000325479;
+	CourtyardPaintingLocs[1] = 2000324767;
+	CourtyardPaintingLocs[2] = 2000324464;
+	CourtyardPaintingLocs[3] = 2000324709;
+	CourtyardPaintingLocs[4] = 2000324855;
+	CourtyardPaintingLocs[5] = 2000325473;
+	CourtyardPaintingLocs[6] = 2000325472;
+	CourtyardPaintingLocs[7] = 2000325082;
+	CourtyardPaintingLocs[8] = 2000324463;
+	CourtyardPaintingLocs[9] = 2000324766;
 }

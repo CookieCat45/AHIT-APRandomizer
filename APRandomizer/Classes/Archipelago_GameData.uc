@@ -4,6 +4,8 @@ var string Game;
 var string Checksum;
 
 // IDs from other games have to be strings because UnrealScript only supports 32 bit integers
+
+// Deprecated
 struct immutable LocationMap
 {
     var string ID;

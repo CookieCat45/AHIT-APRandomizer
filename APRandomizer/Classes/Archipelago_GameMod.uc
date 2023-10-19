@@ -1,10 +1,11 @@
 class Archipelago_GameMod extends GameMod
+	IterationOptimized
 	dependson(Archipelago_ItemInfo)
 	dependson(Archipelago_HUDElementBubble)
 	dependson(Archipelago_GameData)
 	config(Mods);
 
-const SlotDataVersion = 3;
+const SlotDataVersion = 4;
 
 var Archipelago_TcpLink Client;
 var Archipelago_SlotData SlotData;
@@ -22,8 +23,6 @@ var transient string DebugMsg;
 var config int DebugMode;
 var config int DisableInjection;
 var config int VerboseLogging;
-var config int DisableAutoConnect;
-var config int FilterSelfJoins;
 var const editconst Vector SpaceshipSpawnLocation;
 
 var transient array<Hat_SnatcherContract_Selectable> SelectContracts;
@@ -471,7 +470,10 @@ function OnPostInitGame()
 				continue;
 			
 			if (HasAPBit("ArchipelagoEnabled", 1, save))
+			{
 				save.AllowSaving = false;
+				SetAPBits("SaveFileLoad", 0, save);
+			}
 		}
 		
 		ResetEverything();
@@ -1059,16 +1061,16 @@ function OnFullyConnected()
 	
 	if (IsOnlineParty())
 	{
-		SendOnlinePartyCommand(string(SlotData.Seed)$"+"$SlotData.PlayerSlot, 'APSeedCheck', GetALocalPlayerController().Pawn);
+		SendOnlinePartyCommand(SlotData.Seed$"+"$SlotData.PlayerSlot, 'APSeedCheck', GetALocalPlayerController().Pawn);
 	}
 	
 	if (SlotData.ShuffleActContracts)
 	{
 		// The bag trap in Subcon Forest perma-locks if player has Subcon Well contract. Send the location if we enter Act 1 with it.
-		if (SlotData.ObtainedContracts.Find(class'Hat_SnatcherContract_IceWall') != -1 && !IsLocationChecked(300200) 
+		if (SlotData.ObtainedContracts.Find(class'Hat_SnatcherContract_IceWall') != -1 && !IsLocationChecked(2000300200) 
 		&& `GameManager.GetCurrentMapFilename() == "subconforest" && `GameManager.IsCurrentAct(1))
 		{
-			SendLocationCheck(300200);
+			SendLocationCheck(2000300200);
 		}
 	}
 	
@@ -1078,11 +1080,11 @@ function OnFullyConnected()
 event OnOnlinePartyCommand(string Command, Name CommandChannel, Hat_GhostPartyPlayerStateBase Sender)
 {
 	local Actor a;
-	local int seed, slot, i, locId;
+	local int slot, i, locId;
 	local bool isLive;
 	local JsonObject locSync, actSync;
 	local array<Hat_ChapterInfo> chapterInfoArray;
-	local String hourglass, map;
+	local String hourglass, map, seed;
 	local array<string> hourglasses;
 	local Hat_ChapterInfo chapter;
 	local Hat_ChapterActInfo act;
@@ -1090,9 +1092,9 @@ event OnOnlinePartyCommand(string Command, Name CommandChannel, Hat_GhostPartyPl
 	if (CommandChannel == 'APSeedCheck')
 	{
 		slot = int(Split(Command, "+", true));
-		seed = int(Repl(Command, "+"$slot, ""));
+		seed = Repl(Command, "+"$slot, "");
 		
-		if (SlotData.Seed == seed && SlotData.PlayerSlot == slot || Command == "MatchingSeed")
+		if (SlotData.Seed ~= seed && SlotData.PlayerSlot == slot || Command == "MatchingSeed")
 		{
 			// If we have a matching seed and slot number, add this guy to our list of valid buddies.
 			if (Buddies.Find(Sender) == -1)
@@ -1225,9 +1227,11 @@ function LoadSlotData(JsonObject json)
 	SlotData.ShuffleZiplines = json.GetBoolValue("ShuffleAlpineZiplines");
 	SlotData.UmbrellaLogic = json.GetBoolValue("UmbrellaLogic");
 	SlotData.ShuffleSubconPaintings = json.GetBoolValue("ShuffleSubconPaintings");
+	SlotData.NoPaintingSkips = json.GetBoolValue("NoPaintingSkips");
 	SlotData.CTRLogic = json.GetIntValue("CTRLogic");
 	SlotData.DeathLink = json.GetBoolValue("death_link");
-	SlotData.Seed = json.GetIntValue("SeedNumber");
+	SlotData.Seed = json.GetStringValue("SeedNumber");
+	SlotData.SeedName = json.GetStringValue("SeedName");
 	SlotData.HatItems = json.GetBoolValue("HatItems");
 	
 	SlotData.CompassBadgeMode = json.GetIntValue("CompassBadgeMode");
@@ -1648,6 +1652,9 @@ function OnMiniMissionGenericEvent(Object MiniMission, String id)
 
 function OnPreOpenHUD(HUD InHUD, out class<Object> InHUDElement)
 {
+	local Archipelago_HUDElementLocationBanner_Metro banner;
+	local Name locName;
+
 	if (IsCurrentPatch())
 		return;
 	
@@ -1673,6 +1680,17 @@ function OnPreOpenHUD(HUD InHUD, out class<Object> InHUDElement)
 		case class'Hat_HUDElementLocationBanner_Metro':
 			if (`GameManager.GetCurrentMapFilename() != "dlc_metro")
 				break;
+			
+			banner = Archipelago_HUDElementLocationBanner_Metro(Hat_HUD(InHUD).GetHUD(class'Archipelago_HUDElementLocationBanner_Metro'));
+			if (banner != None)
+			{
+				locName = class'Hat_HUDElementLocationBanner_Metro'.static.GetNewLocationName();
+				if (locName != '' && banner.LocationName == locName)
+				{
+					InHUDElement = None;
+					break;
+				}		
+			}
 			
 			InHUDElement = class'Archipelago_HUDElementLocationBanner_Metro';
 			break;
@@ -2138,7 +2156,7 @@ static function int GetTimePieceLocationID(string Identifier)
 	
 	// Happens to be the same as Green Clean Station
 	if (Identifier ~= "Metro_Escape")
-		return 311210;
+		return 2000311210;
 	
 	for (i = 0; i < Len(Identifier); i++)
 		id += Asc(Mid(Identifier, i, 1));
@@ -2378,29 +2396,27 @@ function bool IsActCompletable(Hat_ChapterActInfo act, Hat_Loadout lo, optional 
 				&& lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteC')
 				&& lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteD');
 		
+		case "subcon_village_icewall":
+			return !SlotData.ShuffleSubconPaintings || GetPaintingUnlocks() >= 1;
+		
+		case "subcon_cave":
+			if (!class'Archipelago_HUDElementItemFinder'.static.CanSkipPaintings() && GetPaintingUnlocks() <= 0)
+				return false;
+			
+			return difficulty >= 0 || canHit && hookshot;
+		
 		case "chapter2_toiletboss":
-			if (difficulty < 2 && SlotData.ShuffleSubconPaintings && GetPaintingUnlocks() <= 0)
+			if ((difficulty < 2 || !class'Archipelago_HUDElementItemFinder'.static.CanSkipPaintings()) 
+			&& SlotData.ShuffleSubconPaintings && GetPaintingUnlocks() <= 0)
 				return false;
 			
 			return hookshot && canHit;
 		
 		case "vanessa_manor_attic":
-			if (difficulty < 2 && SlotData.ShuffleSubconPaintings && GetPaintingUnlocks() <= 0)
+			if (!class'Archipelago_HUDElementItemFinder'.static.CanSkipPaintings() && GetPaintingUnlocks() <= 0)
 				return false;
 			
-			return canHitMaskBypass || difficulty >= 2;
-		
-		case "subcon_village_icewall":
-			return !SlotData.ShuffleSubconPaintings || GetPaintingUnlocks() >= 1;
-		
-		case "subcon_cave":
-			if (difficulty < 2 && SlotData.ShuffleSubconPaintings && GetPaintingUnlocks() <= 0)
-				return false;
-			
-			if (difficulty < 0 && !canHit)
-				return false;
-			
-			return difficulty >= 2 || hookshot;
+			return canHitMaskBypass || difficulty >= 0;
 		
 		case "TheFinale_FinalBoss":
 			return (difficulty >= 1 || hookshot) && lo.BackpackHasInventory(class'Hat_Ability_FoxMask');
@@ -2654,7 +2670,7 @@ function ShuffleCollectibles(optional bool cache)
 	else if (mapName ~= "hub_spaceship")
 	{
 		// Rumbi
-		locationArray.AddItem(301000);
+		locationArray.AddItem(2000301000);
 	}
 	
 	for (i = 0; i < ChestArray.Length; i++)
@@ -2717,7 +2733,7 @@ function ShuffleCollectibles(optional bool cache)
 			continue;
 		
 		locId = ObjectToLocationId(npc);
-		if (locId != 303832 && locId != 303833)
+		if (locId != 2000303832 && locId != 2000303833)
 			continue;
 		
 		// Old guys don't appear in SCFOS/HUMT
@@ -3037,12 +3053,12 @@ function ShopItemInfo CreateShopItemInfo(class<Archipelago_ShopItem_Base> itemCl
 	if (class<Archipelago_ShopItem_Metro>(itemClass) != None)
 	{
 		shopInfo.PonCost = SlotData.MetroMinPonCost + 
-			class'Hat_Math'.static.SeededRandWithSeed(SlotData.MetroMaxPonCost-SlotData.MetroMinPonCost+1, SlotData.Seed+SlotData.ShopItemRandStep);
+			class'Hat_Math'.static.SeededRandWithSeed(SlotData.MetroMaxPonCost-SlotData.MetroMinPonCost+1, int(SlotData.Seed)+SlotData.ShopItemRandStep);
 	}
 	else
 	{
 		shopInfo.PonCost = SlotData.MinPonCost + 
-			class'Hat_Math'.static.SeededRandWithSeed(SlotData.MaxPonCost-SlotData.MinPonCost+1, SlotData.Seed+SlotData.ShopItemRandStep);
+			class'Hat_Math'.static.SeededRandWithSeed(SlotData.MaxPonCost-SlotData.MinPonCost+1, int(SlotData.Seed)+SlotData.ShopItemRandStep);
 	}
 	
 	SlotData.ShopItemRandStep++;
@@ -3324,8 +3340,11 @@ function OnLoadoutChanged(PlayerController controller, Object loadout, Object ba
 	&& class<Archipelago_Weapon_Umbrella>(item.BackpackClass) == None)
 	{
 		Hat_Loadout(loadout).RemoveBackpack(item);
-		SendLocationCheck(UmbrellaCheck);
-		SetAPBits("UmbrellaCheck", 1);
+		if (`GameManager.GetCurrentMapFilename() ~= "mafia_town" && `GameManager.IsCurrentAct(1))
+		{
+			SendLocationCheck(UmbrellaCheck);
+			SetAPBits("UmbrellaCheck", 1);
+		}
 	}
 }
 
@@ -4221,6 +4240,13 @@ function string EncodeJson2(JsonObject json)
 	return message;
 }
 
+// Removes the \# at the start of the string when reading a value
+// This is mainly used to properly retrieve number values that could potentially be 64 bit which would break with JsonObject.GetIntValue()
+function string GetStringValue2(JsonObject json, string key)
+{
+	return Mid(json.GetStringValue(key), 2);
+}
+
 function bool IsFullyConnected()
 {
 	return (client != None && client.FullyConnected && !client.ConnectingToAP && client.LinkState == STATE_Connected);
@@ -4387,6 +4413,7 @@ function DebugMessage(String message, optional Name type, optional bool forceLog
     pc.ClientMessage(message, type, 8);
 }
 
+// Deprecated, no longer needed.
 function string LocationIDToName(string id)
 {
 	local int i, a;
@@ -4395,7 +4422,7 @@ function string LocationIDToName(string id)
 	{
 		for (a = 0; a < GameData[i].LocationMappings.Length; a++)
 		{
-			if (GameData[i].LocationMappings[a].ID == id)
+			if (GameData[i].LocationMappings[a].ID ~= id)
 				return GameData[i].LocationMappings[a].Location;
 		}
 	}
@@ -4406,12 +4433,12 @@ function string LocationIDToName(string id)
 function string ItemIDToName(string id)
 {
 	local int i, a;
-
+	
 	for (i = 0; i < GameData.Length; i++)
 	{
 		for (a = 0; a < GameData[i].ItemMappings.Length; a++)
 		{
-			if (GameData[i].ItemMappings[a].ID == id)
+			if (GameData[i].ItemMappings[a].ID ~= id)
 				return GameData[i].ItemMappings[a].Item;
 		}
 	}
@@ -4560,7 +4587,7 @@ function UnlockAlmostEverything()
 	`GameManager.AddEnergyBits(99999);
 }
 
-// DO NOT use the 310000 range, that is for act completion location IDs
+// DO NOT use the 2000310000 range, that is for act completion location IDs
 function int GetChapterIDRange(Hat_ChapterInfo chapter)
 {
 	switch (chapter)

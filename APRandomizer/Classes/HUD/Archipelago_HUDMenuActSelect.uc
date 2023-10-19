@@ -578,7 +578,7 @@ simulated function BuildBonusHourglassesSide(HUD H, Array<Hat_ChapterActInfo> Ho
 		
 		s.ActInfoboxName = basement == 0 ? GetLocalizedActName(shuffledAct, context) : 
 			GetLocalizedActName(Hat_ChapterActInfo(DynamicLoadObject(
-				"hatintime_chapterinfo.BattleOfTheBirds.BattleOfTheBirds_AwardCeremony", class'Hat_ChapterActInfo')), 0);
+				"hatintime_chapterinfo.BattleOfTheBirds.BattleOfTheBirds_DeadBirdStudio", class'Hat_ChapterActInfo')), 0)$"?";
 		
 		s.PosX = posx;
 		s.PosY = posy;

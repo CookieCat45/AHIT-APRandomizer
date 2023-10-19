@@ -5,8 +5,8 @@ class Archipelago_ShopItem_Base extends Hat_Collectible_Important
 
 var const editconst bool NeedsDLC2;
 var const editconst int LocationID;
-var string DisplayName;
 var string ItemNumberName; // Deprecated
+var string DisplayName;
 
 simulated static function string GetLocalizedItemName()
 {
@@ -33,7 +33,6 @@ defaultproperties
 {
     CollectSound = None;
     DisplayName = "Unknown Item";
-    ItemNumberName = "";
     SaveGameOnCollect = true;
     IsBackpackItem = false;
     ShouldShowInBackpack = false;

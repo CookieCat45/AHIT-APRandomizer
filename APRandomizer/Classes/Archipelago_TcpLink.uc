@@ -20,10 +20,8 @@ const GameCacheLimit = 4; // How many games to cache at a time to reduce stutter
 event PostBeginPlay()
 {
 	Super.PostBeginPlay();
-	
-	if (bool(`AP.DisableAutoConnect))
-		return;
-	
+	Connect();
+	/*
 	if (`AP.SlotData.ConnectedOnce)
 	{
 		Connect();
@@ -32,6 +30,7 @@ event PostBeginPlay()
 	{
 		`AP.OpenConnectBubble(1.0);
 	}
+	*/
 }
 
 function Connect()
@@ -114,7 +113,8 @@ event Opened()
 	$"Accept: /" $crlf);
 	LinkMode = MODE_Binary;
 	
-	`AP.DebugMessage("Waiting for RoomInfo packet...");
+	if (!ShouldFilterSelfJoins())
+		`AP.ScreenMessage("Connected to AP client, awaiting room information from server... (connect the AP client to the server if you haven't)");
 }
 
 function ConnectToAP()
@@ -129,12 +129,14 @@ function ConnectToAP()
 	ConnectingToAP = true;
 	CurrentMessage.Length = 0;
 	
+	// This Connect packet isn't actually sent to the server itself, but is used by the AP client
 	json = new class'JsonObject';
 	json.SetStringValue("cmd", "Connect");
 	json.SetStringValue("game", "A Hat in Time");
 	json.SetStringValue("name", `AP.SlotData.SlotName);
 	json.SetStringValue("password", `AP.SlotData.Password);
 	json.SetStringValue("uuid", "");
+	json.SetStringValue("seed_name", `AP.SlotData.SeedName); // Used by AP client for verification.
 	
 	json.SetIntValue("items_handling", 7);
 	json.SetBoolValue("slot_data", !`AP.SlotData.Initialized);
@@ -324,7 +326,7 @@ function ParseJSON(string json)
 	local JsonObject jsonObj, jsonChild, games, myGame, mappings, textObj;
 	local Archipelago_GameMod m;
 	local Archipelago_GameData data;
-	local LocationMap locMapping;
+	//local LocationMap locMapping;
 	local ItemMap itemMapping;
 	
 	m = `AP;
@@ -511,7 +513,7 @@ function ParseJSON(string json)
 						{
 							// Found an item
 							m.DebugMessage("Found item: " $s $", game: " $GamesToCache[i].Game);
-							itemMapping.ID = mappings.GetStringValue(s);
+							itemMapping.ID = m.GetStringValue2(mappings, s);
 							itemMapping.Item = s;
 							GamesToCache[i].ItemMappings.AddItem(itemMapping);
 							s = "";
@@ -524,6 +526,8 @@ function ParseJSON(string json)
 					}
 				}
 				
+				// Not necessary anymore. Item names are still needed for shops.
+				/*
 				mappings = myGame.GetObject("location_name_to_id");
 				json2 = mappings.EncodeJson(mappings);
 				b = false;
@@ -541,7 +545,7 @@ function ParseJSON(string json)
 						{
 							// Found a location
 							m.DebugMessage("Found location: " $s $", game: " $GamesToCache[i].Game);
-							locMapping.ID = mappings.GetStringValue(s);
+							locMapping.ID = m.GetStringValue2(mappings, s);
 							locMapping.Location = s;
 							GamesToCache[i].LocationMappings.AddItem(locMapping);
 							b = false;
@@ -553,6 +557,7 @@ function ParseJSON(string json)
 						s $= Mid(json2, a, 1);
 					}
 				}
+				*/
 				
 				class'Engine'.static.BasicSaveObject(GamesToCache[i], "APGameData/"$GamesToCache[i].Game, false, 2);
 				m.GameData.AddItem(GamesToCache[i]);
@@ -605,6 +610,8 @@ function ParseJSON(string json)
 			if (!ShouldFilterSelfJoins())
 				m.ScreenMessage("Successfully connected to " $m.SlotData.Host $":"$m.SlotData.Port);
 
+			`AP.SetAPBits("SaveFileLoad", 1);
+			
 			Reconnecting = false;
 			m.SlotData.PlayerSlot = jsonObj.GetIntValue("my_slot");
 			FullyConnected = true;
@@ -687,8 +694,7 @@ function ParseJSON(string json)
 				m.SendMultipleLocationChecks(missingLocs);
 			}
 			
-			//if (!m.SlotData.PlayerNamesInitialized)
-			if (true) // avoid breaking saves, for now
+			if (!m.SlotData.PlayerNamesInitialized)
 			{
 				// Initialize our player's names
 				m.ReplOnce(json, "players", "players_0", json, true);
@@ -722,7 +728,7 @@ function ParseJSON(string json)
 					}
 				}
 				
-				//m.SlotData.PlayerNamesInitialized = true;
+				m.SlotData.PlayerNamesInitialized = true;
 			}
 			
 			if (m.SlotData.DeathLink)
@@ -739,7 +745,7 @@ function ParseJSON(string json)
 		case "PrintJSON":
 			if (ShouldFilterSelfJoins() && jsonObj.GetStringValue("type") == "Join")
 			{
-				if (InStr(json, m.SlotData.SlotName) != -1)
+				if (InStr(json, ""$m.SlotData.SlotName$" ") != -1)
 					break;
 			}
 			
@@ -913,7 +919,7 @@ function OnLocationInfoCommand(string json)
 			if (!m.GetShopItemInfo(shopItemClass))
 			{
 				m.CreateShopItemInfo(shopItemClass, 
-					jsonChild.GetStringValue("item"),
+					m.GetStringValue2(jsonChild, "item"),
 					jsonChild.GetIntValue("flags"),
 					jsonChild.GetIntValue("player"));
 			}
@@ -945,7 +951,7 @@ function OnLocationInfoCommand(string json)
 				}
 				
 				m.CreateItem(locId, 
-					jsonChild.GetStringValue("item"),
+					m.GetStringValue2(jsonChild, "item"),
 					jsonChild.GetIntValue("flags"),
 					jsonChild.GetIntValue("player"),
 					collectible);
@@ -962,7 +968,7 @@ function OnLocationInfoCommand(string json)
 		locId = jsonChild.GetIntValue("location");
 		if (m.IsLocationIDContainer(locId, container))
 		{
-			itemId = jsonChild.GetStringValue("item");
+			itemId = m.GetStringValue2(jsonChild, "item");
 			flags = jsonChild.GetIntValue("flags");
 			
 			locInfo.ID = locId;
@@ -984,7 +990,7 @@ function OnLocationInfoCommand(string json)
 				continue;
 
 			item = m.CreateItem(locId, 
-				jsonChild.GetStringValue("item"),
+				m.GetStringValue2(jsonChild, "item"),
 				jsonChild.GetIntValue("flags"),
 				jsonChild.GetIntValue("player"),
 				,
@@ -998,7 +1004,7 @@ function OnLocationInfoCommand(string json)
 		else
 		{
 			// Time piece/page/etc
-			itemId = jsonChild.GetStringValue("item");
+			itemId = m.GetStringValue2(jsonChild, "item");
 			flags = jsonChild.GetIntValue("flags");
 			
 			locInfo.ID = locId;
@@ -1124,11 +1130,11 @@ function GrantItem(int itemId, int playerId)
 		{
 			GrantTimePiece(playerId);
 		}
-		else if (itemId == 300003) // Progressive painting
+		else if (itemId == 2000300003) // Progressive painting
 		{
 			UnlockPaintings();
 		}
-		else if (itemId >= 300045 && itemId <= 300048)
+		else if (itemId >= 2000300045 && itemId <= 2000300048)
 		{
 			// Metro ticket. Update gates if we're currently in Metro
 			if (`GameManager.GetCurrentMapFilename() ~= "dlc_metro")
@@ -1185,7 +1191,7 @@ function GrantItem(int itemId, int playerId)
 		
 		contract.static.UnlockActs(save);
 	}
-	else if (itemId == 300204 || itemId == 300205 || itemId == 300206 || itemId == 300207)
+	else if (itemId == 2000300204 || itemId == 2000300205 || itemId == 2000300206 || itemId == 2000300207)
 	{
 		UnlockZipline(itemId);
 	}
@@ -1232,19 +1238,19 @@ function UnlockZipline(int id)
 	
 	switch (id)
 	{
-		case 300204: // Birdhouse Path
+		case 2000300204: // Birdhouse Path
 			zipline = "Hat_SandTravelNode_44";
 			break;
 		
-		case 300205: // Lava Cake Path
+		case 2000300205: // Lava Cake Path
 			zipline = "Hat_SandTravelNode_15";
 			break;
 		
-		case 300206: // Windmill Path
+		case 2000300206: // Windmill Path
 			zipline = "Hat_SandTravelNode_17";
 			break;
 		
-		case 300207: // Twilight Bell Path
+		case 2000300207: // Twilight Bell Path
 			zipline = "Hat_SandTravelNode_43";
 			break;
 		
@@ -1617,7 +1623,7 @@ event Destroyed()
 
 function bool ShouldFilterSelfJoins()
 {
-	if (Reconnecting)
+	if (Reconnecting || `AP.GetAPBits("SaveFileLoad") == 0)
 		return false;
 	
 	return `AP.SlotData.ConnectedOnce;

@@ -2,6 +2,6 @@ class Archipelago_ShopItem_Cat_YellowOverpassA1 extends Archipelago_ShopItem_Met
 
 defaultproperties
 {
-    LocationID = 301018;
+    LocationID = 2000301018;
     ItemNumberName = "Item 1";
 }

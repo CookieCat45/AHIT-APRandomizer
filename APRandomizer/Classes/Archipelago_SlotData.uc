@@ -16,8 +16,9 @@ var string SlotName;
 var string Password;
 var string Host;
 var int Port;
-var int Seed;
 var int ShopItemRandStep;
+var string Seed;
+var string SeedName;
 var array<int> CheckedLocations;
 var array<int> PageLocationIDs;
 
@@ -28,6 +29,7 @@ var bool ShuffleStorybookPages;
 var bool ShuffleActContracts;
 var bool ShuffleZiplines;
 var bool ShuffleSubconPaintings;
+var bool NoPaintingSkips;
 var int CTRLogic;
 var bool UmbrellaLogic;
 var bool DeathLink;
@@ -94,6 +96,6 @@ var EHatType Hat5;
 
 defaultproperties
 {
-    Host="archipelago.gg";
-    Port=56510;
+    Host="localhost";
+    Port=11311;
 }
