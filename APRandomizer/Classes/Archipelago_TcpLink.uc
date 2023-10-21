@@ -440,7 +440,7 @@ function ParseJSON(string json)
 			
 			if (GamesToCache.Length > 0)
 			{
-				json2 = "[{\"cmd\":\"GetDataPackage\",\"games\":[";
+				json2 = "[{'cmd':'GetDataPackage','games':[";
 				for (i = GameCacheCount; i < GamesToCache.Length; i++)
 				{
 					json2 $= "\""$GamesToCache[i].Game$"\"";
@@ -464,6 +464,7 @@ function ParseJSON(string json)
 					}
 				}
 				
+				json2 = Repl(json2, "'", "\"");
 				m.ScreenMessage("Reading new game location/item data...");
 				m.ScreenMessage("*** PLEASE DO NOT CLOSE THE GAME EVEN IF IT STOPS RESPONDING, IT MAY STUTTER MULTIPLE TIMES DEPENDING ON THE SIZE OF THE MULTI ***", 'Warning');
 				SendBinaryMessage(json2);
@@ -568,7 +569,7 @@ function ParseJSON(string json)
 					break;
 			}
 			
-			json2 = "[{\"cmd\":\"GetDataPackage\",\"games\":[";
+			json2 = "[{'cmd':'GetDataPackage','games':[";
 			limit = 0;
 			for (i = GameCacheCount; i < GamesToCache.Length; i++)
 			{
@@ -595,6 +596,7 @@ function ParseJSON(string json)
 			
 			if (limit > 0)
 			{
+				json2 = Repl(json2, "'", "\"");
 				SendBinaryMessage(json2);
 			}
 			else
@@ -734,7 +736,8 @@ function ParseJSON(string json)
 			
 			if (m.SlotData.DeathLink)
 			{
-				json2 = "[{\"cmd\": \"ConnectUpdate\", \"tags\": [\"DeathLink\"]}]";
+				json2 = "[{'cmd': 'ConnectUpdate', 'tags': ['DeathLink']}]";
+				json2 = Repl(json2, "'", "\"");
 				SendBinaryMessage(json2);
 			}
 			

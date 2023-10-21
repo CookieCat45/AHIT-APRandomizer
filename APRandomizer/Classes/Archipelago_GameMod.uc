@@ -452,8 +452,7 @@ function OnPostInitGame()
 	local class<Hat_CosmeticItemQualityInfo> flair;
 	local Hat_ImpactInteract_Breakable_ChemicalBadge crate;
 	local Actor a;
-	local Light li;
-	
+
 	if (IsCurrentPatch())
 		return;
 	
@@ -550,12 +549,7 @@ function OnPostInitGame()
 			}
 		}
 		
-		foreach AllActors(class'Light', li)
-		{
-			li.LightComponent.SetEnabled(true);
-			li.bEnabled = true;
-		}
-		
+		SetTimer(0.2, false, NameOf(ForceLightsOn));
 		OpenBedroomDoor();
 		`SetMusicParameterInt('FirstChapterUnlockSilence', 0);
 		
@@ -881,6 +875,17 @@ function OnPostInitGame()
 		CreateClient();
 }
 
+function ForceLightsOn()
+{
+	local Light li;
+
+	foreach AllActors(class'Light', li)
+	{
+		li.LightComponent.SetEnabled(true);
+		li.bEnabled = true;
+	}
+}
+
 function FixInventoryIssues()
 {
 	local Hat_Loadout lo;
@@ -1017,7 +1022,8 @@ function KeepConnectionAlive()
 	if (!IsFullyConnected())
 		return;
 	
-	message = "[{\"cmd\":\"Bounce\",\"slots\":["$SlotData.PlayerSlot$"]}]";
+	message = "[{'cmd':'Bounce','slots':["$SlotData.PlayerSlot$"]}]";
+	message = Repl(message, "'", "\"");
 	client.SendBinaryMessage(message);
 }
 
@@ -1036,6 +1042,7 @@ function OnFullyConnected()
 	
 	SetTimer(0.5, false, NameOf(ShuffleCollectibles));
 	UpdateChapterInfo();
+	UpdateCurrentMap();
 	
 	// Have we beaten our seed? Send again in case we somehow weren't connected before.
 	if (HasAPBit("HasBeatenGame", 1))
@@ -1074,7 +1081,20 @@ function OnFullyConnected()
 		}
 	}
 	
-	SetTimer(60.0, true, NameOf(KeepConnectionAlive));
+	SetTimer(180.0, true, NameOf(KeepConnectionAlive));
+}
+
+function UpdateCurrentMap()
+{
+	local String json;
+	
+	if (!IsFullyConnected())
+		return;
+	
+	json = "[{'cmd':'Set','default':'','key':'ahit_currentmap_"$SlotData.SlotName;
+	json $= "','operations':[{'operation':'replace','value':'"$`GameManager.GetCurrentMapFilename()$"'}]}]";
+	json = Repl(json, "'", "\"");
+	client.SendBinaryMessage(json);
 }
 
 event OnOnlinePartyCommand(string Command, Name CommandChannel, Hat_GhostPartyPlayerStateBase Sender)
@@ -2370,6 +2390,9 @@ function bool IsActCompletable(Hat_ChapterActInfo act, Hat_Loadout lo, optional 
 			return umbrella;
 		
 		case "DeadBirdStudio":
+			if (!SlotData.UmbrellaLogic && difficulty < 0)
+				return canHit;
+			
 			return difficulty >= 2 || canHit;
 		
 		case "Cruise_Boarding": case "Cruise_WaterRift_Slide": case "TimeRift_Water_Subcon_Hookshot": case "trainwreck_selfdestruct":
@@ -3320,7 +3343,8 @@ function OnPlayerDeath(Pawn Player)
 		return;
 	
 	// commit myurder
-	message = "[{\"cmd\":\"Bounce\",\"tags\":[\"DeathLink\"],\"data\":{\"time\":" $float(TimeStamp()) $",\"source\":" $"\"" $SlotData.SlotName $"\"" $"}}]";
+	message = "[{'cmd':'Bounce','tags':['DeathLink'],'data':{'time':" $float(TimeStamp()) $",'source':" $"'" $SlotData.SlotName $"'" $"}}]";
+	message = Repl(message, "'", "\"");
 	client.SendBinaryMessage(message);
 }
 
@@ -3670,7 +3694,7 @@ function SendLocationCheck(int id, optional bool scout, optional bool hint)
 	
 	if (!scout)
 	{
-		jsonMessage = "[{\"cmd\":\"LocationChecks\",\"locations\":[" $id $"]}]";
+		jsonMessage = "[{'cmd':'LocationChecks','locations':[" $id $"]}]";
 		DebugMessage("Sending location ID: " $id);
 		SlotData.CheckedLocations.AddItem(id);
 		PartySyncLocations_Single(id, , true);
@@ -3680,14 +3704,15 @@ function SendLocationCheck(int id, optional bool scout, optional bool hint)
 	{
 		if (hint)
 		{
-			jsonMessage = "[{\"cmd\":\"LocationScouts\",\"locations\":[" $id $"],\"create_as_hint\":2}]";
+			jsonMessage = "[{'cmd':'LocationScouts','locations':[" $id $"],'create_as_hint':2}]";
 		}
 		else
 		{
-			jsonMessage = "[{\"cmd\":\"LocationScouts\",\"locations\":[" $id $"]}]";
+			jsonMessage = "[{'cmd':'LocationScouts','locations':[" $id $"]}]";
 		}
 	}
 	
+	jsonMessage = Repl(jsonMessage, "'", "\"");
 	Client.SendBinaryMessage(jsonMessage);
 }
 
@@ -3711,7 +3736,7 @@ function SendMultipleLocationChecks(array<int> locationArray, optional bool scou
 	
 	if (!scout)
 	{
-		jsonMessage = "[{\"cmd\":\"LocationChecks\",\"locations\":[";
+		jsonMessage = "[{'cmd':'LocationChecks','locations':[";
 		for (i = 0; i < locationArray.Length; i++)
 		{
 			jsonMessage $= locationArray[i];
@@ -3727,7 +3752,7 @@ function SendMultipleLocationChecks(array<int> locationArray, optional bool scou
 	}
 	else
 	{
-		jsonMessage = "[{\"cmd\":\"LocationScouts\",\"locations\":[";
+		jsonMessage = "[{'cmd':'LocationScouts','locations':[";
 		for (i = 0; i < locationArray.Length; i++)
 		{
 			jsonMessage $= locationArray[i];
@@ -3740,7 +3765,7 @@ function SendMultipleLocationChecks(array<int> locationArray, optional bool scou
 	
 	if (scout && hint)
 	{
-		jsonMessage $= "],\"create_as_hint\":1";
+		jsonMessage $= "],'create_as_hint':1";
 	}
 	else
 	{
@@ -3748,6 +3773,7 @@ function SendMultipleLocationChecks(array<int> locationArray, optional bool scou
 	}
 	
 	jsonMessage $= "}]";
+	jsonMessage = Repl(jsonMessage, "'", "\"");
 	client.SendBinaryMessage(jsonMessage);
 }
 
