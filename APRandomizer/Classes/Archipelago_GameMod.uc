@@ -1091,7 +1091,7 @@ function UpdateCurrentMap()
 	if (!IsFullyConnected())
 		return;
 	
-	json = "[{'cmd':'Set','default':'','key':'ahit_currentmap_"$SlotData.SlotName;
+	json = "[{'cmd':'Set','default':'','key':'ahit_currentmap_"$SlotData.PlayerSlot;
 	json $= "','operations':[{'operation':'replace','value':'"$`GameManager.GetCurrentMapFilename()$"'}]}]";
 	json = Repl(json, "'", "\"");
 	client.SendBinaryMessage(json);
@@ -2100,7 +2100,7 @@ function OnTimePieceCollected(string Identifier)
 	
 	if (class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false))
 		return;
-
+	
 	if (SlotData.Goal == 1 && Identifier ~= "TheFinale_FinalBoss"
 		|| SlotData.Goal == 2 && Identifier ~= "Metro_Escape")
 	{
