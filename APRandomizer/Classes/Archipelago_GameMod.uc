@@ -1098,7 +1098,7 @@ function OnFullyConnected()
 			|| dw == class'Hat_SnatcherContract_ChallengeRoad')
 				continue;
 			
-			if (SlotData.ExcludedContracts.Find(dw) != -1)
+			if (SlotData.ExcludedContracts.Find(dw) != -1 || SlotData.DeathWishShuffle && SlotData.ShuffledDeathWishes.Find(dw) == -1)
 				continue;
 			
 			if (dw.static.IsContractPerfected())

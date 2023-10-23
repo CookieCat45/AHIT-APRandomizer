@@ -1509,7 +1509,7 @@ function OnRetrievedCommand(string json)
 	local int pos, i, v;
 	local string s, hourglass;
 	local bool b;
-	local JsonObject jsonObj;
+	local JsonObject jsonObj, jsonChild;
 	
 	m = `AP;
 	hourglass = "";
@@ -1552,6 +1552,7 @@ function OnRetrievedCommand(string json)
 	if (m.SlotData.DeathWish)
 	{
 		jsonObj = class'JsonObject'.static.DecodeJson(json);
+		jsonChild = jsonObj.GetObject("keys");
 		dws = class'Hat_ClassHelper'.static.GetAllScriptClasses("Hat_SnatcherContract_DeathWish");
 		for (i = 0; i < dws.Length; i++)
 		{
@@ -1560,13 +1561,13 @@ function OnRetrievedCommand(string json)
 			|| dw == class'Hat_SnatcherContract_ChallengeRoad')
 				continue;
 			
-			if (m.SlotData.ExcludedContracts.Find(dw) != -1)
+			if (m.SlotData.ExcludedContracts.Find(dw) != -1 || m.SlotData.DeathWishShuffle && m.SlotData.ShuffledDeathWishes.Find(dw) == -1)
 				continue;
 			
 			if (dw.static.IsContractPerfected())
 				continue;
 			
-			s = jsonObj.GetStringValue(string(dw));
+			s = jsonChild.GetStringValue(string(dw)$"_"$m.SlotData.PlayerSlot);
 			if (s != "")
 			{
 				for (v = 0; v <= 2; v++)
@@ -1576,11 +1577,11 @@ function OnRetrievedCommand(string json)
 				}
 			}
 		}
-
 	}
 	
 	m.SaveGame();
 	jsonObj = None;
+	jsonChild = None;
 }
 
 function SendBinaryMessage(string message, optional bool continuation, optional bool pong, optional string nullChar="")
