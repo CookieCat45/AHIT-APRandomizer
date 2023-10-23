@@ -1106,11 +1106,11 @@ function OnFullyConnected()
 			
 			if (dwClasses == "")
 			{
-				dwClasses $= "["$"`"$dw$"`";
+				dwClasses $= "["$"`"$dw$"_"$SlotData.PlayerSlot$"`";
 			}
 			else
 			{
-				dwClasses $= ","$"`"$dw$"`";
+				dwClasses $= ","$"`"$dw$"_"$SlotData.PlayerSlot$"`";
 			}
 		}
 		
