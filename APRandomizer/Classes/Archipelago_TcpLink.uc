@@ -440,7 +440,7 @@ function ParseJSON(string json)
 			
 			if (GamesToCache.Length > 0)
 			{
-				json2 = "[{'cmd':'GetDataPackage','games':[";
+				json2 = "[{\"cmd\":\"GetDataPackage\",\"games\":[";
 				for (i = GameCacheCount; i < GamesToCache.Length; i++)
 				{
 					json2 $= "\""$GamesToCache[i].Game$"\"";
@@ -464,7 +464,6 @@ function ParseJSON(string json)
 					}
 				}
 				
-				json2 = Repl(json2, "'", "\"");
 				m.ScreenMessage("Reading new game location/item data...");
 				m.ScreenMessage("*** PLEASE DO NOT CLOSE THE GAME EVEN IF IT STOPS RESPONDING, IT MAY STUTTER MULTIPLE TIMES DEPENDING ON THE SIZE OF THE MULTI ***", 'Warning');
 				SendBinaryMessage(json2);
@@ -563,13 +562,13 @@ function ParseJSON(string json)
 				class'Engine'.static.BasicSaveObject(GamesToCache[i], "APGameData/"$GamesToCache[i].Game, false, 2);
 				m.GameData.AddItem(GamesToCache[i]);
 				GameCacheCount++;
-
+				
 				limit++;
 				if (limit >= GameCacheLimit)
 					break;
 			}
 			
-			json2 = "[{'cmd':'GetDataPackage','games':[";
+			json2 = "[{\"cmd\":\"GetDataPackage\",\"games\":[";
 			limit = 0;
 			for (i = GameCacheCount; i < GamesToCache.Length; i++)
 			{
@@ -596,7 +595,6 @@ function ParseJSON(string json)
 			
 			if (limit > 0)
 			{
-				json2 = Repl(json2, "'", "\"");
 				SendBinaryMessage(json2);
 			}
 			else
@@ -612,8 +610,6 @@ function ParseJSON(string json)
 			
 			if (!ShouldFilterSelfJoins())
 				m.ScreenMessage("Successfully connected to AP Client (" $m.SlotData.Host $":"$m.SlotData.Port $")");
-			
-			`AP.SetAPBits("SaveFileLoad", 1);
 			
 			Reconnecting = false;
 			m.SlotData.PlayerSlot = jsonObj.GetIntValue("my_slot");
@@ -736,13 +732,14 @@ function ParseJSON(string json)
 			
 			if (m.SlotData.DeathLink)
 			{
-				json2 = "[{'cmd': 'ConnectUpdate', 'tags': ['DeathLink']}]";
-				json2 = Repl(json2, "'", "\"");
+				json2 = "[{`cmd`: `ConnectUpdate`, `tags`: [`DeathLink`]}]";
+				json2 = Repl(json2, "`", "\"");
 				SendBinaryMessage(json2);
 			}
 			
 			// Fully connected
 			m.OnFullyConnected();
+			`AP.SetAPBits("SaveFileLoad", 1);
 			break;
 			
 			
@@ -828,6 +825,11 @@ function ParseJSON(string json)
 		
 		case "Bounced":
 			OnBouncedCommand(json);
+			break;
+
+
+		case "Retrieved":
+			OnRetrievedCommand(json);
 			break;
 			
 		
@@ -1499,6 +1501,88 @@ function OnBouncedCommand(string json)
 	jsonChild = None;
 }
 
+function OnRetrievedCommand(string json)
+{
+	local Archipelago_GameMod m;
+	local class<Hat_SnatcherContract_DeathWish> dw;
+	local array<class< Object> > dws;
+	local int pos, i, v;
+	local string s, hourglass;
+	local bool b;
+	local JsonObject jsonObj;
+	
+	m = `AP;
+	hourglass = "";
+	pos = InStr(json, "\"ahit_clearedacts_"$`AP.SlotData.PlayerSlot$"\":[");
+	
+	if (pos != -1)
+	{
+		pos += Len("\"ahit_clearedacts_"$`AP.SlotData.PlayerSlot$"\":[");
+		for (i = pos; i < Len(json); i++)
+		{
+			s = Mid(json, i, 1);
+			if (s == "]")
+			{
+				break;
+			}
+			
+			if (b)
+			{
+				if (s == "\"")
+				{
+					b = false;
+					if (hourglass != "")
+					{
+						m.SetAPBits("ActComplete_"$hourglass, 1);
+						hourglass = "";
+					}
+				}
+				else
+				{
+					hourglass $= s;
+				}
+			}
+			else if (s == "\"")
+			{
+				b = true;
+			}
+		}
+	}
+	
+	if (m.SlotData.DeathWish)
+	{
+		jsonObj = class'JsonObject'.static.DecodeJson(json);
+		dws = class'Hat_ClassHelper'.static.GetAllScriptClasses("Hat_SnatcherContract_DeathWish");
+		for (i = 0; i < dws.Length; i++)
+		{
+			dw = class<Hat_SnatcherContract_DeathWish>(dws[i]);
+			if (dw == class'Hat_SnatcherContract_DeathWish'
+			|| dw == class'Hat_SnatcherContract_ChallengeRoad')
+				continue;
+			
+			if (m.SlotData.ExcludedContracts.Find(dw) != -1)
+				continue;
+			
+			if (dw.static.IsContractPerfected())
+				continue;
+			
+			s = jsonObj.GetStringValue(string(dw));
+			if (s != "")
+			{
+				for (v = 0; v <= 2; v++)
+				{
+					if (InStr(s, string(v)) != -1)
+						dw.static.ForceUnlockObjective(v);
+				}
+			}
+		}
+
+	}
+	
+	m.SaveGame();
+	jsonObj = None;
+}
+
 function SendBinaryMessage(string message, optional bool continuation, optional bool pong, optional string nullChar="")
 {
 	local byte byteMessage[255];
@@ -1627,7 +1711,7 @@ event Destroyed()
 
 function bool ShouldFilterSelfJoins()
 {
-	if (Reconnecting || `AP.GetAPBits("SaveFileLoad") == 0)
+	if (Reconnecting || `AP.IsSaveFileJustLoaded())
 		return false;
 	
 	return `AP.SlotData.ConnectedOnce;

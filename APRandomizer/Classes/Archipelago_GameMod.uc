@@ -5,7 +5,7 @@ class Archipelago_GameMod extends GameMod
 	dependson(Archipelago_GameData)
 	config(Mods);
 
-const SlotDataVersion = 4;
+const SlotDataVersion = 5;
 
 var Archipelago_TcpLink Client;
 var Archipelago_SlotData SlotData;
@@ -452,7 +452,7 @@ function OnPostInitGame()
 	local class<Hat_CosmeticItemQualityInfo> flair;
 	local Hat_ImpactInteract_Breakable_ChemicalBadge crate;
 	local Actor a;
-
+	
 	if (IsCurrentPatch())
 		return;
 	
@@ -1022,8 +1022,8 @@ function KeepConnectionAlive()
 	if (!IsFullyConnected())
 		return;
 	
-	message = "[{'cmd':'Bounce','slots':["$SlotData.PlayerSlot$"]}]";
-	message = Repl(message, "'", "\"");
+	message = "[{`cmd`:`Bounce`,`slots`:["$SlotData.PlayerSlot$"]}]";
+	message = Repl(message, "`", "\"");
 	client.SendBinaryMessage(message);
 }
 
@@ -1039,6 +1039,9 @@ function OnPreConnected()
 function OnFullyConnected()
 {
 	local int i;
+	local string json, dwClasses;
+	local class<Hat_SnatcherContract_DeathWish> dw;
+	local array<class< Object> > dws;
 	
 	SetTimer(0.5, false, NameOf(ShuffleCollectibles));
 	UpdateChapterInfo();
@@ -1081,6 +1084,58 @@ function OnFullyConnected()
 		}
 	}
 	
+	json = "[{`cmd`:`Get`,`keys`:[`ahit_clearedacts_"$SlotData.PlayerSlot$"`]}]";
+	json = Repl(json, "`", "\"");
+	client.SendBinaryMessage(json);
+	
+	if (SlotData.DeathWish)
+	{
+		dws = class'Hat_ClassHelper'.static.GetAllScriptClasses("Hat_SnatcherContract_DeathWish");
+		for (i = 0; i < dws.Length; i++)
+		{
+			dw = class<Hat_SnatcherContract_DeathWish>(dws[i]);
+			if (dw == class'Hat_SnatcherContract_DeathWish'
+			|| dw == class'Hat_SnatcherContract_ChallengeRoad')
+				continue;
+			
+			if (SlotData.ExcludedContracts.Find(dw) != -1)
+				continue;
+			
+			if (dw.static.IsContractPerfected())
+				continue;
+			
+			if (dwClasses == "")
+			{
+				dwClasses $= "["$"`"$dw$"`";
+			}
+			else
+			{
+				dwClasses $= ","$"`"$dw$"`";
+			}
+		}
+		
+		if (dwClasses != "")
+		{
+			dwClasses $= "]";
+			json = "[{`cmd`:`Get`,`keys`:"$dwClasses$"}]";
+			json = Repl(json, "`", "\"");
+			client.SendBinaryMessage(json);
+		}
+		
+		for (i = 0; i < SlotData.PendingCompletedDeathWishes.Length; i++)
+		{
+			UpdateCompletedDeathWishes(SlotData.PendingCompletedDeathWishes[i]);
+		}
+		
+		SlotData.PendingCompletedDeathWishes.Length = 0;
+	}
+	
+	for (i = 0; i < SlotData.PendingCompletedActs.Length; i++)
+	{
+		UpdateCompletedActs(SlotData.PendingCompletedActs[i]);
+	}
+	
+	SlotData.PendingCompletedActs.Length = 0;
 	SetTimer(180.0, true, NameOf(KeepConnectionAlive));
 }
 
@@ -1091,9 +1146,9 @@ function UpdateCurrentMap()
 	if (!IsFullyConnected())
 		return;
 	
-	json = "[{'cmd':'Set','default':'','key':'ahit_currentmap_"$SlotData.PlayerSlot;
-	json $= "','operations':[{'operation':'replace','value':'"$`GameManager.GetCurrentMapFilename()$"'}]}]";
-	json = Repl(json, "'", "\"");
+	json = "[{`cmd`:`Set`,`default`:``,`key`:`ahit_currentmap_"$SlotData.PlayerSlot;
+	json $= "`,`operations`:[{`operation`:`replace`,`value`:`"$`GameManager.GetCurrentMapFilename()$"`}]}]";
+	json = Repl(json, "`", "\"");
 	client.SendBinaryMessage(json);
 }
 
@@ -1102,12 +1157,16 @@ event OnOnlinePartyCommand(string Command, Name CommandChannel, Hat_GhostPartyPl
 	local Actor a;
 	local int slot, i, locId;
 	local bool isLive;
-	local JsonObject locSync, actSync;
+	local JsonObject locSync, actSync, dwSync;
+	local class<Hat_SnatcherContract_DeathWish> dw;
 	local array<Hat_ChapterInfo> chapterInfoArray;
 	local String hourglass, map, seed;
 	local array<string> hourglasses;
 	local Hat_ChapterInfo chapter;
 	local Hat_ChapterActInfo act;
+	
+	if (CommandChannel != 'APSeedCheck' && Buddies.Find(Sender) == -1)
+		return;
 	
 	if (CommandChannel == 'APSeedCheck')
 	{
@@ -1211,10 +1270,21 @@ event OnOnlinePartyCommand(string Command, Name CommandChannel, Hat_GhostPartyPl
 			i++;
 		}
 	}
+	else if (CommandChannel == 'APDeathWishStamps')
+	{
+		dwSync = class'JsonObject'.static.DecodeJson(Command);
+		dw = class<Hat_SnatcherContract_DeathWish>(class'Hat_ClassHelper'.static.ClassFromName(dwSync.GetStringValue("DeathWishClass")));
+		for (i = 0; i <= 2; i++)
+		{
+			if (dwSync.GetBoolValue(string(i)))
+				dw.static.ForceUnlockObjective(i);
+		}
+	}
 	
 	SaveGame();
 	locSync = None;
 	actSync = None;
+	dwSync = None;
 }
 
 function ResendLocations()
@@ -1228,7 +1298,7 @@ function ResendLocations()
 function LoadSlotData(JsonObject json)
 {
 	local array<Hat_ChapterInfo> chapters;
-	local array<string> actNames;
+	local array<Hat_ChapterActInfo> acts;
 	local ShuffledAct actShuffle;
 	local string n;
 	local int i, j, v;
@@ -1390,45 +1460,38 @@ function LoadSlotData(JsonObject json)
 		{
 			chapters[i].ConditionalUpdateActList();
 			for (j = 0; j < chapters[i].ChapterActInfo.Length; j++)
-				actNames.AddItem(PathName(chapters[i].ChapterActInfo[j]));
+				acts.AddItem(chapters[i].ChapterActInfo[j]);
 		}
 		
-		for (v = 0; v < actNames.Length; v++)
+		// Note: HasKey() doesn't work at all
+		for (v = 0; v < acts.Length; v++)
 		{
-			// HasKey() doesn't work :/
-			n = json.GetStringValue(actNames[v]);
+			// This is what our act is being replaced with
+			n = json.GetStringValue(acts[v].Hourglass);
 			if (n != "")
 			{
-				if (n ~= "DeadBirdBasement")
+				if (n ~= "chapter3_secret_finale")
 				{
 					// Ch.2 true finale needs a special flag, since there's no unique ChapterActInfo for it
-					actShuffle = CreateShuffledAct(Hat_ChapterActInfo(DynamicLoadObject(actNames[v], class'Hat_ChapterActInfo')), None);
+					actShuffle = CreateShuffledAct(acts[v], None);
 					actShuffle.IsDeadBirdBasementShuffledAct = true;
 				}
 				else
 				{
-					actShuffle = CreateShuffledAct(Hat_ChapterActInfo(DynamicLoadObject(actNames[v], class'Hat_ChapterActInfo')), 
-													Hat_ChapterActInfo(DynamicLoadObject(n, class'Hat_ChapterActInfo')));
+					actShuffle = CreateShuffledAct(acts[v], GetChapterActInfoFromHourglass(n));
 				}
-				
-				/*
-				if (actShuffle.NewAct != None && actShuffle.NewAct.Hourglass == "")
-				{
-					SetAPBits("ActComplete_"$actShuffle.OriginalAct.hourglass, 1);
-				}
-				*/
 				
 				SlotData.ShuffledActList.AddItem(actShuffle);
-				DebugMessage("FOUND act pair:" $actNames[v] $"REPLACED WITH: " $n);
+				DebugMessage("FOUND act pair:" $acts[v].Hourglass $"REPLACED WITH: " $n);
 			}
 		}
 		
 		// This is what the basement was replaced with
-		n = json.GetStringValue("DeadBirdBasement");
-		actShuffle = CreateShuffledAct(None, Hat_ChapterActInfo(DynamicLoadObject(n, class'Hat_ChapterActInfo')));
+		n = json.GetStringValue("chapter3_secret_finale");
+		actShuffle = CreateShuffledAct(None, GetChapterActInfoFromHourglass(n));
 		actShuffle.IsDeadBirdBasementOriginalAct = true;
 		SlotData.ShuffledActList.AddItem(actShuffle);
-		DebugMessage("FOUND act pair:" $"DeadBirdBasement" $"REPLACED WITH: " $n);
+		DebugMessage("FOUND act pair:" $"chapter3_secret_finale" $"REPLACED WITH: " $n);
 	}
 	
 	if (SlotData.UmbrellaLogic)
@@ -1773,6 +1836,7 @@ function OnDeathWishObjectiveCompleted(class<Hat_SnatcherContract_DeathWish> dw)
 {
 	local int id;
 	local array<int> locIds;
+	local bool update;
 	
 	id = class'Archipelago_ItemInfo'.static.GetDeathWishLocationID(dw);
 	if (id <= 0)
@@ -1799,12 +1863,14 @@ function OnDeathWishObjectiveCompleted(class<Hat_SnatcherContract_DeathWish> dw)
 		}
 		
 		SlotData.CompletedDeathWishes.AddItem(dw);
+		update = true;
 		locIds.AddItem(id);
 	}
 	
 	if (SlotData.AutoCompleteBonuses || dw.static.IsContractPerfected() && !dw.static.IsDeathWishEasyMode())
 	{
 		SlotData.PerfectedDeathWishes.AddItem(dw);
+		update = true;
 		
 		if (SlotData.BonusRewards)
 			locIds.AddItem(id+1);
@@ -1812,6 +1878,50 @@ function OnDeathWishObjectiveCompleted(class<Hat_SnatcherContract_DeathWish> dw)
 	
 	if (locIds.Length > 0)
 		SendMultipleLocationChecks(locIds);
+	
+	if (update)
+		UpdateCompletedDeathWishes(dw);
+}
+
+function UpdateCompletedDeathWishes(class<Hat_SnatcherContract_DeathWish> dw)
+{
+	local JsonObject jsonObj;
+	local int i;
+	local string json, objs;
+	
+	if (IsOnlineParty())
+	{
+		jsonObj = new class'JsonObject';
+		jsonObj.SetStringValue("DeathWishClass", string(dw));
+		for (i = 0; i <= 2; i++)
+		{
+			if (dw.static.IsObjectiveCompleted(i))
+				jsonObj.SetBoolValue(string(i), true);
+		}
+		
+		SendOnlinePartyCommand(jsonObj.EncodeJson(jsonObj), 'APDeathWishStamps', GetALocalPlayerController().Pawn);
+	}
+	
+	if (IsFullyConnected())
+	{
+		for (i = 0; i <= 2; i++)
+		{
+			if (dw.static.IsObjectiveCompleted(i))
+			{
+				objs $= i;
+			}
+		}
+		
+		objs $= "]";
+		json = "[{`cmd`:`Set`,`default`:``,`key`:`"$string(dw)$"_"$SlotData.PlayerSlot;
+		json $= "`,`operations`:[{`operation`:`add`,`value`:`"$objs$"`}]}]";
+		json = Repl(json, "`", "\"");
+		client.SendBinaryMessage(json);
+	}
+	else if (SlotData.PendingCompletedDeathWishes.Find(dw) == -1)
+	{
+		SlotData.PendingCompletedDeathWishes.AddItem(dw);
+	}
 }
 
 function CheckShopOverride(Hat_HUD hud)
@@ -2152,22 +2262,42 @@ function OnTimePieceCollected(string Identifier)
 		}
 		
 		SetAPBits("ActComplete_"$hourglass, 1);
+		UpdateCompletedActs(hourglass);
 		PartySyncActs_Single(hourglass);
 	}
 	else
 	{
 		DebugMessage("Completed act: " $GetChapterActInfoFromHourglass(Identifier));
 		SetAPBits("ActComplete_"$Identifier, 1);
-		PartySyncActs_Single(hourglass);
+		UpdateCompletedActs(Identifier);
+		PartySyncActs_Single(Identifier);
 	}
 	
-	if (hourglass == "")
+	if (SlotData.ActRando && hourglass == "")
 	{
 		DebugMessage("FAILED to find ChapterActInfo: "$Identifier, , true);
 		ScriptTrace();
 	}
 	
 	SendLocationCheck(id);
+}
+
+function UpdateCompletedActs(string hourglass)
+{
+	local String json;
+	
+	if (!IsFullyConnected())
+	{
+		if (SlotData.PendingCompletedActs.Find(hourglass) == -1)
+			SlotData.PendingCompletedActs.AddItem(hourglass);
+		
+		return;
+	}
+	
+	json = "[{`cmd`:`Set`,`default`:[],`key`:`ahit_clearedacts_"$SlotData.PlayerSlot;
+	json $= "`,`operations`:[{`operation`:`add`,`value`:[`"$hourglass$"`]}]}]";
+	json = Repl(json, "`", "\"");
+	client.SendBinaryMessage(json);
 }
 
 static function int GetTimePieceLocationID(string Identifier)
@@ -2189,6 +2319,16 @@ function Hat_ChapterActInfo GetChapterActInfoFromHourglass(string hourglass)
 	local array<Hat_ChapterInfo> chapterInfoArray;
 	local Hat_ChapterInfo chapter;
 	local Hat_ChapterActInfo act;
+	
+	// Special identifiers for act shuffle
+	if (hourglass ~= "AlpineFreeRoam")
+	{
+		return Hat_ChapterActInfo(DynamicLoadObject("hatintime_chapterinfo.AlpineSkyline.AlpineSkyline_IntroMountain", class'Hat_ChapterActInfo'));
+	}
+	else if (hourglass ~= "MetroFreeRoam")
+	{
+		return Hat_ChapterActInfo(DynamicLoadObject("hatintime_chapterinfo_dlc2.metro.Metro_FreeRoam", class'Hat_ChapterActInfo'));
+	}
 	
 	chapterInfoArray = class'Hat_ChapterInfo'.static.GetAllChapterInfo();
 	foreach chapterInfoArray(chapter)
@@ -3343,8 +3483,8 @@ function OnPlayerDeath(Pawn Player)
 		return;
 	
 	// commit myurder
-	message = "[{'cmd':'Bounce','tags':['DeathLink'],'data':{'time':" $float(TimeStamp()) $",'source':" $"'" $SlotData.SlotName $"'" $"}}]";
-	message = Repl(message, "'", "\"");
+	message = "[{`cmd`:`Bounce`,`tags`:[`DeathLink`],`data`:{`time`:" $float(TimeStamp()) $",`source`:" $"`" $SlotData.SlotName $"`" $"}}]";
+	message = Repl(message, "`", "\"");
 	client.SendBinaryMessage(message);
 }
 
@@ -3694,7 +3834,7 @@ function SendLocationCheck(int id, optional bool scout, optional bool hint)
 	
 	if (!scout)
 	{
-		jsonMessage = "[{'cmd':'LocationChecks','locations':[" $id $"]}]";
+		jsonMessage = "[{`cmd`:`LocationChecks`,`locations`:[" $id $"]}]";
 		DebugMessage("Sending location ID: " $id);
 		SlotData.CheckedLocations.AddItem(id);
 		PartySyncLocations_Single(id, , true);
@@ -3704,15 +3844,15 @@ function SendLocationCheck(int id, optional bool scout, optional bool hint)
 	{
 		if (hint)
 		{
-			jsonMessage = "[{'cmd':'LocationScouts','locations':[" $id $"],'create_as_hint':2}]";
+			jsonMessage = "[{`cmd`:`LocationScouts`,`locations`:[" $id $"],`create_as_hint`:2}]";
 		}
 		else
 		{
-			jsonMessage = "[{'cmd':'LocationScouts','locations':[" $id $"]}]";
+			jsonMessage = "[{`cmd`:`LocationScouts`,`locations`:[" $id $"]}]";
 		}
 	}
 	
-	jsonMessage = Repl(jsonMessage, "'", "\"");
+	jsonMessage = Repl(jsonMessage, "`", "\"");
 	Client.SendBinaryMessage(jsonMessage);
 }
 
@@ -3736,7 +3876,7 @@ function SendMultipleLocationChecks(array<int> locationArray, optional bool scou
 	
 	if (!scout)
 	{
-		jsonMessage = "[{'cmd':'LocationChecks','locations':[";
+		jsonMessage = "[{`cmd`:`LocationChecks`,`locations`:[";
 		for (i = 0; i < locationArray.Length; i++)
 		{
 			jsonMessage $= locationArray[i];
@@ -3752,7 +3892,7 @@ function SendMultipleLocationChecks(array<int> locationArray, optional bool scou
 	}
 	else
 	{
-		jsonMessage = "[{'cmd':'LocationScouts','locations':[";
+		jsonMessage = "[{`cmd`:`LocationScouts`,`locations`:[";
 		for (i = 0; i < locationArray.Length; i++)
 		{
 			jsonMessage $= locationArray[i];
@@ -3765,7 +3905,7 @@ function SendMultipleLocationChecks(array<int> locationArray, optional bool scou
 	
 	if (scout && hint)
 	{
-		jsonMessage $= "],'create_as_hint':1";
+		jsonMessage $= "],`create_as_hint`:1";
 	}
 	else
 	{
@@ -3773,7 +3913,7 @@ function SendMultipleLocationChecks(array<int> locationArray, optional bool scou
 	}
 	
 	jsonMessage $= "}]";
-	jsonMessage = Repl(jsonMessage, "'", "\"");
+	jsonMessage = Repl(jsonMessage, "`", "\"");
 	client.SendBinaryMessage(jsonMessage);
 }
 
@@ -4324,6 +4464,11 @@ function bool IsActReallyCompleted(Hat_ChapterActInfo act)
 	}
 	
 	return HasAPBit("ActComplete_"$act.hourglass, 1);
+}
+
+function bool IsSaveFileJustLoaded()
+{
+	return GetAPBits("SaveFileLoad") == 0;
 }
 
 function bool IsActFreeRoam(Hat_ChapterActInfo act)

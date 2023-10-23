@@ -21,6 +21,8 @@ var string Seed;
 var string SeedName;
 var array<int> CheckedLocations;
 var array<int> PageLocationIDs;
+var array<string> PendingCompletedActs;
+var array<class< Hat_SnatcherContract_DeathWish > > PendingCompletedDeathWishes;
 
 var int Goal;
 var int LogicDifficulty; // -1 = Normal, 0 = Moderate, 1 = Hard, 2 = Expert

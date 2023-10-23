@@ -374,6 +374,27 @@ function bool CanReachLocation(int id, HUD H)
 	
 	if (mapName ~= "DeadBirdStudio")
 	{
+		if (!m.SlotData.UmbrellaLogic)
+		{
+			if (difficulty < 0 && !lo.BackpackHasInventory(class'Archipelago_Weapon_Umbrella', true) 
+				&& !lo.BackpackHasInventory(class'Archipelago_Weapon_BaseballBat', true)
+				&& !lo.BackpackHasInventory(class'Hat_Ability_Chemical', true))
+			{
+				return id == 2000304874 || id == 2000305024 || id == 2000305248 || id == 2000305247 || id == 2000303898;
+			}
+			else
+			{
+				if (act == 6)
+				{
+					return difficulty >= 2 || id == 2000304874 || id == 2000305024 || id == 2000305248 || id == 2000305247;
+				}
+				else
+				{
+					return true;
+				}
+			}
+		}
+		
 		if (difficulty >= 2)
 		{
 			return true;
@@ -502,6 +523,9 @@ function bool CanReachLocation(int id, HUD H)
 	// Nyakuza Metro
 	if (id == 2000305111)
 	{
+		if (difficulty >= 0)
+			return true;
+		
 		// Green or blue ticket
 		return lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteB')
 			|| lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteC');
