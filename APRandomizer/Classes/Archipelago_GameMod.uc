@@ -1300,7 +1300,7 @@ function LoadSlotData(JsonObject json)
 	local array<Hat_ChapterInfo> chapters;
 	local array<Hat_ChapterActInfo> acts;
 	local ShuffledAct actShuffle;
-	local string n;
+	local string n, hg;
 	local int i, j, v;
 	local class<Hat_SnatcherContract_DeathWish> dw;
 	
@@ -1466,8 +1466,24 @@ function LoadSlotData(JsonObject json)
 		// Note: HasKey() doesn't work at all
 		for (v = 0; v < acts.Length; v++)
 		{
+			if (IsActFreeRoam(acts[v]))
+			{
+				if (acts[v].ChapterInfo.ChapterID == 4)
+				{
+					hg = "AlpineFreeRoam";
+				}
+				else if (SlotData.DLC2 && acts[v].ChapterInfo.ChapterID == 7)
+				{
+					hg = "MetroFreeRoam";
+				}
+			}
+			else
+			{
+				hg = acts[v].Hourglass;
+			}
+			
 			// This is what our act is being replaced with
-			n = json.GetStringValue(acts[v].Hourglass);
+			n = json.GetStringValue(hg);
 			if (n != "")
 			{
 				if (n ~= "chapter3_secret_finale")
@@ -1912,7 +1928,6 @@ function UpdateCompletedDeathWishes(class<Hat_SnatcherContract_DeathWish> dw)
 			}
 		}
 		
-		objs $= "]";
 		json = "[{`cmd`:`Set`,`default`:``,`key`:`"$string(dw)$"_"$SlotData.PlayerSlot;
 		json $= "`,`operations`:[{`operation`:`add`,`value`:`"$objs$"`}]}]";
 		json = Repl(json, "`", "\"");
@@ -2320,7 +2335,7 @@ function Hat_ChapterActInfo GetChapterActInfoFromHourglass(string hourglass)
 	local Hat_ChapterInfo chapter;
 	local Hat_ChapterActInfo act;
 	
-	// Special identifiers for act shuffle
+	// Special identifiers for act shuffle since Free Roam levels have no Time Piece
 	if (hourglass ~= "AlpineFreeRoam")
 	{
 		return Hat_ChapterActInfo(DynamicLoadObject("hatintime_chapterinfo.AlpineSkyline.AlpineSkyline_IntroMountain", class'Hat_ChapterActInfo'));
@@ -2589,6 +2604,10 @@ function bool IsActCompletable(Hat_ChapterActInfo act, Hat_Loadout lo, optional 
 		
 		case "Cruise_Sinking":
 			return difficulty >= 0 || lo.BackpackHasInventory(class'Hat_Ability_StatueFall');
+		
+		case "Cruise_CaveRift_Aquarium":
+			return hookshot && (difficulty >= 0 || lo.BackpackHasInventory(class'Hat_Ability_StatueFall'))
+					&& (difficulty >= 1 || lo.BackpackHasInventory(class'Hat_Ability_FoxMask'));
 		
 		case "AlpineSkyline_Finale":
 			return hookshot &&

@@ -404,6 +404,13 @@ function bool CanReachLocation(int id, HUD H)
 			return id == 2000304874 || id == 2000305024 || id == 2000305248 || id == 2000305247;
 		}
 	}
+	else if (mapName ~= "TimeRift_Cave_Aquarium")
+	{
+		if (!hookshot)
+		{
+			return id == 2000346454 || id == 2000346452 || id == 2000346449;
+		}
+	}
 	else if (mapName ~= "dlc_metro" && act == 8)
 	{
 		return false;
