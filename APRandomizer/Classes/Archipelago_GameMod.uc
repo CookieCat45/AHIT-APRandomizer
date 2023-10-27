@@ -549,7 +549,7 @@ function OnPostInitGame()
 			}
 		}
 		
-		SetTimer(0.2, false, NameOf(ForceLightsOn));
+		ForceLightsOn();
 		OpenBedroomDoor();
 		`SetMusicParameterInt('FirstChapterUnlockSilence', 0);
 		
@@ -878,11 +878,20 @@ function OnPostInitGame()
 function ForceLightsOn()
 {
 	local Light li;
-
+	local PostProcessVolume vol;
 	foreach AllActors(class'Light', li)
 	{
 		li.LightComponent.SetEnabled(true);
 		li.bEnabled = true;
+	}
+	
+	foreach AllActors(class'PostProcessVolume', vol)
+	{
+		if (vol.Name == 'PostProcessVolume_1')
+		{
+			vol.bEnabled = false;
+			break;
+		}
 	}
 }
 
