@@ -1485,6 +1485,7 @@ function OnBouncedCommand(string json)
 		if (source != "" && source != `AP.SlotData.SlotName)
 		{
 			// commit myurder
+			`AP.DeathLinked = true;
 			foreach DynamicActors(class'Hat_Player', player)
 				player.Suicide();
 			

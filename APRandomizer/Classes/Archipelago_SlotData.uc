@@ -25,6 +25,7 @@ var array<string> PendingCompletedActs;
 var array<class< Hat_SnatcherContract_DeathWish > > PendingCompletedDeathWishes;
 
 var int Goal;
+var int TotalLocations;
 var int LogicDifficulty; // -1 = Normal, 0 = Moderate, 1 = Hard, 2 = Expert
 var bool ActRando;
 var bool ShuffleStorybookPages;
@@ -47,6 +48,7 @@ var int TaskStep;
 var int CompletedTasks;
 
 var bool DLC2;
+var int NoTicketSkips; // 2 means only Rush Hour ticket skips are allowed in logic
 var bool BaseballBat;
 
 var bool DeathWish;

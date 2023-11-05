@@ -268,6 +268,7 @@ defaultproperties
 	DoSpinEffect = true;
 	bAlwaysTick = true;
 	bNoDelete = false;
+	bCanBeDamaged = false;
 	TickOptimize = TickOptimize_Distance;
 	LocationId = 0;
 }

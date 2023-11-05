@@ -31,7 +31,7 @@ function OnOpenHUD(HUD H, optional String command)
 	{
 		// Subcon Well without Hookshot
 		HookshotRequiredLocs.RemoveItem(2000324311);
-
+		
 		// Birdhouse without Brewers
 		BrewingHatRequiredLocs.RemoveItem(2000335756);
 		BrewingHatRequiredLocs.RemoveItem(2000336497);
@@ -49,6 +49,12 @@ function OnOpenHUD(HUD H, optional String command)
 		// Clock Tower + Ruined Tower with nothing
 		HookshotRequiredLocs.RemoveItem(2000303481);
 		IceHatRequiredLocs.RemoveItem(2000304607);
+		
+		// Pink Paw Cat Vaccuum + Fan without Hookshot/Dweller
+		HookshotRequiredLocs.RemoveItem(2000305110);
+		HookshotRequiredLocs.RemoveItem(2000304106);
+		DwellerMaskRequiredLocs.RemoveItem(2000305110);
+		DwellerMaskRequiredLocs.RemoveItem(2000304106);
 	}
 	
 	if (difficulty >= 1)
@@ -62,6 +68,12 @@ function OnOpenHUD(HUD H, optional String command)
 		// Mafia Town - Above Boats without Hookshot
 		HookshotRequiredLocs.RemoveItem(2000305218);
 		
+		// Mafia Town - Hot Air Balloon without Ice Hat
+		IceHatRequiredLocs.RemoveItem(2000304829);
+
+		// Mafia Town - Top of Lighthouse without Hookshot
+		HookshotRequiredLocs.RemoveItem(2000304213);
+		
 		// Some Subcon locations without Hookshot
 		HookshotRequiredLocs.RemoveItem(2000324766);
 		HookshotRequiredLocs.RemoveItem(2000324856);
@@ -73,6 +85,9 @@ function OnOpenHUD(HUD H, optional String command)
 		
 		// Some Subcon locations without Dwellers
 		DwellerMaskRequiredLocs.RemoveItem(2000324766);
+		
+		// Subcon magnet badge bush without Brewing using cherries
+		BrewingHatRequiredLocs.RemoveItem(2000325479);
 	}
 }
 
@@ -87,6 +102,7 @@ function UpdateClosestMarker(HUD H)
 	local bool HasAnyDeathWishLevelTokens, onlyImportant, hasBrewing, valid;
 	local string mapName;
 	local Hat_ImpactInteract_Breakable_ChemicalBadge b;
+	local Archipelago_ShopInventory_Base shop;
 	local Archipelago_GameMod m;
 	local LocationInfo locInfo;
 	local Actor a;
@@ -191,7 +207,7 @@ function UpdateClosestMarker(HUD H)
 	
 	foreach H.PlayerOwner.DynamicActors(class'Actor', a)
 	{
-		if (mapName ~= "subconforest" && a.IsA('Hat_InteractiveFoliage_HarborBush') && hasBrewing)
+		if (mapName ~= "subconforest" && a.IsA('Hat_InteractiveFoliage_HarborBush'))
 		{
 			if (a.Name == 'Hat_InteractiveFoliage_HarborBush_2' || a.Name == 'Hat_InteractiveFoliage_HarborBush_3')
 			{
@@ -215,6 +231,26 @@ function UpdateClosestMarker(HUD H)
 			if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
 			
 			UpdateClosestMarker_Actor(H, a, closest_distance, bestindx);
+		}
+		else if (a.IsA('Hat_NPC_NyakuzaShop') || a.IsA('Hat_MetroTicketBooth_Base'))
+		{
+			if (m.HasAPBit("TalkedTo_"$a.Name, 1))
+				continue;
+			
+			if (a.IsA('Hat_NPC_NyakuzaShop') && m.GetAPBits(string(a.Name)) <= 0)
+				continue;
+			
+			if (!IsShopReachable(H, a))
+				continue;
+
+			shop = m.GetShopInventoryFromName(a.Name);
+			if (shop != None)
+			{
+				if (!onlyImportant || m.DoesShopHaveImportantItems(shop, true))
+				{
+					UpdateClosestMarker_Actor(H, a, closest_distance, bestindx);
+				}
+			}
 		}
 	}
 	
@@ -248,6 +284,37 @@ function UpdateClosestMarker(HUD H)
 	}
 }
 
+function bool IsShopReachable(HUD H, Actor a)
+{
+	local Hat_Loadout lo;
+	local int difficulty;
+	lo = Hat_PlayerController(H.PlayerOwner).MyLoadout;
+	difficulty = `AP.SlotData.LogicDifficulty;
+	
+	switch (a.Name)
+	{
+		// Green Clean Station below the Ice Hat trap door
+		case 'Hat_NPC_NyakuzaShop_6':
+			return lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteA') || lo.BackpackHasInventory(class'Hat_Ability_StatueFall');
+		
+		// Bluefin Tunnel
+		case 'Hat_NPC_NyakuzaShop_7':  case 'Hat_MetroTicketBooth_2':
+			return difficulty >= 0 && `AP.SlotData.NoTicketSkips == 0
+			|| lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteB') 
+			|| lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteC');
+		
+		// Pink Paw Station
+		case 'Hat_NPC_NyakuzaShop_12': case 'Hat_MetroTicketBooth_3':
+			return difficulty >= 0 && `AP.SlotData.NoTicketSkips == 0
+			|| (lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteD')
+			|| lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteA')
+			&& lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteC'))
+			&& (difficulty >= 0 || lo.BackpackHasInventory(class'Hat_Ability_Hookshot') && lo.BackpackHasInventory(class'Hat_Ability_FoxMask'));
+	}
+	
+	return true;
+}
+
 function bool Tick(HUD H, float d)
 {
 	IdleTime = 10.0;
@@ -259,6 +326,8 @@ function bool AreImportantItemsLeft(HUD H, optional bool traps=true)
 	local int i;
 	local string mapName;
 	local Archipelago_GameMod m;
+	local Actor a;
+	local Archipelago_ShopInventory_Base shop;
 	mapName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename();
 	m = `AP;
 	
@@ -268,8 +337,33 @@ function bool AreImportantItemsLeft(HUD H, optional bool traps=true)
 		&& m.SlotData.LocationInfoArray[i].Flags != ItemFlag_Garbage 
 		&& !m.SlotData.LocationInfoArray[i].IsStatic)
 		{
-			if (!m.IsLocationChecked(m.SlotData.LocationInfoArray[i].ID))
+			if (!m.IsLocationChecked(m.SlotData.LocationInfoArray[i].ID) && CanReachLocation(m.SlotData.LocationInfoArray[i].ID, H))
 				return true;
+		}
+	}
+	
+	if (`GameManager.GetCurrentMapFilename() ~= "dlc_metro")
+	{
+		foreach H.PlayerOwner.DynamicActors(class'Actor', a)
+		{
+			if (a.IsA('Hat_NPC_NyakuzaShop') || a.IsA('Hat_MetroTicketBooth_Base'))
+			{
+				if (m.HasAPBit("TalkedTo_"$a.Name, 1))
+					continue;
+				
+				if (a.IsA('Hat_NPC_NyakuzaShop') && m.GetAPBits(string(a.Name)) <= 0)
+					continue;
+				
+				if (!IsShopReachable(H, a))
+					continue;
+				
+				shop = m.GetShopInventoryFromName(a.Name);
+				if (shop != None)
+				{
+					if (m.DoesShopHaveImportantItems(shop, true))
+						return true;
+				}
+			}
 		}
 	}
 	
@@ -361,12 +455,23 @@ function bool CanReachLocation(int id, HUD H)
 			return false;
 	}
 	
+	// Goat Refinery
+	if (id == 2000333635)
+	{
+		if (class'Hat_SeqCond_IsAlpineFinale'.static.IsAlpineFinale())
+		{
+			return difficulty >= 1 || difficulty >= 0 && lo.BackpackHasInventory(class'Hat_Ability_Sprint');
+		}
+		
+		return hookshot && CanHitObjects(false, true);
+	}
+	
 	// Manor rooftop item
 	if (id == 2000325466)
 	{
 		if (difficulty >= 0)
 		{
-			return true;
+			return CanSkipPaintings() || m.GetPaintingUnlocks() >= 1;
 		}
 		
 		return (CanSkipPaintings() || m.GetPaintingUnlocks() >= 1) && CanHitObjects(true);
@@ -528,9 +633,9 @@ function bool CanReachLocation(int id, HUD H)
 	}
 	
 	// Nyakuza Metro
-	if (id == 2000305111)
+	if (id == 2000305111) // Bluefin Tunnel item
 	{
-		if (difficulty >= 0)
+		if (difficulty >= 0 && m.SlotData.NoTicketSkips == 0)
 			return true;
 		
 		// Green or blue ticket
@@ -549,14 +654,14 @@ function bool CanReachLocation(int id, HUD H)
 	}
 	else if (id == 2000304106)
 	{
-		if (difficulty >= 0)
+		if (difficulty >= 0 && m.SlotData.NoTicketSkips == 0)
 			return true;
 		
 		// Pink or yellow+blue AND Time Stop
 		return (lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteD')
 			|| lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteA')
 			&& lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteC'))
-			&& lo.BackpackHasInventory(class'Hat_Ability_TimeStop');
+			&& (difficulty >= 0 || lo.BackpackHasInventory(class'Hat_Ability_TimeStop'));
 	}
 	
 	return true;
@@ -645,6 +750,8 @@ defaultproperties
 	BrewingHatRequiredLocs[5] = 2000335885;
 	BrewingHatRequiredLocs[6] = 2000335886;
 	BrewingHatRequiredLocs[7] = 2000335492;
+	BrewingHatRequiredLocs[8] = 2000325479;
+	BrewingHatRequiredLocs[9] = 2000325478;
 	
 	BirdhousePathLocs[0] = 2000335911;
 	BirdhousePathLocs[1] = 2000335756;

@@ -5,19 +5,21 @@ class Archipelago_GameMod extends GameMod
 	dependson(Archipelago_GameData)
 	config(Mods);
 
-const SlotDataVersion = 5;
+const SlotDataVersion = 6;
 
 var Archipelago_TcpLink Client;
 var Archipelago_SlotData SlotData;
 var Archipelago_ItemResender ItemResender;
 var array<Archipelago_GameData> GameData;
 var array<Hat_GhostPartyPlayerStateBase> Buddies; // Online Party co-op support
+var array<class<Object> > CachedShopInvs;
 var transient int ActMapChangeChapter;
 var transient bool ActMapChange;
 var transient bool CollectiblesShuffled;
 var transient bool ControllerCapsLock;
 var transient bool ContractEventActive;
 var transient bool ItemSoundCooldown;
+var transient bool DeathLinked;
 var transient string DebugMsg;
 
 var config int DebugMode;
@@ -203,6 +205,7 @@ function bool ShouldFreezeParade(Hat_PlayerController c)
 event OnHookedActorSpawn(Object newActor, Name identifier)
 {
 	local int i;
+	local array<int> ids;
 	local Hat_SaveGame save;
 	local Hat_PlayerController ctr;
 	
@@ -227,6 +230,15 @@ event OnHookedActorSpawn(Object newActor, Name identifier)
 					DebugMessage("Hooking contract event: " $newActor.name);
 					ContractEventActive = true;
 					save = `SaveManager.GetCurrentSaveData();
+					
+					if (!HasAPBit("ContractScout", 1) && IsFullyConnected())
+					{
+						ids.AddItem(2000300201);
+						ids.AddItem(2000300202);
+						ids.AddItem(2000300203);
+						SendMultipleLocationChecks(ids, true, true);
+						SetAPBits("ContractScout", 1);
+					}
 					
 					for (i = 0; i < SlotData.ObtainedContracts.Length; i++)
 					{
@@ -319,8 +331,9 @@ event PreBeginPlay()
 	{
 		if (SlotData.Goal != 1)
 		{
-			// never play ending if our goal isn't Finale
+			// never play endgame cutscenes if our goal isn't Finale
 			class'Hat_SaveBitHelper'.static.SetActBits("thefinale_ending", 0);
+			class'Hat_SaveBitHelper'.static.SetLevelBits("MuMission_Finale", 1, "hub_spaceship");
 		}
 	}
 	
@@ -1022,7 +1035,7 @@ function OpenConnectBubble(optional float delay=0.0)
 	
 	hud = Hat_HUD(Hat_PlayerController(GetALocalPlayerController()).MyHUD);
 	bubble = Archipelago_HUDElementBubble(hud.OpenHUD(class'Archipelago_HUDElementBubble'));
-	bubble.OpenInputText(hud, "Please enter the IP:Port provided by the proxy. If you do not have a proxy, consult the setup guide.", class'Hat_ConversationType_Regular', 'a', 25);
+	bubble.OpenInputText(hud, "Please enter the IP:Port of the AHITClient (localhost:11311 by default, NOT archipelago.gg). If you do not have the AHITClient, consult the setup guide.", class'Hat_ConversationType_Regular', 'a', 25);
 }
 
 function KeepConnectionAlive()
@@ -1318,6 +1331,7 @@ function LoadSlotData(JsonObject json)
 	
 	SlotData.ConnectedOnce = true;
 	SlotData.Goal = json.GetIntValue("EndGoal");
+	SlotData.TotalLocations = json.GetIntValue("TotalLocations");
 	SlotData.LogicDifficulty = json.GetIntValue("LogicDifficulty");
 	SlotData.ActRando = json.GetBoolValue("ActRandomizer");
 	SlotData.StartWithCompassBadge = json.GetBoolValue("StartWithCompassBadge");
@@ -1361,6 +1375,7 @@ function LoadSlotData(JsonObject json)
 	if (SlotData.DLC2)
 	{
 		SlotData.Chapter7Cost = json.GetIntValue("Chapter7Cost");
+		SlotData.NoTicketSkips = json.GetIntValue("NoTicketSkips");
 		for (i = 0; i < ThugCatShops.Length; i++)
 		{
 			// Set shop item count as level bit
@@ -2015,6 +2030,11 @@ function CheckShopOverride(Hat_HUD hud)
 	if (newShop == None)
 		return;
 	
+	if (newShop.ShopNPCName != "")
+	{
+		SetAPBits("TalkedTo_"$newShop.ShopNPCName, 1);
+	}
+	
 	for (i = 0; i < newShop.ItemsForSale.Length; i++)
 	{
 		GetShopItemInfo(class<Archipelago_ShopItem_Base>(newShop.ItemsForSale[i].CollectibleClass), shopInfo);
@@ -2564,10 +2584,17 @@ function bool IsActCompletable(Hat_ChapterActInfo act, Hat_Loadout lo, optional 
 		
 		case "Metro_Escape":
 			if (difficulty >= 2)
-				return true;
+				return (SlotData.NoTicketSkips != 1
+				|| lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteA')
+				&& lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteC')
+				&& lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteD'));
 			
 			if (difficulty >= 1)
-				return lo.BackpackHasInventory(class'Hat_Ability_Chemical');
+				return lo.BackpackHasInventory(class'Hat_Ability_Chemical')
+				&& (SlotData.NoTicketSkips != 1
+				|| lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteA')
+				&& lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteC')
+				&& lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteD'));
 			
 			if (difficulty >= 0)
 				return lo.BackpackHasInventory(class'Hat_Ability_StatueFall')
@@ -3262,13 +3289,14 @@ function ShopItemInfo CreateShopItemInfo(class<Archipelago_ShopItem_Base> itemCl
 function Archipelago_ShopInventory_Base GetShopInventoryFromShopItem(class<Archipelago_ShopItem_Base> itemClass)
 {
 	local int i, j;
-	local array<class<Object > > invClasses;
 	local Archipelago_ShopInventory_Base shopInv;
 	
-	invClasses = class'Hat_ClassHelper'.static.GetAllScriptClasses("Archipelago_ShopInventory_Base");
-	for (i = 0; i < invClasses.Length; i++)
+	if (CachedShopInvs.Length <= 0)
+		CachedShopInvs = class'Hat_ClassHelper'.static.GetAllScriptClasses("Archipelago_ShopInventory_Base");
+	
+	for (i = 0; i < CachedShopInvs.Length; i++)
 	{
-		shopInv = new class<Archipelago_ShopInventory_Base>(invClasses[i]);
+		shopInv = new class<Archipelago_ShopInventory_Base>(CachedShopInvs[i]);
 
 		for (j = 0; j < shopInv.ItemsForSale.Length; j++)
 		{
@@ -3344,6 +3372,45 @@ function bool GetShopItemInfo(class<Archipelago_ShopItem_Base> itemClass, option
 	}
 	
 	return false;
+}
+
+function bool DoesShopHaveImportantItems(Archipelago_ShopInventory_Base shop, optional bool excludePurchased)
+{
+	local int i;
+	local ShopItemInfo shopInfo;
+	local Hat_PlayerController pc;
+	
+	pc = Hat_PlayerController(GetALocalPlayerController());
+	for (i = 0; i < shop.ItemsForSale.Length; i++)
+	{
+		if (GetShopItemInfo(class<Archipelago_ShopItem_Base>(shop.ItemsForSale[i].CollectibleClass), shopInfo))
+		{
+			if ((shopInfo.ItemFlags == ItemFlag_Important || shopInfo.ItemFlags == ItemFlag_ImportantSkipBalancing)
+			&& (!excludePurchased || !pc.HasCollectible(shop.ItemsForSale[i].CollectibleClass)))
+				return true;
+		}
+	}
+	
+	return false;
+}
+
+function Archipelago_ShopInventory_Base GetShopInventoryFromName(Name n)
+{
+	local int i;
+	
+	if (CachedShopInvs.Length <= 0)
+		CachedShopInvs = class'Hat_ClassHelper'.static.GetAllScriptClasses("Archipelago_ShopInventory_Base");
+	
+	for (i = 0; i < CachedShopInvs.Length; i++)
+	{
+		if (class<Archipelago_ShopInventory_Base>(CachedShopInvs[i]).default.ShopNPCName != ""
+			&& class<Archipelago_ShopInventory_Base>(CachedShopInvs[i]).default.ShopNPCName == string(n))
+		{
+			return new class<Archipelago_ShopInventory_Base>(CachedShopInvs[i]);
+		}
+	}
+	
+	return None;
 }
 
 function IterateChestArray()
@@ -3509,7 +3576,7 @@ function OnPlayerDeath(Pawn Player)
 	local string message;
 	if (!IsDeathLinkEnabled() || !IsArchipelagoEnabled() || !IsFullyConnected())
 		return;
-	
+
 	// commit myurder
 	message = "[{`cmd`:`Bounce`,`tags`:[`DeathLink`],`data`:{`time`:" $float(TimeStamp()) $",`source`:" $"`" $SlotData.SlotName $"`" $"}}]";
 	message = Repl(message, "`", "\"");
@@ -3864,7 +3931,10 @@ function SendLocationCheck(int id, optional bool scout, optional bool hint)
 	{
 		jsonMessage = "[{`cmd`:`LocationChecks`,`locations`:[" $id $"]}]";
 		DebugMessage("Sending location ID: " $id);
-		SlotData.CheckedLocations.AddItem(id);
+		
+		if (!IsLocationChecked(id))
+			SlotData.CheckedLocations.AddItem(id);
+
 		PartySyncLocations_Single(id, , true);
 		SaveGame();
 	}
@@ -3909,7 +3979,9 @@ function SendMultipleLocationChecks(array<int> locationArray, optional bool scou
 		{
 			jsonMessage $= locationArray[i];
 			DebugMessage("Sending location ID: " $locationArray[i]);
-			SlotData.CheckedLocations.AddItem(locationArray[i]);
+			
+			if (!IsLocationChecked(locationArray[i]))
+				SlotData.CheckedLocations.AddItem(locationArray[i]);
 			
 			if (i+1 < locationArray.Length)
 				jsonMessage $= ",";
@@ -3948,8 +4020,8 @@ function SendMultipleLocationChecks(array<int> locationArray, optional bool scou
 function WaitForContractEvent()
 {
 	local Actor event;
-
-	// Stupid, but sending in the event actor as a timer parameter and checking if it's None/has bDeleteMe doesn't work
+	
+	// Stupid, but sending in the event actor as a timer parameter and checking if it's None/has bDeleteMe doesn't seem to work
 	foreach DynamicActors(class'Actor', event)
 	{
 		if (event.IsA('Hat_SnatcherContractEvent'))
@@ -4328,6 +4400,7 @@ function BeatGame()
 	json.SetStringValue("cmd", "StatusUpdate");
 	json.SetIntValue("status", 30);
 	client.SendBinaryMessage(EncodeJson2(json));
+	ScreenMessage("Total Checks: " $SlotData.CheckedLocations.Length $"/"$SlotData.TotalLocations);
 	json = None;
 }
 
@@ -4443,12 +4516,12 @@ function string GetStringValue2(JsonObject json, string key)
 
 function bool IsFullyConnected()
 {
-	return (client != None && client.FullyConnected && !client.ConnectingToAP && client.LinkState == STATE_Connected);
+	return client != None && client.FullyConnected && !client.ConnectingToAP && client.LinkState == STATE_Connected;
 }
 
 function bool IsDeathLinkEnabled()
 {
-	return SlotData.DeathLink && !ContractEventActive;
+	return !DeathLinked && SlotData.DeathLink && !ContractEventActive;
 }
 
 function bool IsInSpaceship()

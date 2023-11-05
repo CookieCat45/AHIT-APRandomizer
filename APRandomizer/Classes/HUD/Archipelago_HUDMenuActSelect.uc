@@ -112,7 +112,7 @@ simulated function BuildActs(HUD H)
 		
 		s.ActInfoboxName = basement == 0 ? GetLocalizedActName(shuffledAct, context) : 
 			GetLocalizedActName(Hat_ChapterActInfo(DynamicLoadObject(
-				"hatintime_chapterinfo.BattleOfTheBirds.BattleOfTheBirds_AwardCeremony", class'Hat_ChapterActInfo')), 0);
+				"hatintime_chapterinfo.BattleOfTheBirds.BattleOfTheBirds_DeadBirdStudio", class'Hat_ChapterActInfo')), 0)$"?";
 		
 		if (ChapterInfo.IsActless)
 		{
@@ -382,6 +382,7 @@ simulated function BuildSpecialHourglasses(HUD H)
 			s.SpecialAnimation = None;
 		s.IsValid = true;
 		
+		basement = 0;
 		if (`AP.SlotData.ActRando)
 		{
 			if (ChapterInfo.ChapterID == 2 && s.ActID == 6 && `AP.IsAwardCeremonyCompleted())
@@ -405,10 +406,10 @@ simulated function BuildSpecialHourglasses(HUD H)
 		
 		s.ActInfoboxName = basement == 0 ? GetLocalizedActName(shuffledAct, context) : 
 			GetLocalizedActName(Hat_ChapterActInfo(DynamicLoadObject(
-				"hatintime_chapterinfo.BattleOfTheBirds.BattleOfTheBirds_AwardCeremony", class'Hat_ChapterActInfo')), 0);
+				"hatintime_chapterinfo.BattleOfTheBirds.BattleOfTheBirds_DeadBirdStudio", class'Hat_ChapterActInfo')), 0)$"?";
 		
 		s.ActDisplayLabel = s.ActInfoboxName;
-
+		s.IsMissingItem = shuffledAct.hourglass != "" && !`AP.IsActCompletable(shuffledAct, Hat_PlayerController(H.PlayerOwner).MyLoadout, bool(basement));
 		Hourglasses.AddItem(s);
 	}
 	else if (HasFreeRoam)
@@ -450,6 +451,7 @@ simulated function BuildSpecialHourglasses(HUD H)
 			s.SpecialAnimation = None;
 		s.IsValid = true;
 		
+		basement = 0;
 		if (`AP.SlotData.ActRando)
 		{
 			if (ChapterInfo.ChapterID == 2 && s.ActID == 6 && `AP.IsAwardCeremonyCompleted())
@@ -473,10 +475,10 @@ simulated function BuildSpecialHourglasses(HUD H)
 		
 		s.ActInfoboxName = basement == 0 ? GetLocalizedActName(shuffledAct, context) : 
 			GetLocalizedActName(Hat_ChapterActInfo(DynamicLoadObject(
-				"hatintime_chapterinfo.BattleOfTheBirds.BattleOfTheBirds_AwardCeremony", class'Hat_ChapterActInfo')), 0);
+				"hatintime_chapterinfo.BattleOfTheBirds.BattleOfTheBirds_DeadBirdStudio", class'Hat_ChapterActInfo')), 0)$"?";
 		
 		s.ActDisplayLabel = s.ActInfoboxName;
-
+		s.IsMissingItem = shuffledAct.hourglass != "" && !`AP.IsActCompletable(shuffledAct, Hat_PlayerController(H.PlayerOwner).MyLoadout, bool(basement));
 		Hourglasses.AddItem(s);
 	}
 }

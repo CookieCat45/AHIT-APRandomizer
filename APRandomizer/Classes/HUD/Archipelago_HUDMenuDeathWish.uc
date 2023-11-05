@@ -16,6 +16,34 @@ function bool IsActIncomplete(Hat_DeathWishIcon icon)
 	return false;
 }
 
+function RenderStampCounter(HUD H, float posx)
+{
+	local string StampString;
+	local float XL, YL, posy, IconSize, space;
+	local Color C;
+	
+	StampString = mod.SlotData.DeathWishShuffle ? string(mod.SlotData.ShuffledDeathWishes.Length) : NumStamps $ " / " $ TotalStamps;
+	H.Canvas.Font = class'Hat_FontInfo'.static.GetDefaultFont(StampString);
+	H.Canvas.StrLen(StampString, XL, YL);
+	XL *= H.Canvas.ClipY*0.00111;
+	IconSize = H.Canvas.ClipY*0.08;
+	posy = H.Canvas.ClipY*0.09 - class'Hat_Math'.static.InterpolationEaseInEaseOutJonas(H.Canvas.ClipY*0.2, 0, IntroOutro);
+	space = IconSize*0.11;
+	
+	C = class'Hat_SnatcherContract_DeathWish'.default.CompleteColor;
+	
+	H.Canvas.SetDrawColor(255, 255, 255);
+	DrawCenter(H, posx, posy, IconSize*4.6, IconSize*2.1, StampTotalBackground);
+	
+	H.Canvas.SetDrawColor(255, 255, 255);
+	DrawCenter(H, posx + space/2 + XL/2, posy, IconSize, IconSize, NumStamps >= TotalStamps ? class'Hat_SnatcherContract_DeathWish'.default.PerfectIcon : class'Hat_SnatcherContract_DeathWish'.default.CompleteIcon);
+	
+	if (NumStamps >= TotalStamps)
+		H.Canvas.SetDrawColor(C.R, C.G, C.B);
+	
+	DrawBorderedText(H.Canvas, StampString, posx - space/2 - IconSize/2, posy - IconSize*0.04, IconSize*0.0138, true, TextAlign_Center);
+}
+
 function bool Tick(HUD H, float d)
 {
 	if (!Super.Tick(H, d)) 
