@@ -5,7 +5,7 @@ class Archipelago_GameMod extends GameMod
 	dependson(Archipelago_GameData)
 	config(Mods);
 
-const SlotDataVersion = 6;
+const SlotDataVersion = 8;
 
 var Archipelago_TcpLink Client;
 var Archipelago_SlotData SlotData;
@@ -136,23 +136,16 @@ function SaveGame()
 {
 	if (SlotData != None && SlotData.Initialized)
 	{
-		if (class'Engine'.static.BasicSaveObject(SlotData, 
-		"APSlotData/slot_data"$`SaveManager.GetCurrentSaveData().CreationTimeStamp, false, SlotDataVersion, true))
-		{
-			DebugMessage("Saved slot data to file successfully!");
-		}
+		class'Engine'.static.BasicSaveObject(SlotData, "APSlotData/slot_data"$`SaveManager.GetCurrentSaveData().CreationTimeStamp, false, SlotDataVersion, true);
 	}
 	
 	if (ItemResender != None)
 	{
-		if (class'Engine'.static.BasicSaveObject(ItemResender, 
-		"APSlotData/item_resender"$`SaveManager.GetCurrentSaveData().CreationTimeStamp, false, 1, true))
-		{
-			DebugMessage("Saved item resender to file successfully!");
-		}
+		class'Engine'.static.BasicSaveObject(ItemResender, "APSlotData/item_resender"$`SaveManager.GetCurrentSaveData().CreationTimeStamp, false, 1, true);
 	}
 	
 	`SaveManager.SaveToFile(true);
+	DebugMessage("Saved the game");
 }
 
 event Tick(float d)
@@ -300,6 +293,7 @@ event PreBeginPlay()
 	local Hat_SaveGame save;
 	local string path;
 	local int i, pos, a, j;
+	local bool firstLoad;
 	
 	Super.PreBeginPlay();
 	
@@ -313,10 +307,26 @@ event PreBeginPlay()
 	if (!IsArchipelagoEnabled() && save.TotalPlayTime <= 0.0)
 	{
 		SetAPBits("ArchipelagoEnabled", 1);
+		firstLoad = true;
 	}
 	
 	if (!IsArchipelagoEnabled())
 		return;
+	
+	if (IsSaveFileJustLoaded())
+		firstLoad = true;
+	
+	if (firstLoad)
+	{
+		// set all to 99 to prevent chapters from unlocking before we get a chance to set the actual costs
+		SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo.maingame.MafiaTown', 99);
+		SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo.maingame.trainwreck_of_science', 99);
+		SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo.maingame.subconforest', 99);
+		SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo.maingame.Sand_and_Sails', 99);
+		SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo.maingame.Mu_Finale', 99);
+		SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo_DLC1.ChapterInfos.ChapterInfo_Cruise', 99);
+		SetChapterTimePieceRequirement(Hat_ChapterInfo'hatintime_chapterinfo_dlc2.ChapterInfos.ChapterInfo_Metro', 99);
+	}
 	
 	SlotData = new class'Archipelago_SlotData';
 	path = "APSlotData/slot_data"$`SaveManager.GetCurrentSaveData().CreationTimeStamp;
@@ -1569,9 +1579,10 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 	{
 		if (Hat_ChapterInfo(ChapterInfo).ChapterID == 4)
 		{
-			if (ActID == 99 && class'Hat_SaveBitHelper'.static.HasLevelBit("Actless_FreeRoam_Intro_Complete", 1, "AlpsAndSails"))
+			if (ActID == 99)
 			{
-				ActID = 1;
+				if (class'Hat_SaveBitHelper'.static.HasLevelBit("Actless_FreeRoam_Intro_Complete", 1, "AlpsAndSails"))
+					ActID = 1;
 				
 				if (class'Hat_SeqCond_IsAlpineFinale'.static.IsAlpineFinale())
 					DisableAlpineFinale();
@@ -2419,7 +2430,7 @@ function UpdateChapterInfo()
 	
 	UpdateActUnlocks();
 	
-	if (IsInSpaceship() && !class'Hat_SeqCond_IsMuMission'.static.IsFinaleMuMission() 
+	if (IsInSpaceship() && (IsSaveFileJustLoaded() || !class'Hat_SeqCond_IsMuMission'.static.IsFinaleMuMission())
 		&& !class'Hat_SaveBitHelper'.static.HasActBit("thefinale_ending", 1))
 	{
 		UpdatePowerPanels();
@@ -4574,6 +4585,10 @@ function bool IsSaveFileJustLoaded()
 
 function bool IsActFreeRoam(Hat_ChapterActInfo act)
 {
+	// -_-
+	if (act.Hourglass ~= "AlpineSkyline_Finale")
+		return false;
+	
 	return (act.ChapterInfo != None && (act.ChapterInfo.IsActless || act.ChapterInfo.HasFreeRoam)
 	&& (act.ActID == 99 || (act.ChapterInfo.ActIDAfterIntro > 0 && act.ActID == act.ChapterInfo.ActIDAfterIntro)) && !act.IsBonus);
 }

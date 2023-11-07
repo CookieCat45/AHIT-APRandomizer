@@ -708,13 +708,7 @@ function Array<Hat_ChapterActInfo> GetUnlockedActIDs(Hat_ChapterInfo ci, optiona
 
 simulated function bool HasActiveBlockingFinale(HUD H)
 {
-	local int TotalRequired, CompletedRequiredActsLength;
-	if (!ChapterInfo.FinaleIsBlocking) return false;
-	if (!GetFinaleInfo(H, TotalRequired, CompletedRequiredActsLength)) return false;
-	
-	if (`AP.IsChapterActInfoUnlocked(ChapterInfo.GetChapterActInfoFromActID(ChapterInfo.FinaleActID))) return false;
-	
-	return (CompletedRequiredActsLength >= TotalRequired);
+	return false;
 }
 
 simulated function bool GetFinaleInfo(HUD H, out int TotalRequired, out int CompletedRequiredActsLength)
