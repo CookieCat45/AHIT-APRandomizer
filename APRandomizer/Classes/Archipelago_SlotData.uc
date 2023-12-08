@@ -23,6 +23,7 @@ var array<int> CheckedLocations;
 var array<int> PageLocationIDs;
 var array<string> PendingCompletedActs;
 var array<class< Hat_SnatcherContract_DeathWish > > PendingCompletedDeathWishes;
+var Vector LastSpaceshipLocation;
 
 var int Goal;
 var int TotalLocations;
@@ -102,4 +103,5 @@ defaultproperties
 {
     Host="localhost";
     Port=11311;
+    LastSpaceshipLocation = (x=-134, y=295, z=295);
 }

@@ -5,7 +5,7 @@ class Archipelago_GameMod extends GameMod
 	dependson(Archipelago_GameData)
 	config(Mods);
 
-const SlotDataVersion = 8;
+const SlotDataVersion = 9;
 
 var Archipelago_TcpLink Client;
 var Archipelago_SlotData SlotData;
@@ -542,7 +542,10 @@ function OnPostInitGame()
 				if (ply.IsA('Hat_Player_MustacheGirl'))
 					continue;
 				
-				ply.SetLocation(SpaceshipSpawnLocation);
+				if (SlotData.Initialized)
+					ply.SetLocation(SlotData.LastSpaceshipLocation);
+				else
+					ply.SetLocation(SpaceshipSpawnLocation);
 			}
 		}
 		
@@ -1566,9 +1569,15 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 	local Hat_ChapterActInfo act, shuffled, ceremony;
 	local bool basementShuffle;
 	local int basement;
-
+	
 	if (!IsArchipelagoEnabled())
 		return;
+	
+	if (SlotData.Initialized && IsInSpaceship())
+	{
+		SlotData.LastSpaceshipLocation = GetALocalPlayerController().Pawn.Location;
+		SaveGame();
+	}
 	
 	if (InStr(MapName, "timerift_", false, true) == 0)
 		return;
@@ -5022,7 +5031,7 @@ defaultproperties
 	ParadeTrapMembers = 4;
 	ParadeTrapDelay = 1;
 	ParadeTrapSpread = 1;
-	SpaceshipSpawnLocation = (x=-2011, y=-1808, z=38);
+	SpaceshipSpawnLocation = (x=-134, y=295, z=295);
 	Camera1Loc = (x=-5367,y=6471,z=-468);
 	Camera2Loc = (x=5767,y=6763,z=-496);
 	
