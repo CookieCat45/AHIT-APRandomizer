@@ -582,11 +582,7 @@ function OnPostInitGame()
 		// Set this level bit to 0 so that Rumbi will drop the yarn and trigger the check
 		class'Hat_SaveBitHelper'.static.SetLevelBits("mu_preawakening_intruder_tutorial", 0);
 	}
-	
-	// We need to do this early, before connecting, otherwise the game
-	// might empty the chest on us if it has an important item in vanilla.
-	// Example of this happening is the Hookshot Badge chest in the Subcon Well.
-	// This will also prevent the player from possibly nabbing vanilla chest contents as well.
+
 	foreach DynamicActors(class'Hat_TreasureChest_Base', chest)
 	{
 		if (chest.Opened || class<Hat_Collectible_Important>(chest.Content) == None
@@ -1117,6 +1113,14 @@ function OnFullyConnected()
 		{
 			SendLocationCheck(2000300200);
 		}
+	}
+	
+	// The Hookshot Badge chest in Subcon Well opens itself if the player has Hookshot Badge, leaving the check unobtainable
+	if (`GameManager.GetCurrentMapFilename() == "subcon_cave" && !class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false)
+		&& Hat_PlayerController(GetALocalPlayerController()).MyLoadout.BackpackHasInventory(class'Hat_Ability_Hookshot')
+		&& !IsLocationChecked(2000324114))
+	{
+		SendLocationCheck(2000324114);
 	}
 	
 	json = "[{`cmd`:`Get`,`keys`:[`ahit_clearedacts_"$SlotData.PlayerSlot$"`]}]";
@@ -2795,12 +2799,19 @@ function bool IsChapterActInfoUnlocked(Hat_ChapterActInfo ChapterActInfo, option
 	
 	// If actless and we don't have this Time Piece (and its not the finale nor free roam nor rift), skip!
 	if (!ChapterActInfo.IsBonus && ChapterInfo.IsActless && (ChapterInfo.FinaleActID <= 0 || actid != ChapterInfo.FinaleActID) && !IsFreeRoam
-	&& !HasAPBit("ActComplete_"$ChapterActInfo.hourglass, 1)) 
+		&& !HasAPBit("ActComplete_"$ChapterActInfo.hourglass, 1)) 
 		return false;
 	
 	// Subcon Forest
 	if (!ChapterActInfo.IsBonus && !IsFreeRoam && actid > 1 && ChapterInfo.UnlockedByLevelBit != "")
 	{
+		// hotfix attempt for Chapter 3 levels disappearing after finale completion
+		if (ChapterInfo.ChapterID == 3)
+		{
+			if (HasAPBit("ActComplete_snatcher_boss", 1))
+				return true;
+		}
+		
 		return class'Hat_SaveBitHelper'.static.HasLevelBit(ChapterInfo.UnlockedByLevelBit, actid, ChapterInfo.GetActMap(1));
 	}
 	else if (IsPurpleRift(ChapterActInfo))
