@@ -15,22 +15,12 @@ var transient array<Archipelago_GameData> GamesToCache;
 var transient int GameCacheCount;
 
 const MaxSentMessageLength = 246;
-const GameCacheLimit = 4; // How many games to cache at a time to reduce stutter lag
+const GameCacheLimit = 3; // How many games to cache at a time to reduce stutter lag
 
 event PostBeginPlay()
 {
 	Super.PostBeginPlay();
 	Connect();
-	/*
-	if (`AP.SlotData.ConnectedOnce)
-	{
-		Connect();
-	}
-	else
-	{
-		`AP.OpenConnectBubble(1.0);
-	}
-	*/
 }
 
 function Connect()
@@ -44,11 +34,10 @@ function Connect()
 	
 	if (!ShouldFilterSelfJoins())
 	{
-		`AP.ScreenMessage("Connecting to A Hat in Time AP Client (" $`AP.SlotData.Host$":"$`AP.SlotData.Port $")");
+		`AP.ScreenMessage("Connecting to A Hat in Time AP Client");
 	}
 	
     Resolve(`AP.SlotData.Host);
-	
 	ClearTimer(NameOf(TimedOut));
 	SetTimer(10.0, false, NameOf(TimedOut));
 }
@@ -72,15 +61,7 @@ function TimedOut()
 {
 	if (!FullyConnected && !ConnectingToAP)
 	{
-		if (`AP.SlotData.ConnectedOnce)
-		{
-			`AP.ScreenMessage("Connection attempt timed out. Try changing port with ap_set_port <port> in the console?");
-		}
-		else
-		{
-			`AP.ScreenMessage("Connection attempt timed out.");
-		}
-		
+		`AP.ScreenMessage("Connection attempt timed out. Is the A Hat in Time AP Client running?");
 		ClearTimer(NameOf(Connect));
 		Close();
 	}
@@ -114,7 +95,7 @@ event Opened()
 	LinkMode = MODE_Binary;
 	
 	if (!ShouldFilterSelfJoins())
-		`AP.ScreenMessage("Connected to AP Client, awaiting room information from server... (connect the AP client to the server if you haven't)");
+		`AP.ScreenMessage("Connected to A Hat in Time AP Client, awaiting room information from server... (connect the A Hat in Time AP client to the server if you haven't)");
 }
 
 function ConnectToAP()
@@ -320,7 +301,7 @@ function ParseJSON(string json)
 {
 	local bool b;
 	local Name msgType;
-	local int i, a, count, pos, locId, count1, count2, limit;
+	local int i, a, count, pos, locId, count1, count2, limit, length;
 	local array<int> missingLocs;
 	local string s, text, num, json2, game, checksum, player;
 	local JsonObject jsonObj, jsonChild, games, myGame, mappings, textObj;
@@ -501,7 +482,8 @@ function ParseJSON(string json)
 				mappings = myGame.GetObject("item_name_to_id");
 				json2 = mappings.EncodeJson(mappings);
 				
-				for (a = 0; a < Len(json2); a++)
+				length = Len(json2);
+				for (a = 0; a < length; a++)
 				{
 					if (Mid(json2, a, 1) == "\"")
 					{
@@ -512,7 +494,9 @@ function ParseJSON(string json)
 						else
 						{
 							// Found an item
-							m.DebugMessage("Found item: " $s $", game: " $GamesToCache[i].Game);
+							if (bool(m.DebugMode))
+								m.DebugMessage("Found item: " $s $", game: " $GamesToCache[i].Game);
+
 							itemMapping.ID = m.GetStringValue2(mappings, s);
 							itemMapping.Item = s;
 							GamesToCache[i].ItemMappings.AddItem(itemMapping);
@@ -1694,15 +1678,7 @@ event Closed()
 	FullyConnected = false;
 	ConnectingToAP = false;
 	Reconnecting = true;
-	
-	if (`AP.SlotData.ConnectedOnce)
-	{
-		SetTimer(5.0, false, NameOf(Connect));
-	}
-	else
-	{
-		`AP.OpenConnectBubble(1.0);
-	}
+	SetTimer(5.0, false, NameOf(Connect));
 }
 
 event Destroyed()

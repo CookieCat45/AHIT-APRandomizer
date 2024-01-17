@@ -1903,9 +1903,8 @@ function OnDeathWishObjectiveCompleted(class<Hat_SnatcherContract_DeathWish> dw)
 	local bool update;
 	
 	id = class'Archipelago_ItemInfo'.static.GetDeathWishLocationID(dw);
-	if (id <= 0)
+	if (id <= 0) // likely a mod
 	{
-		ScreenMessage("[OnDeathWishObjectiveCompleted] contract with missing location ID: "$dw, 'Warning');
 		return;
 	}
 	
