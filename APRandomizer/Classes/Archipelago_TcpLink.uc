@@ -10,12 +10,8 @@ var transient bool FullyConnected;
 var transient bool Refused;
 var transient bool Reconnecting;
 var transient int EmptyCount;
-var transient bool GameDataLoaded;
-var transient array<Archipelago_GameData> GamesToCache;
-var transient int GameCacheCount;
 
 const MaxSentMessageLength = 246;
-const GameCacheLimit = 3; // How many games to cache at a time to reduce stutter lag
 
 event PostBeginPlay()
 {
@@ -301,14 +297,11 @@ function ParseJSON(string json)
 {
 	local bool b;
 	local Name msgType;
-	local int i, a, count, pos, locId, count1, count2, limit, length;
+	local int i, a, count, pos, locId, count1, count2;
 	local array<int> missingLocs;
-	local string s, text, num, json2, game, checksum, player;
-	local JsonObject jsonObj, jsonChild, games, myGame, mappings, textObj;
+	local string s, text, num, json2, player;
+	local JsonObject jsonObj, jsonChild, textObj;
 	local Archipelago_GameMod m;
-	local Archipelago_GameData data;
-	//local LocationMap locMapping;
-	local ItemMap itemMapping;
 	
 	m = `AP;
 	if (Len(json) <= 10) // this is probably garbage that we thought was a json
@@ -364,229 +357,8 @@ function ParseJSON(string json)
 	switch (jsonObj.GetStringValue("cmd"))
 	{
 		case "RoomInfo":
-			if (GameDataLoaded)
-			{
-				m.DebugMessage("Received RoomInfo packet, sending Connect packet...");
-				ConnectToAP();
-				break;
-			}
-			
-			games = jsonObj.GetObject("datapackage_checksums");
-			json2 = games.EncodeJson(games);
-			
-			b = true;
-			game = "";
-			
-			if (GamesToCache.Length == 0)
-			{
-				for (i = 0; i < Len(json2); i++)
-				{
-					if (!b && Mid(json2, i, 2) == "\",") // start of game name string
-					{
-						b = true;
-					}
-					else if (b && Mid(json2, i, 2) == "\":") // end of game name string
-					{
-						m.DebugMessage("Found game: " $game);
-						data = new class'Archipelago_GameData';
-						class'Engine'.static.BasicLoadObject(data, "APGameData/"$game, false, 2);
-						
-						// do we need to update the data for this game, or create it?
-						checksum = games.GetStringValue(game);
-						if (data.Game == "" || data.Checksum != checksum)
-						{
-							data.Game = game;
-							data.Checksum = checksum;
-							GamesToCache.AddItem(data);
-						}
-						else
-						{
-							m.GameData.AddItem(data);
-						}
-						
-						game = "";
-						b = false;
-					}
-					else if (b)
-					{
-						s = Mid(json2, i, 1);
-						
-						if (s != "\"" && s != "{" && s != "}" && s != ",")
-						{
-							game $= Mid(json2, i, 1);
-						}
-					}
-				}
-			}
-			
-			if (GamesToCache.Length > 0)
-			{
-				json2 = "[{\"cmd\":\"GetDataPackage\",\"games\":[";
-				for (i = GameCacheCount; i < GamesToCache.Length; i++)
-				{
-					json2 $= "\""$GamesToCache[i].Game$"\"";
-					limit++;
-					
-					// impose a limit because reading from too many games at once causes colossal stutters
-					if (limit >= GameCacheLimit)
-					{
-						json2 $= "]}]";
-						break;
-					}
-					
-					if (i < GamesToCache.Length-1)
-					{
-						json2 $= ",";
-					}
-					else
-					{
-						json2 $= "]}]";
-						break;
-					}
-				}
-				
-				m.ScreenMessage("Reading new game location/item data...");
-				m.ScreenMessage("*** PLEASE DO NOT CLOSE THE GAME EVEN IF IT STOPS RESPONDING, IT MAY STUTTER MULTIPLE TIMES DEPENDING ON THE SIZE OF THE MULTI ***", 'Warning');
-				SendBinaryMessage(json2);
-			}
-			else
-			{
-				GameDataLoaded = true;
-			}
-			
 			m.DebugMessage("Received RoomInfo packet, sending Connect packet...");
 			ConnectToAP();
-			break;
-		
-		case "DataPackage":
-			if (GameDataLoaded)
-				break;
-			
-			m.DebugMessage("Reading data package...");
-			games = jsonObj.GetObject("data").GetObject("games");
-			if (games == None)
-			{
-				m.DebugMessage("Failed to read datapackage!", , true);
-				break;
-			}
-			
-			for (i = GameCacheCount; i < GamesToCache.Length; i++)
-			{
-				myGame = games.GetObject(GamesToCache[i].Game);
-				if (myGame == None)
-				{
-					m.DebugMessage("Failed to cache game: " $GamesToCache[i].Game, , true);
-					continue;
-				}
-			
-				mappings = myGame.GetObject("item_name_to_id");
-				json2 = mappings.EncodeJson(mappings);
-				
-				length = Len(json2);
-				for (a = 0; a < length; a++)
-				{
-					if (Mid(json2, a, 1) == "\"")
-					{
-						if (!b)
-						{
-							b = true;
-						}
-						else
-						{
-							// Found an item
-							if (bool(m.DebugMode))
-								m.DebugMessage("Found item: " $s $", game: " $GamesToCache[i].Game);
-
-							itemMapping.ID = m.GetStringValue2(mappings, s);
-							itemMapping.Item = s;
-							GamesToCache[i].ItemMappings.AddItem(itemMapping);
-							s = "";
-							b = false;
-						}
-					}
-					else if (b)
-					{
-						s $= Mid(json2, a, 1);
-					}
-				}
-				
-				// Not necessary anymore. Item names are still needed for shops.
-				/*
-				mappings = myGame.GetObject("location_name_to_id");
-				json2 = mappings.EncodeJson(mappings);
-				b = false;
-				s = "";
-				
-				for (a = 0; a < Len(json2); a++)
-				{
-					if (Mid(json2, a, 1) == "\"")
-					{
-						if (!b)
-						{
-							b = true;
-						}
-						else
-						{
-							// Found a location
-							m.DebugMessage("Found location: " $s $", game: " $GamesToCache[i].Game);
-							locMapping.ID = m.GetStringValue2(mappings, s);
-							locMapping.Location = s;
-							GamesToCache[i].LocationMappings.AddItem(locMapping);
-							b = false;
-							s = "";
-						}
-					}
-					else if (b)
-					{
-						s $= Mid(json2, a, 1);
-					}
-				}
-				*/
-				
-				class'Engine'.static.BasicSaveObject(GamesToCache[i], "APGameData/"$GamesToCache[i].Game, false, 2);
-				m.GameData.AddItem(GamesToCache[i]);
-				GameCacheCount++;
-				
-				limit++;
-				if (limit >= GameCacheLimit)
-					break;
-			}
-			
-			json2 = "[{\"cmd\":\"GetDataPackage\",\"games\":[";
-			limit = 0;
-			for (i = GameCacheCount; i < GamesToCache.Length; i++)
-			{
-				json2 $= "\""$GamesToCache[i].Game$"\"";
-				limit++;
-				
-				// impose a limit because reading from too many games at once causes colossal stutters
-				if (limit >= GameCacheLimit)
-				{
-					json2 $= "]}]";
-					break;
-				}
-				
-				if (i < GamesToCache.Length-1)
-				{
-					json2 $= ",";
-				}
-				else
-				{
-					json2 $= "]}]";
-					break;
-				}
-			}
-			
-			if (limit > 0)
-			{
-				SendBinaryMessage(json2);
-			}
-			else
-			{
-				GameDataLoaded = true;
-				`AP.ScreenMessage("Finished loading new game data");
-			}
-			
 			break;
 		
 		case "Connected":
@@ -768,6 +540,7 @@ function ParseJSON(string json)
 						text $= player;
 						break;
 					
+					/*
 					case "item_id":
 						text $= m.ItemIDToName(textObj.GetStringValue("text"));
 						break;
@@ -775,6 +548,7 @@ function ParseJSON(string json)
 					case "location_id":
 						text $= m.LocationIDToName(textObj.GetStringValue("text"));
 						break;
+					*/
 					
 					default:
 						text $= textObj.GetStringValue("text");
@@ -859,9 +633,6 @@ function ParseJSON(string json)
 
 	jsonObj = None;
 	jsonChild = None;
-	myGame = None;
-	games = None;
-	mappings = None;
 	textObj = None;
 }
 

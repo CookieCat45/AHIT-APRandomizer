@@ -2,15 +2,13 @@ class Archipelago_GameMod extends GameMod
 	IterationOptimized
 	dependson(Archipelago_ItemInfo)
 	dependson(Archipelago_HUDElementBubble)
-	dependson(Archipelago_GameData)
 	config(Mods);
 
-const SlotDataVersion = 9;
+const SlotDataVersion = 11;
 
 var Archipelago_TcpLink Client;
 var Archipelago_SlotData SlotData;
 var Archipelago_ItemResender ItemResender;
-var array<Archipelago_GameData> GameData;
 var array<Hat_GhostPartyPlayerStateBase> Buddies; // Online Party co-op support
 var array<class<Object> > CachedShopInvs;
 var transient int ActMapChangeChapter;
@@ -48,6 +46,12 @@ struct immutable ShopItemInfo
 	var int PonCost;
 	var int Player;
 	var bool Hinted;
+};
+
+struct immutable ShopItemName
+{
+	var int ID;
+	var string ItemName;
 };
 
 struct immutable LocationInfo
@@ -191,6 +195,10 @@ function bool ShouldFreezeParade(Hat_PlayerController c)
 		if (Hat_HUD(c.MyHUD).GetHUD(class'Hat_HUDMenu_ItemWheel', true) == None)
 			return true;
 	}
+	
+	// mainly for Snatcher boss end cutscene
+	if (c.Pawn.Base.IsA('Hat_Bench_Generic'))
+		return true;
 	
 	return false;
 }
@@ -1339,9 +1347,13 @@ function LoadSlotData(JsonObject json)
 	local array<Hat_ChapterInfo> chapters;
 	local array<Hat_ChapterActInfo> acts;
 	local ShuffledAct actShuffle;
-	local string n, hg;
-	local int i, j, v;
+	local string n, hg, itemName;
+	local int i, j, v, id;
 	local class<Hat_SnatcherContract_DeathWish> dw;
+	local JsonObject shopNames;
+	local array<class<Object > > shopItemClasses;
+	local class<Object> shopItem;
+	local ShopItemName shopName;
 	
 	if (SlotData.Initialized)
 		return;
@@ -1363,18 +1375,32 @@ function LoadSlotData(JsonObject json)
 	SlotData.Seed = json.GetStringValue("SeedNumber");
 	SlotData.SeedName = json.GetStringValue("SeedName");
 	SlotData.HatItems = json.GetBoolValue("HatItems");
-	
 	SlotData.CompassBadgeMode = json.GetIntValue("CompassBadgeMode");
-	
 	SlotData.Chapter1Cost = json.GetIntValue("Chapter1Cost");
 	SlotData.Chapter2Cost = json.GetIntValue("Chapter2Cost");
 	SlotData.Chapter3Cost = json.GetIntValue("Chapter3Cost");
 	SlotData.Chapter4Cost = json.GetIntValue("Chapter4Cost");
 	SlotData.Chapter5Cost = json.GetIntValue("Chapter5Cost");
-	
 	SlotData.DLC1 = json.GetBoolValue("EnableDLC1");
 	SlotData.DLC2 = json.GetBoolValue("EnableDLC2");
 	
+	shopNames = json.GetObject("ShopItemNames");
+	shopItemClasses = class'Hat_ClassHelper'.static.GetAllScriptClasses("Archipelago_ShopItem_Base");
+	foreach shopItemClasses(shopItem)
+	{
+		id = class<Archipelago_ShopItem_Base>(shopItem).default.LocationID;
+		if (id <= 0)
+			continue;
+		
+		itemName = shopNames.GetStringValue(string(id));
+		if (itemName != "")
+		{
+			shopName.ID = id;
+			shopName.ItemName = itemName;
+			SlotData.ShopItemNames.AddItem(shopName);
+		}
+	}
+
 	if (SlotData.DLC1)
 	{
 		SlotData.Chapter6Cost = json.GetIntValue("Chapter6Cost");
@@ -1547,6 +1573,12 @@ function LoadSlotData(JsonObject json)
 		n = json.GetStringValue("chapter3_secret_finale");
 		actShuffle = CreateShuffledAct(None, GetChapterActInfoFromHourglass(n));
 		actShuffle.IsDeadBirdBasementOriginalAct = true;
+		if (n ~= "chapter3_secret_finale")
+		{
+			// Vanilla
+			actShuffle.IsDeadBirdBasementShuffledAct = true;
+		}
+		
 		SlotData.ShuffledActList.AddItem(actShuffle);
 		DebugMessage("FOUND act pair:" $"chapter3_secret_finale" $"REPLACED WITH: " $n);
 	}
@@ -1687,8 +1719,13 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 	if (basementShuffle)
 	{
 		shuffled = GetDeadBirdBasementShuffledAct(basement);
-		if (basement == 1) // It's vanilla, just don't do anything at this point
+		if (basement == 1)
+		{
+			ActMapChangeChapter = 2;
+			ActID = 6;
+			MapName = "DeadBirdStudio";
 			return;
+		}
 	}
 	else
 	{
@@ -3353,11 +3390,9 @@ function InitShopItemDisplayName(class<Archipelago_ShopItem_Base> itemClass)
 	local ShopItemInfo shopInfo;
 	local string displayName;
 	local class<Actor> worldClass;
+	local int i;
 	
-	if (GameData.Length <= 0)
-		return;
-	
-	if (!GetShopItemInfo(itemClass, shopInfo))
+	if (!SlotData.Initialized || !GetShopItemInfo(itemClass, shopInfo))
 		return;
 	
 	if (class'Archipelago_ItemInfo'.static.GetNativeItemData(shopInfo.ItemID, worldClass))
@@ -3369,7 +3404,19 @@ function InitShopItemDisplayName(class<Archipelago_ShopItem_Base> itemClass)
 		itemClass.static.SetHUDIcon(class'Archipelago_ShopItem_Base'.default.HUDIcon);
 	}
 	
-	displayName = ItemIDToName(shopInfo.ItemID);
+	for (i = 0; i < SlotData.ShopItemNames.Length; i++)
+	{
+		if (SlotData.ShopItemNames[i].ID == itemClass.default.LocationID)
+		{
+			displayName = SlotData.ShopItemNames[i].ItemName;
+			break;
+		}
+	}
+	
+	DebugMessage("Shop Item Name: " $itemClass.default.LocationID $displayName);
+	// Hotfix for metro shops having blank item names for some reason?
+	if (displayName ~= "")
+		return;
 	
 	if (displayName != "Unknown Item")
 		displayName $= " ("$PlayerIdToName(shopInfo.Player)$")";
@@ -4515,6 +4562,9 @@ function bool IsArchipelagoEnabled()
 function bool IsCurrentPatch()
 {
 	local string version;
+	if (bool(DebugMode))
+		return false;
+		
 	version = class'Engine'.static.GetBuildDate();
 	
 	// 2021 and later is around the time when TcpLink broke, which means we can't function. We only want 2019 or 2020 builds.
@@ -4720,6 +4770,7 @@ function DebugMessage(String message, optional Name type, optional bool forceLog
 }
 
 // Deprecated, no longer needed.
+/*
 function string LocationIDToName(string id)
 {
 	local int i, a;
@@ -4751,6 +4802,7 @@ function string ItemIDToName(string id)
 	
 	return "Unknown Item";
 }
+*/
 
 delegate int SortHats(Hat_LoadoutBackpackItem A, Hat_LoadoutBackpackItem B)
 {

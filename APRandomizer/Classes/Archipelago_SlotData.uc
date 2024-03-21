@@ -6,6 +6,7 @@ var transient bool Initialized;
 var array<ShuffledAct> ShuffledActList;
 var array<LocationInfo> LocationInfoArray;
 var array<ShopItemInfo> ShopItemList;
+var array<ShopItemName> ShopItemNames;
 var array<string> PlayerNames;
 var bool PlayerNamesInitialized;
 

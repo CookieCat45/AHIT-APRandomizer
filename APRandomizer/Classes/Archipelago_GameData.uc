@@ -1,4 +1,5 @@
-class Archipelago_GameData extends Object;
+class Archipelago_GameData extends Object
+    deprecated;
 
 var string Game;
 var string Checksum;

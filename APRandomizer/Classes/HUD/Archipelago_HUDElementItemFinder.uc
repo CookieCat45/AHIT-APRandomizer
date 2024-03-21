@@ -485,7 +485,7 @@ function bool CanReachLocation(int id, HUD H)
 				&& !lo.BackpackHasInventory(class'Archipelago_Weapon_BaseballBat', true)
 				&& !lo.BackpackHasInventory(class'Hat_Ability_Chemical', true))
 			{
-				return id == 2000304874 || id == 2000305024 || id == 2000305248 || id == 2000305247 || id == 2000303898;
+				return id == 2000304874 || id == 2000305024 || id == 2000305248 || id == 2000305247;
 			}
 			else
 			{
