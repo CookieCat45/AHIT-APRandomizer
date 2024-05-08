@@ -113,7 +113,6 @@ event OnModLoaded()
 		return;
 	
 	HookActorSpawn(class'Hat_Player', 'Player');
-	
 	if (IsArchipelagoEnabled())
 	{
 		mapName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename();
@@ -413,10 +412,6 @@ event PreBeginPlay()
 		}
 	}
 	
-	// Hat_DecorationStand is not alwaysloaded, and the alwaysloaded workaround doesn't seem to work with it (crash on boot).
-	// So what we do here is, when a relic stand is completed, tell our save file that it actually HASN'T been
-	// completed on map load so that it doesn't place the decorations on the stand and we can place more.
-	// We do this because the player can place relics in an order the logic doesn't expect them to, potentially locking them out of a seed.
 	for (i = 0; i < save.HUBDecorations.Length; i++)
 	{
 		if (save.HUBDecorations[i].Complete)
@@ -465,7 +460,6 @@ function OnPostInitGame()
 	local string mapName, realMapName;
 	local Hat_BackpackItem item;
 	local Hat_TreasureChest_Base chest;
-	local Hat_TimeRiftPortal portal;
 	local TriggerVolume trigger;
 	local Hat_SaveGame save;
 	local Hat_Player ply;
@@ -561,21 +555,23 @@ function OnPostInitGame()
 		{
 			// In vanilla, Tour requires ALL but 1 time pieces, which changes depending on the DLC the player has.
 			// This may change in the future, but for now, it's always available (once the player unlocks Chapter 5).
-			foreach DynamicActors(class'Hat_TimeRiftPortal', portal)
+			foreach DynamicActors(class'Actor', a)
 			{
-				if (portal.Name == 'Hat_TimeRiftPortal_2')
+				if (a.Name == 'Hat_TimeRiftPortal_2')
 				{
 					if (SlotData.ExcludeTour && !SlotData.DeathWishOnly)
 					{
-						portal.Enabled = false;
-						portal.SetIdleSound(false);
-						portal.SetHidden(true);
+						ConsoleCommand("set "$a.Name $" Enabled false");
+						ConsoleCommand("set "$a.Name $" IdleSoundComponent none");
+						a.SetHidden(true);
 					}
 					else
 					{
-						portal.Enabled = true;
-						portal.SetIdleSound(true);
-						portal.SetHidden(false);
+						DebugMessage("FORCING TOUR TIME RIFT ENABLED");
+						SetTimer(0.8, true, NameOf(ForceTourTimeRift), self, a); // to make sure it's enabled, cause it seems stubborn otherwise
+						ConsoleCommand("set "$a.Name $" Enabled true");
+						ConsoleCommand("set "$a.Name $" ForceEnable true");
+						a.SetHidden(false);
 					}
 					
 					break;
@@ -679,8 +675,8 @@ function OnPostInitGame()
 		
 		for (i = 0; i < shopInvs.Length; i++)
 		{
-			if (Archipelago_ShopInventory_Base(shopInvs[i]) != None
-			|| Hat_ShopInventory_MetroFood(shopInvs[i]) != None)
+			if (shopInvs[i].IsA('Archipelago_ShopInventory_Base')
+			|| shopInvs[i].IsA('Hat_ShopInventory_MetroFood'))
 				continue;
 		
 			Hat_ShopInventory(shopInvs[i]).ItemsForSale.AddItem(dummy);
@@ -745,7 +741,6 @@ function OnPostInitGame()
 		ConsoleCommand("set hat_snatchercontract_deathwish_riftcollapse PenaltyWaitTimeInSeconds 0");
 		ConsoleCommand("set hat_snatchercontract_deathwish_riftcollapse Condition_3Lives false");
 		ConsoleCommand("set hat_snatchercontract_deathwish neverobscureobjectives true");
-		
 		if (`SaveManager.GetNumberOfTimePieces() >= SlotData.DeathWishTPRequirement)
 		{
 			if (!class'Hat_SaveBitHelper'.static.HasLevelBit("DeathWish_intro", 1, `GameManager.HubMapName))
@@ -761,7 +756,6 @@ function OnPostInitGame()
 		if (class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(true))
 		{
 			SetTimer(0.5, true, NameOf(CheckDeathWishObjectives));
-		
 			if (class'Hat_SnatcherContract_DeathWish_Speedrun_SubWell'.static.IsActive())
 			{
 				foreach DynamicActors(class'Hat_BonfireBarrier', barrier)
@@ -815,15 +809,12 @@ function OnPostInitGame()
 	
 	if (class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false))
 	{
-		foreach DynamicActors(class'Hat_TimeRiftPortal', portal)
-			portal.Destroy();
-		
 		foreach DynamicActors(class'Hat_SubconPainting', painting)
 			painting.Destroy();
 		
 		foreach DynamicActors(class'Actor', a)
 		{
-			if (a.IsA('Hat_SnatcherContractSummon') || a.IsA('Hat_NPC_Bullied'))
+			if (a.IsA('Hat_SnatcherContractSummon') || a.IsA('Hat_NPC_Bullied') || a.IsA('Hat_TimeRiftPortal'))
 				a.Destroy();
 			
 			if (realMapName ~= "subconforest" && a.IsA('Hat_InteractiveFoliage_HarborBush'))
@@ -903,6 +894,13 @@ function OnPostInitGame()
 	SetTimer(2.0, true, NameOf(FixInventoryIssues));
 	if (Client == None)
 		CreateClient();
+}
+
+function ForceTourTimeRift(Actor a)
+{
+	ConsoleCommand("set "$a.Name $" Enabled true");
+	ConsoleCommand("set "$a.Name $" ForceEnable true");
+	a.SetHidden(false);
 }
 
 function ForceLightsOn()
@@ -1735,7 +1733,7 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 	
 	if (shuffled == None && basement == 0)
 	{
-		DebugMessage("[ERROR] Failed to find shuffled act for " $act, , true);
+		DebugMessage("[ERROR] Failed to find shuffled act for " $act);
 		ScriptTrace();
 		return;
 	}
@@ -2077,8 +2075,8 @@ function CheckShopOverride(Hat_HUD hud)
 	
 	for (i = 0; i < shopInvs.Length; i++)
 	{
-		if (class<Archipelago_ShopInventory_Base>(shopInvs[i]).default.ShopNPC != None
-			&& class<Archipelago_ShopInventory_Base>(shopInvs[i]).default.ShopNPC == merchant.Class
+		if (class<Archipelago_ShopInventory_Base>(shopInvs[i]).default.IsBadgeSeller && merchant.IsA('Hat_NPC_BadgeSalesman')
+			|| class<Archipelago_ShopInventory_Base>(shopInvs[i]).default.IsMafiaBoss && merchant.IsA('Hat_NPC_MafiaBossJar')
 			|| class<Archipelago_ShopInventory_Base>(shopInvs[i]).default.ShopNPCName != ""
 			&& class<Archipelago_ShopInventory_Base>(shopInvs[i]).default.ShopNPCName == string(merchant.Name))
 		{
@@ -2379,7 +2377,7 @@ function OnTimePieceCollected(string Identifier)
 	
 	if (SlotData.ActRando && hourglass == "")
 	{
-		DebugMessage("FAILED to find ChapterActInfo: "$Identifier, , true);
+		DebugMessage("FAILED to find ChapterActInfo: "$Identifier);
 		ScriptTrace();
 	}
 	
@@ -2568,7 +2566,6 @@ function ResetEverything()
 function OpenBedroomDoor()
 {
 	local Hat_SpaceshipPowerPanel panel;
-	
 	foreach DynamicActors(class'Hat_SpaceshipPowerPanel', panel)
 	{
 		if (panel.ChapterInfo.ChapterID == 3)
@@ -3052,9 +3049,9 @@ function ShuffleCollectibles(optional bool cache)
 			continue;
 		
 		if (InStr(shopInv.ShopNPCName, "Hat_NPC_NyakuzaShop", false, true) != -1
-			|| shopInv.ShopNPC == class'Hat_NPC_BadgeSalesman')
+			|| shopInv.IsBadgeSeller)
 		{
-			maxItems = shopInv.ShopNPC == class'Hat_NPC_BadgeSalesman' ? SlotData.BadgeSellerItemCount : GetAPBits(shopInv.ShopNPCName, 0);	
+			maxItems = shopInv.IsBadgeSeller ? SlotData.BadgeSellerItemCount : GetAPBits(shopInv.ShopNPCName, 0);	
 		}
 		else
 		{
@@ -3373,11 +3370,6 @@ function Archipelago_ShopInventory_Base GetShopInventoryFromShopItem(class<Archi
 	}
 	
 	return None;
-}
-
-function class<Hat_NPC> GetShopItemMerchantClass(class<Archipelago_ShopItem_Base> itemClass)
-{
-	return GetShopInventoryFromShopItem(itemClass).ShopNPC;
 }
 
 function string GetShopItemMerchantName(class<Archipelago_ShopItem_Base> itemClass)
@@ -3883,7 +3875,6 @@ function OnYarnCollected(optional int amount=1)
 	abilityClass = GetNextHat();
 	cost = GetHatYarnCost(abilityClass);
 	index = GetAPBits("HatCraftIndex", 1);
-	
 	if (abilityClass != None && index <= 5)
 	{
 		if (amount > 0)
@@ -3995,7 +3986,7 @@ function SendLocationCheck(int id, optional bool scout, optional bool hint)
 	{
 		if (scout)
 		{
-			DebugMessage("[WARNING] Tried to scout a location while not connected!", , true);
+			DebugMessage("[WARNING] Tried to scout a location while not connected!");
 			return;
 		}
 		
@@ -4040,7 +4031,7 @@ function SendMultipleLocationChecks(array<int> locationArray, optional bool scou
 	{
 		if (scout || hint)
 		{
-			DebugMessage("[WARNING] Tried to scout locations while not connected!", , true);
+			DebugMessage("[WARNING] Tried to scout locations while not connected!");
 			return;
 		}
 		
@@ -4388,8 +4379,8 @@ function string GetHatName(class<Hat_Ability> abilityClass)
 
 function ReplaceUnarmedWeapon()
 {
-	local Hat_SaveGame save;
 	local int i;
+	local Hat_SaveGame save;
 	local Hat_BackpackItem item;
 	local Hat_PlayerController ctr;
 	
@@ -4749,11 +4740,10 @@ function ScreenMessage(String message, optional Name type)
     pc.ClientMessage(message, type, 8);
 }
 
-function DebugMessage(String message, optional Name type, optional bool forceLog)
+function DebugMessage(String message, optional Name type)
 {
 	local PlayerController pc;
-	
-	if (bool(VerboseLogging) || forceLog)
+	if (bool(VerboseLogging))
 	{
 		DebugMsg = message;
 		ConsoleCommand("getall Archipelago_GameMod DebugMsg");
@@ -4768,41 +4758,6 @@ function DebugMessage(String message, optional Name type, optional bool forceLog
     
     pc.ClientMessage(message, type, 8);
 }
-
-// Deprecated, no longer needed.
-/*
-function string LocationIDToName(string id)
-{
-	local int i, a;
-	
-	for (i = 0; i < GameData.Length; i++)
-	{
-		for (a = 0; a < GameData[i].LocationMappings.Length; a++)
-		{
-			if (GameData[i].LocationMappings[a].ID ~= id)
-				return GameData[i].LocationMappings[a].Location;
-		}
-	}
-	
-	return "Unknown Location";
-}
-
-function string ItemIDToName(string id)
-{
-	local int i, a;
-	
-	for (i = 0; i < GameData.Length; i++)
-	{
-		for (a = 0; a < GameData[i].ItemMappings.Length; a++)
-		{
-			if (GameData[i].ItemMappings[a].ID ~= id)
-				return GameData[i].ItemMappings[a].Item;
-		}
-	}
-	
-	return "Unknown Item";
-}
-*/
 
 delegate int SortHats(Hat_LoadoutBackpackItem A, Hat_LoadoutBackpackItem B)
 {
@@ -4840,7 +4795,7 @@ function int ObjectToLocationId(Object obj)
 	
 	if (obj == None)
 	{
-		DebugMessage("[ObjectToLocationId] obj is None", , true);
+		DebugMessage("[ObjectToLocationId] obj is None");
 		ScriptTrace();
 	}
 	
@@ -5053,7 +5008,6 @@ function float GetVectorDistance(Vector start, Vector end)
 	distance = Abs(start.x - end.x);
 	distance += Abs(start.y - end.y);
 	distance += Abs(start.z - end.z);
-	
 	return distance;
 }
 

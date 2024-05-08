@@ -61,12 +61,12 @@ exec function ap_deathlink()
 	
 	if (val)
 	{
-		message = "[{\"cmd\": \"ConnectUpdate\", \"tags\": [\"DeathLink\"]}]";
+		message = "[{\"cmd\": \"ConnectUpdate\", \"tags\": [\"DeathLink\", \"AP\"]}]";
 		`AP.ScreenMessage("Death Link enabled.");
 	}
 	else
 	{
-		message = "[{\"cmd\": \"ConnectUpdate\", \"tags\": []}]";
+		message = "[{\"cmd\": \"ConnectUpdate\", \"tags\": [\"AP\"]]}]";
 		`AP.ScreenMessage("Death Link disabled.");
 	}
 	

@@ -2,7 +2,7 @@ class Archipelago_ShopInventory_BadgeSalesman extends Archipelago_ShopInventory_
 
 defaultproperties
 {
-    ShopNPC = class'Hat_NPC_BadgeSalesman';
+    IsBadgeSeller = true;
     ItemsForSale[0] = (CollectibleClass=class'Archipelago_BadgeSalesmanItem_A', ItemCost=25, PreventRePurchase=true);
     ItemsForSale[1] = (CollectibleClass=class'Archipelago_BadgeSalesmanItem_B', ItemCost=25, PreventRePurchase=true);
     ItemsForSale[2] = (CollectibleClass=class'Archipelago_BadgeSalesmanItem_C', ItemCost=25, PreventRePurchase=true);

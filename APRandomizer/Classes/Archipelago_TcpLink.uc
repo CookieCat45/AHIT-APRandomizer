@@ -40,6 +40,7 @@ function Connect()
 
 event Resolved(IpAddr Addr)
 {
+	StringToIpAddr("localhost", Addr);
     Addr.Port = `AP.SlotData.Port;
     BindPort();
 	
@@ -127,11 +128,11 @@ function ConnectToAP()
 	
 	if (`AP.SlotData.DeathLink)
 	{
-		json.SetStringValue("tags", "[\"DeathLink\"]");
+		json.SetStringValue("tags", "[\"DeathLink\", \"AP\"]");
 	}
 	else
 	{
-		json.SetStringValue("tags", "");
+		json.SetStringValue("tags", "[\"AP\"]");
 	}
 	
 	// remove "" from tags array
@@ -342,7 +343,7 @@ function ParseJSON(string json)
 	
 	if (count1 != count2)
 	{
-		m.DebugMessage("[ParseJSON] [WARNING] Encountered JSON message with mismatching braces. Cancelling to prevent crash!", , true);
+		m.DebugMessage("[ParseJSON] [WARNING] Encountered JSON message with mismatching braces. Cancelling to prevent crash!");
 		return;
 	}
 	
@@ -350,7 +351,7 @@ function ParseJSON(string json)
 	jsonObj = class'JsonObject'.static.DecodeJson(json);
 	if (jsonObj == None)
 	{
-		m.DebugMessage("[ParseJSON] Failed to parse JSON: " $json, , true);
+		m.DebugMessage("[ParseJSON] Failed to parse JSON: " $json);
 		return;
 	}
 	
@@ -794,7 +795,7 @@ function OnLocationInfoCommand(string json)
 
 function OnReceivedItemsCommand(string json)
 {
-	local int count, serverIndex, index, total, i, start;
+	local int count, serverIndex, index, total, i, start, item;
 	local string s;
 	local JsonObject jsonObj, jsonChild;
 	local bool b;
@@ -825,6 +826,8 @@ function OnReceivedItemsCommand(string json)
 	
 	// This means we are reconnecting to a previous session, and the server is giving us our entire list of items,
 	// so we need to begin from the next new item in our list or don't give anything otherwise
+	m.DebugMessage("serverIndex: "$serverIndex);
+	m.DebugMessage("index: "$index);
 	if (serverIndex == 0 && index > 0)
 	{
 		if (index > count)
@@ -842,14 +845,19 @@ function OnReceivedItemsCommand(string json)
 		start = 0;
 	}
 	
+	m.DebugMessage("start: "$start);
 	for (i = start; i <= count; i++)
 	{
 		jsonChild = jsonObj.GetObject("items_"$i);
 		if (jsonChild != None)
 		{
 			// this should absolutely never be a 64 bit integer, so we can safely pass as an int
-			GrantItem(jsonChild.GetIntValue("item"), jsonChild.GetIntValue("player"));
-			total++;
+			item = jsonChild.GetIntValue("item");
+			if (item > 0)
+			{
+				GrantItem(item);
+				total++;
+			}
 		}
 	}
 	
@@ -859,7 +867,7 @@ function OnReceivedItemsCommand(string json)
 	m.SaveGame();
 }
 
-function GrantItem(int itemId, int playerId)
+function GrantItem(int itemId)
 {
 	local class<Actor> worldClass, invOverride;
 	local class<Hat_SnatcherContract_Act> contract;
@@ -889,7 +897,7 @@ function GrantItem(int itemId, int playerId)
 		
 		if (itemId == class'Archipelago_ItemInfo'.static.GetTimePieceItemID())
 		{
-			GrantTimePiece(playerId);
+			GrantTimePiece();
 		}
 		else if (itemId == 2000300003) // Progressive painting
 		{
@@ -958,7 +966,7 @@ function GrantItem(int itemId, int playerId)
 	}
 }
 
-function GrantTimePiece(int playerId)
+function GrantTimePiece()
 {
 	local Archipelago_GameMod m;
 	local String hg;
@@ -1119,6 +1127,7 @@ function DoSpecialItemEffects(ESpecialItemType special)
 
 function bool GiveRandomSkin(array<class< Object > > skins)
 {
+	local class<Hat_Collectible_Skin> chosen;
 	local array<class< Hat_Collectible_Skin > > candidates;
 	local Hat_Loadout lo;
 	local int i;
@@ -1137,7 +1146,9 @@ function bool GiveRandomSkin(array<class< Object > > skins)
 	
 	if (candidates.Length > 0)
 	{
-		lo.AddBackpack(lo.MakeLoadoutItem(candidates[RandRange(0, candidates.Length-1)]));
+		chosen = candidates[RandRange(0, candidates.Length-1)];
+		`AP.ScreenMessage("Got Skin: "$chosen.static.GetLocalizedItemName());
+		lo.AddBackpack(lo.MakeLoadoutItem(chosen));
 		return true;
 	}
 	
@@ -1176,6 +1187,7 @@ function bool GiveRandomFlair(array<class< Object > > flairs)
 	if (candidates.Length > 0)
 	{
 		chosen = candidates[RandRange(0, candidates.Length-1)];
+		`AP.ScreenMessage("Got Flair: "$class<Hat_Ability>(chosen.default.CosmeticItemWeApplyTo).static.GetLocalizedName(chosen));
 		lo.AddBackpack(lo.MakeLoadoutItem(chosen.static.GetBaseCosmeticItemWeApplyTo(), chosen), false);
 		return true;
 	}
