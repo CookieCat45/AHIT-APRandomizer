@@ -1617,7 +1617,6 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 		return;
 	
 	ActMapChange = true;
-	
 	if (!SlotData.ActRando)
 	{
 		if (Hat_ChapterInfo(ChapterInfo).ChapterID == 4)
@@ -1625,7 +1624,9 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 			if (ActID == 99)
 			{
 				if (class'Hat_SaveBitHelper'.static.HasLevelBit("Actless_FreeRoam_Intro_Complete", 1, "AlpsAndSails"))
-					ActID = 1;
+				{
+					ActID = 98;
+				}
 				
 				if (class'Hat_SeqCond_IsAlpineFinale'.static.IsAlpineFinale())
 					DisableAlpineFinale();
@@ -1638,8 +1639,14 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 		else if (Hat_ChapterInfo(ChapterInfo).ChapterID == 7)
 		{
 			// ActID 99 is intro, skip if completed
-			if (ActID == 99 && IsActReallyCompleted(GetChapterActInfoFromHourglass("Metro_Intro")))
+			if (ActID == 99 && HasAPBit("ActComplete_Metro_Intro", 1))
+			{
 				ActID = 98;
+			}
+			else if (ActID == 98 && !HasAPBit("ActComplete_Metro_Intro", 1))
+			{
+				ActID = 99;
+			}
 		}
 		
 		if (Hat_ChapterInfo(ChapterInfo).ChapterID != 2)
@@ -1773,8 +1780,14 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 	else if (shuffled.ChapterInfo.ChapterID == 7)
 	{
 		// ActID 99 is intro, skip if completed
-		if (ActID == 99 && IsActReallyCompleted(GetChapterActInfoFromHourglass("Metro_Intro")))
+		if (ActID == 99 && HasAPBit("ActComplete_Metro_Intro", 1))
+		{
 			ActID = 98;
+		}
+		else if (ActID == 98 && !HasAPBit("ActComplete_Metro_Intro", 1))
+		{
+			ActID = 99;
+		}
 	}
 	
 	DebugMessage("Switching act " $PathName(act) $" with act: " $PathName(shuffled) $", map:" $MapName $" Act ID: "$ActID);
@@ -2205,8 +2218,14 @@ function CheckActTitleCard(Hat_HUD hud)
 		else if (chapterId == 7)
 		{
 			// ActID 99 is intro, skip if completed
-			if (actId == 99 && IsActReallyCompleted(GetChapterActInfoFromHourglass("Metro_Intro")))
+			if (actId == 99 && HasAPBit("ActComplete_Metro_Intro", 1))
+			{
 				actId = 98;
+			}
+			else if (actId == 98 && !HasAPBit("ActComplete_Metro_Intro", 1))
+			{
+				actId = 99;
+			}
 		}
 		
 		`GameManager.LoadNewAct(chapterId, actId);
@@ -2745,6 +2764,17 @@ function UpdatePowerPanels()
 	
 	foreach DynamicActors(class'Hat_SpaceshipPowerPanel', panel)
 	{
+		// hide spaceship panels for DLC chapters we have disabled
+		if (panel.ChapterInfo.ChapterID == 6 && !SlotData.DLC1 || panel.ChapterInfo.ChapterID == 7 && !SlotData.DLC2)
+		{
+			panel.ShutDown();
+			if (panel.InteractPoint != None)
+			{
+				panel.InteractPoint.Destroy();
+				panel.InteractPoint = None;
+			}
+		}
+		
 		if (SlotData.DeathWishOnly && !IsPowerPanelActivated2(panel))
 		{
 			panel.OnDoUnlock();
@@ -3207,9 +3237,11 @@ function Archipelago_RandomizedItem_Base CreateItem(int locId, string itemId, in
 	local int i;
 	local bool found;
 	local LocationInfo locInfo;
-	
+
 	if (!class'Archipelago_ItemInfo'.static.GetNativeItemData(itemId, worldClass)) // not a regular item
+	{
 		worldClass = class'Archipelago_RandomizedItem_Misc';
+	}
 	
 	item = Archipelago_RandomizedItem_Base(Spawn(worldClass, , , collectible != None ? collectible.Location : pos, , , true));
 	item.LocationId = locId;
@@ -3889,20 +3921,22 @@ function OnYarnCollected(optional int amount=1)
 			loadout.AddBackpack(item);
 			PlayHatStitchAnimation(pc, item);
 			ScreenMessage("Got " $GetHatName(abilityClass), 'Warning');
-			
 			`GameManager.AddBadgePoints(-cost);
 			SetAPBits("TotalYarnCollected", 0);
 			SetAPBits("HatCraftIndex", index+1);
-			
-			`SaveManager.GetCurrentSaveData().MyBackpack2017.Hats.Sort(SortHats);
 		}
 	}
 	else if (amount > 0)
 	{
-		pons = 25 * amount;
+		pons = 75 * amount;
 		`GameManager.AddEnergyBits(pons);
-		ScreenMessage("Got " $pons $" Pons", 'Warning');
+		ScreenMessage("Got " $pons $" Pons from Yarn", 'Warning');
 	}
+}
+
+function SortPlayerHats()
+{
+	`SaveManager.GetCurrentSaveData().MyBackpack2017.Hats.Sort(SortHats);
 }
 
 function class<Hat_Ability> GetNextHat()
@@ -4073,7 +4107,7 @@ function SendMultipleLocationChecks(array<int> locationArray, optional bool scou
 	
 	if (scout && hint)
 	{
-		jsonMessage $= "],`create_as_hint`:1";
+		jsonMessage $= "],`create_as_hint`:2";
 	}
 	else
 	{
@@ -4603,7 +4637,6 @@ function bool IsInSpaceship()
 function bool IsActReallyCompleted(Hat_ChapterActInfo act)
 {
 	local Hat_ChapterActInfo shuffled;
-	
 	if (SlotData != None && SlotData.Initialized)
 	{
 		if (SlotData.DeathWishOnly)
@@ -4615,16 +4648,18 @@ function bool IsActReallyCompleted(Hat_ChapterActInfo act)
 			if (IsChapterActInfoUnlocked(act))
 			{
 				shuffled = GetShuffledAct(act);
-				
 				if (shuffled != None && shuffled.hourglass == "")
 				{
 					// If the original act is a rift, and the new act a free roam, check if we actually entered the rift portal
 					if (act.IsBonus && !HasAPBit("RiftEntered_"$act.hourglass, 1))
 						return false;
 					
+					// hotfix for metro intro time piece becoming unobtainable if nyakuza is vanilla
+					if (act.hourglass ~= "Metro_Intro" && shuffled.ActID >= 98)
+						return true;
+					
 					SetAPBits("ActComplete_"$act.hourglass, 1);
 					PartySyncActs_Single(act.hourglass);
-					
 					return true;
 				}
 			}

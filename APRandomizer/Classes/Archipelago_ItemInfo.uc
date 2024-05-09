@@ -318,19 +318,19 @@ optional out class<Actor> inventoryOverride) // Item inventory class override. M
 			return true;
 			
 		case BabyTrapItem:
-			worldClass = class'Archipelago_RandomizedItem_Misc';
+			worldClass = class'Archipelago_RandomizedItem_TimeObject';
 			return true;
 			
 		case LaserTrapItem:
-			worldClass = class'Archipelago_RandomizedItem_Misc';
+			worldClass = class'Archipelago_RandomizedItem_TimeObject';
 			return true;
 			
 		case ParadeTrapItem:
-			worldClass = class'Archipelago_RandomizedItem_Misc';
+			worldClass = class'Archipelago_RandomizedItem_TimeObject';
 			return true;
 		
 		case RandomCosmeticItem:
-			worldClass = class'Archipelago_RandomizedItem_Misc';
+			worldClass = class'Archipelago_RandomizedItem_RouletteToken';
 			return true;
 			
 		// --------- MISC ---------------------------------------------------------------------------------------------- \\

@@ -19,6 +19,7 @@ defaultproperties
     Components.Add(Mesh1);
 	RotationComponents.Add(Mesh1);
 	Mesh=Mesh1;
+	HUDIcon = Texture2D'HatInTime_Hud_ItemIcons.Misc.token_icon'
 	
-	InventoryClass = class'Hat_Collectible_RouletteToken';
+	//InventoryClass = class'Hat_Collectible_RouletteToken';
 }

@@ -912,6 +912,11 @@ function GrantItem(int itemId)
 					gate.DelayedInit();
 			}
 		}
+		else if (itemId >= 2000300049 && itemId <= 2000300053)
+		{
+			// This is a hat, make sure hats are in the correct order for swapping
+			`AP.SortPlayerHats();
+		}
 		else
 		{
 			special = class'Archipelago_ItemInfo'.static.GetItemSpecialType(itemId);
