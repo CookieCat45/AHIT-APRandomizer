@@ -4,6 +4,7 @@ class Archipelago_GameMod extends GameMod
 	dependson(Archipelago_HUDElementBubble)
 	config(Mods);
 
+`include(APRandomizer\Classes\Globals.uci);
 const SlotDataVersion = 11;
 
 var Archipelago_TcpLink Client;
@@ -107,19 +108,13 @@ var array<string> ThugCatShops;
 
 event OnModLoaded()
 {
-	local string mapName;
-	
 	if (IsCurrentPatch())
 		return;
 	
 	HookActorSpawn(class'Hat_Player', 'Player');
 	if (IsArchipelagoEnabled())
 	{
-		mapName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename();
-		if (mapName ~= "subconforest")
-		{
-			HookActorSpawn(class'Actor', 'ContractEvent');
-		}
+		HookActorSpawn(class'Actor', 'ActorSpawn');
 	}
 }
 
@@ -220,52 +215,59 @@ event OnHookedActorSpawn(Object newActor, Name identifier)
 	
 	if (IsArchipelagoEnabled())
 	{
-		if (identifier == 'ContractEvent' && SlotData.ShuffleActContracts)
+		if (identifier == 'ActorSpawn')
 		{
-			if (newActor.IsA('Hat_SnatcherContractEvent'))
+			if (newActor.IsA('Hat_Vacuum') && !IsLocationChecked(RumbiYarnCheck))
 			{
-				if (newActor.IsA('Hat_SnatcherContractEvent_Initial') || newActor.IsA('Hat_SnatcherContractEvent_GenericTrap')
-					|| newActor.IsA('Hat_SnatcherContractEvent_IceBroken'))
-				{
-					DebugMessage("Hooking contract event: " $newActor.name);
-					ContractEventActive = true;
-					save = `SaveManager.GetCurrentSaveData();
-					
-					if (!HasAPBit("ContractScout", 1) && IsFullyConnected())
-					{
-						ids.AddItem(2000300201);
-						ids.AddItem(2000300202);
-						ids.AddItem(2000300203);
-						SendMultipleLocationChecks(ids, true, true);
-						SetAPBits("ContractScout", 1);
-					}
-					
-					for (i = 0; i < SlotData.ObtainedContracts.Length; i++)
-					{
-						if (SlotData.CheckedContracts.Find(SlotData.ObtainedContracts[i]) != -1)
-							continue;
-						
-						// temporarily remove any obtained contracts so player can still do contract checks
-						SlotData.TakenContracts.AddItem(SlotData.ObtainedContracts[i]);
-						save.SnatcherContracts.RemoveItem(SlotData.ObtainedContracts[i]);
-						save.CompletedSnatcherContracts.RemoveItem(SlotData.ObtainedContracts[i]);
-					}
-					
-					foreach DynamicActors(class'Hat_PlayerController', ctr)
-					{
-						// Dying while signing a contract may cause the check to not send and become permanently unavailable.
-						// This can primarily happen with traps. So we need to enable god mode temporarily.
-						ctr.bGodMode = true;
-					}
-					
-					SetTimer(0.5, true, NameOf(WaitForContractEvent));
-				}
+				SetTimer(0.1, true, NameOf(RumbiHitCheckTimer), self, newActor);
 			}
-			else if (newActor.IsA('Hat_SnatcherContract_Selectable'))
+			else if (SlotData.ShuffleActContracts)
 			{
-				SelectContracts.AddItem(Hat_SnatcherContract_Selectable(newActor));
-				ClearTimer(NameOf(CheckContractsForDeletion));
-				SetTimer(0.5, false, NameOf(CheckContractsForDeletion));
+				if (newActor.IsA('Hat_SnatcherContractEvent'))
+				{
+					if (newActor.IsA('Hat_SnatcherContractEvent_Initial') || newActor.IsA('Hat_SnatcherContractEvent_GenericTrap')
+						|| newActor.IsA('Hat_SnatcherContractEvent_IceBroken'))
+					{
+						DebugMessage("Hooking contract event: " $newActor.name);
+						ContractEventActive = true;
+						save = `SaveManager.GetCurrentSaveData();
+						
+						if (!HasAPBit("ContractScout", 1) && IsFullyConnected())
+						{
+							ids.AddItem(2000300201);
+							ids.AddItem(2000300202);
+							ids.AddItem(2000300203);
+							SendMultipleLocationChecks(ids, true, true);
+							SetAPBits("ContractScout", 1);
+						}
+						
+						for (i = 0; i < SlotData.ObtainedContracts.Length; i++)
+						{
+							if (SlotData.CheckedContracts.Find(SlotData.ObtainedContracts[i]) != -1)
+								continue;
+							
+							// temporarily remove any obtained contracts so player can still do contract checks
+							SlotData.TakenContracts.AddItem(SlotData.ObtainedContracts[i]);
+							save.SnatcherContracts.RemoveItem(SlotData.ObtainedContracts[i]);
+							save.CompletedSnatcherContracts.RemoveItem(SlotData.ObtainedContracts[i]);
+						}
+						
+						foreach DynamicActors(class'Hat_PlayerController', ctr)
+						{
+							// Dying while signing a contract may cause the check to not send and become permanently unavailable.
+							// This can primarily happen with traps. So we need to enable god mode temporarily.
+							ctr.bGodMode = true;
+						}
+						
+						SetTimer(0.5, true, NameOf(WaitForContractEvent));
+					}
+				}
+				else if (newActor.IsA('Hat_SnatcherContract_Selectable'))
+				{
+					SelectContracts.AddItem(Hat_SnatcherContract_Selectable(newActor));
+					ClearTimer(NameOf(CheckContractsForDeletion));
+					SetTimer(0.5, false, NameOf(CheckContractsForDeletion));
+				}
 			}
 		}
 	}
@@ -397,6 +399,11 @@ event PreBeginPlay()
 				// (using console commands to set to 0 doesn't work, because some have it set to 2 when the default is 1)
 				save.GiveContract(class'Archipelago_SnatcherContract_Dummy1', GetALocalPlayerController());
 				save.GiveContract(class'Archipelago_SnatcherContract_Dummy2', GetALocalPlayerController());
+			}
+			
+			if (!HasAPBit("SubconBush1", 1) || !HasAPBit("SubconBush2", 1))
+			{
+				SetTimer(0.3, true, NameOf(SubconBushCheckTimer));
 			}
 		}
 		
@@ -555,26 +562,22 @@ function OnPostInitGame()
 		{
 			// In vanilla, Tour requires ALL but 1 time pieces, which changes depending on the DLC the player has.
 			// This may change in the future, but for now, it's always available (once the player unlocks Chapter 5).
-			foreach DynamicActors(class'Actor', a)
+			a = FindActorByName('Hat_TimeRiftPortal_2', true);
+			if (a != None)
 			{
-				if (a.Name == 'Hat_TimeRiftPortal_2')
+				if (SlotData.ExcludeTour && !SlotData.DeathWishOnly)
 				{
-					if (SlotData.ExcludeTour && !SlotData.DeathWishOnly)
-					{
-						ConsoleCommand("set "$a.Name $" Enabled false");
-						ConsoleCommand("set "$a.Name $" IdleSoundComponent none");
-						a.SetHidden(true);
-					}
-					else
-					{
-						DebugMessage("FORCING TOUR TIME RIFT ENABLED");
-						SetTimer(0.8, true, NameOf(ForceTourTimeRift), self, a); // to make sure it's enabled, cause it seems stubborn otherwise
-						ConsoleCommand("set "$a.Name $" Enabled true");
-						ConsoleCommand("set "$a.Name $" ForceEnable true");
-						a.SetHidden(false);
-					}
-					
-					break;
+					ConsoleCommand("set "$a.Name $" Enabled false");
+					ConsoleCommand("set "$a.Name $" IdleSoundComponent none");
+					a.SetHidden(true);
+				}
+				else
+				{
+					DebugMessage("FORCING TOUR TIME RIFT ENABLED");
+					SetTimer(0.8, true, NameOf(ForceTourTimeRift), self, a); // to make sure it's enabled, cause it seems stubborn otherwise
+					ConsoleCommand("set "$a.Name $" Enabled true");
+					ConsoleCommand("set "$a.Name $" ForceEnable true");
+					a.SetHidden(false);
 				}
 			}
 		}
@@ -586,7 +589,7 @@ function OnPostInitGame()
 		// Set this level bit to 0 so that Rumbi will drop the yarn and trigger the check
 		class'Hat_SaveBitHelper'.static.SetLevelBits("mu_preawakening_intruder_tutorial", 0);
 	}
-
+	
 	foreach DynamicActors(class'Hat_TreasureChest_Base', chest)
 	{
 		if (chest.Opened || class<Hat_Collectible_Important>(chest.Content) == None
@@ -896,6 +899,40 @@ function OnPostInitGame()
 		CreateClient();
 }
 
+function RumbiHitCheckTimer(Actor rumbi)
+{
+	if (rumbi.IsInState('DamageFlip'))
+	{
+		SendLocationCheck(RumbiYarnCheck);
+		ClearTimer(NameOf(RumbiHitCheckTimer));
+	}
+}
+
+function SubconBushCheckTimer(Actor bush)
+{
+	local Actor yarnBush, magnetBush;
+	yarnBush = FindActorByName('Hat_InteractiveFoliage_HarborBush_2');
+	magnetBush = FindActorByName('Hat_InteractiveFoliage_HarborBush_3');
+	if (HasAPBit("SubconBush1", 1) && HasAPBit("SubconBush2", 1))
+	{
+		ClearTimer(NameOf(SubconBushCheckTimer));
+	}
+	else
+	{
+		if (yarnBush == None && !HasAPBit("SubconBush1", 1))
+		{
+			SendLocationCheck(SubconBushCheck1);
+			SetAPBits("SubconBush1", 1);
+		}
+		
+		if (magnetBush == None && !HasAPBit("SubconBush2", 1))
+		{
+			SendLocationCheck(SubconBushCheck2);
+			SetAPBits("SubconBush2", 1);
+		}
+	}
+}
+
 function ForceTourTimeRift(Actor a)
 {
 	ConsoleCommand("set "$a.Name $" Enabled true");
@@ -913,12 +950,34 @@ function ForceLightsOn()
 		li.bEnabled = true;
 	}
 	
-	foreach AllActors(class'PostProcessVolume', vol)
+	vol = PostProcessVolume(FindActorByName('PostProcessVolume_1'));
+	if (vol != None)
 	{
-		if (vol.Name == 'PostProcessVolume_1')
+		vol.bEnabled = false;
+	}
+}
+
+function Actor FindActorByName(Name n, optional bool dynamic)
+{
+	local Actor a;
+	if (dynamic)
+	{
+		foreach DynamicActors(class'Actor', a)
 		{
-			vol.bEnabled = false;
-			break;
+			if (a.Name == n)
+			{
+				return a;
+			}
+		}
+	}
+	else
+	{
+		foreach AllActors(class'Actor', a)
+		{
+			if (a.Name == n)
+			{
+				return a;
+			}
 		}
 	}
 }
@@ -1091,11 +1150,8 @@ function OnFullyConnected()
 	}
 	
 	// resend any locations we checked while not connected
-	if (class'Engine'.static.BasicLoadObject(ItemResender, 
-	"APSlotData/item_resender"$`SaveManager.GetCurrentSaveData().CreationTimeStamp, false, 1))
-	{
-		SetTimer(0.5, false, NameOf(ResendLocations));
-	}
+	class'Engine'.static.BasicLoadObject(ItemResender, "APSlotData/item_resender"$`SaveManager.GetCurrentSaveData().CreationTimeStamp, false, 1);
+	SetTimer(2.0, true, NameOf(ResendLocations));
 	
 	for (i = 0; i < SlotData.ShopItemList.Length; i++)
 	{
@@ -1334,10 +1390,10 @@ event OnOnlinePartyCommand(string Command, Name CommandChannel, Hat_GhostPartyPl
 
 function ResendLocations()
 {
-	if (!IsFullyConnected() || ItemResender == None)
-		return;
-
-	ItemResender.ResendLocations();
+	if (ItemResender != None)
+	{
+		ItemResender.ResendLocations();
+	}
 }
 
 function LoadSlotData(JsonObject json)
@@ -1381,7 +1437,6 @@ function LoadSlotData(JsonObject json)
 	SlotData.Chapter5Cost = json.GetIntValue("Chapter5Cost");
 	SlotData.DLC1 = json.GetBoolValue("EnableDLC1");
 	SlotData.DLC2 = json.GetBoolValue("EnableDLC2");
-	
 	shopNames = json.GetObject("ShopItemNames");
 	shopItemClasses = class'Hat_ClassHelper'.static.GetAllScriptClasses("Archipelago_ShopItem_Base");
 	foreach shopItemClasses(shopItem)
@@ -2650,29 +2705,29 @@ function bool IsActCompletable(Hat_ChapterActInfo act, Hat_Loadout lo, optional 
 			return umbrella;
 		
 		case "DeadBirdStudio":
-			if (!SlotData.UmbrellaLogic && difficulty < 0)
+			if (!SlotData.UmbrellaLogic && difficulty < `MODERATE)
 				return canHit;
 			
-			return difficulty >= 2 || canHit;
+			return difficulty >= `EXPERT || canHit;
 		
 		case "Cruise_Boarding": case "Cruise_WaterRift_Slide": case "TimeRift_Water_Subcon_Hookshot": case "trainwreck_selfdestruct":
 			return hookshot;
 		
 		case "Metro_Escape":
-			if (difficulty >= 2)
+			if (difficulty >= `EXPERT)
 				return (SlotData.NoTicketSkips != 1
 				|| lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteA')
 				&& lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteC')
 				&& lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteD'));
 			
-			if (difficulty >= 1)
+			if (difficulty >= `HARD)
 				return lo.BackpackHasInventory(class'Hat_Ability_Chemical')
 				&& (SlotData.NoTicketSkips != 1
 				|| lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteA')
 				&& lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteC')
 				&& lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteD'));
 			
-			if (difficulty >= 0)
+			if (difficulty >= `MODERATE)
 				return lo.BackpackHasInventory(class'Hat_Ability_StatueFall')
 				&& lo.BackpackHasInventory(class'Hat_Ability_Chemical')
 				&& lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteA')
@@ -2693,10 +2748,10 @@ function bool IsActCompletable(Hat_ChapterActInfo act, Hat_Loadout lo, optional 
 			if (!class'Archipelago_HUDElementItemFinder'.static.CanSkipPaintings() && GetPaintingUnlocks() <= 0)
 				return false;
 			
-			return difficulty >= 0 || canHit && hookshot;
+			return difficulty >= `MODERATE || canHit && hookshot;
 		
 		case "chapter2_toiletboss":
-			if ((difficulty < 2 || !class'Archipelago_HUDElementItemFinder'.static.CanSkipPaintings()) 
+			if ((difficulty < `EXPERT || !class'Archipelago_HUDElementItemFinder'.static.CanSkipPaintings()) 
 			&& SlotData.ShuffleSubconPaintings && GetPaintingUnlocks() <= 0)
 				return false;
 			
@@ -2706,19 +2761,19 @@ function bool IsActCompletable(Hat_ChapterActInfo act, Hat_Loadout lo, optional 
 			if (!class'Archipelago_HUDElementItemFinder'.static.CanSkipPaintings() && GetPaintingUnlocks() <= 0)
 				return false;
 			
-			return canHitMaskBypass || difficulty >= 0;
+			return canHitMaskBypass || difficulty >= `MODERATE;
 		
 		case "TheFinale_FinalBoss":
-			return (difficulty >= 1 || hookshot) && lo.BackpackHasInventory(class'Hat_Ability_FoxMask');
+			return (difficulty >= `MODERATE || hookshot) && lo.BackpackHasInventory(class'Hat_Ability_FoxMask');
 		
 		case "Spaceship_WaterRift_Gallery":
-			return difficulty >= 0 || lo.BackpackHasInventory(class'Hat_Ability_Chemical');
+			return difficulty >= `MODERATE || lo.BackpackHasInventory(class'Hat_Ability_Chemical');
 		
 		case "Cruise_Sinking":
-			return difficulty >= 0 || lo.BackpackHasInventory(class'Hat_Ability_StatueFall');
+			return difficulty >= `MODERATE || lo.BackpackHasInventory(class'Hat_Ability_StatueFall');
 		
 		case "Cruise_CaveRift_Aquarium":
-			return hookshot && (difficulty >= 0 || lo.BackpackHasInventory(class'Hat_Ability_StatueFall'))
+			return hookshot && (difficulty >= `MODERATE || lo.BackpackHasInventory(class'Hat_Ability_StatueFall'))
 					&& (difficulty >= 1 || lo.BackpackHasInventory(class'Hat_Ability_FoxMask'));
 		
 		case "AlpineSkyline_Finale":
@@ -2726,11 +2781,11 @@ function bool IsActCompletable(Hat_ChapterActInfo act, Hat_Loadout lo, optional 
 				(!SlotData.ShuffleZiplines || HasZipline(Zipline_Birdhouse) && HasZipline(Zipline_LavaCake) && HasZipline(Zipline_Windmill));
 		
 		case "TimeRift_Water_AlpineSkyline_Cats":
-			return difficulty >= 2 || sdj || lo.BackpackHasInventory(class'Hat_Ability_StatueFall');
+			return difficulty >= `EXPERT || sdj || lo.BackpackHasInventory(class'Hat_Ability_StatueFall');
 		
 		case "TimeRift_Water_Alp_Goats":
 			return lo.BackpackHasInventory(class'Hat_Ability_FoxMask')
-				|| difficulty >= 1 && lo.BackpackHasInventory(class'Hat_Ability_Sprint') && lo.BackpackHasInventory(class'Hat_Badge_Scooter');
+				|| difficulty >= `HARD && lo.BackpackHasInventory(class'Hat_Ability_Sprint') && lo.BackpackHasInventory(class'Hat_Badge_Scooter');
 		
 		case "harbor_impossible_race":
 			if (SlotData.CTRLogic >= 3)
@@ -3577,7 +3632,7 @@ function bool IsLocationIDContainer(int id, optional out Actor container)
 			if (a.IsA('Hat_InteractiveFoliage_HarborBush'))
 			{
 				if (id == SubconBushCheck1 && a.Name == 'Hat_InteractiveFoliage_HarborBush_2'
-				|| id == SubconBushCheck2 && a.Name == 'Hat_InteractiveFoliage_HarborBush_3')
+					|| id == SubconBushCheck2 && a.Name == 'Hat_InteractiveFoliage_HarborBush_3')
 				{
 					container = a;
 					return true;
@@ -3585,7 +3640,7 @@ function bool IsLocationIDContainer(int id, optional out Actor container)
 			}
 		}
 		else if (a.IsA('Hat_TreasureChest_Base') || a.IsA('Hat_Goodie_Vault_Base') || a.IsA('Hat_NPC_Bullied')
-		|| a.IsA('Hat_ImpactInteract_Breakable_ChemicalBadge'))
+			|| a.IsA('Hat_ImpactInteract_Breakable_ChemicalBadge'))
 		{
 			if (ObjectToLocationId(a) == id)
 			{
@@ -3608,9 +3663,7 @@ function OnPreBreakableBreak(Actor Breakable, Pawn Breaker)
 	local int i;
 	local bool hasImportantItem;
 	local string message;
-	local Rotator rot;
 	local Vector vel;
-	local float rangeMin, rangeMax;
 	local LocationInfo locInfo;
 	
 	if (!IsArchipelagoEnabled())
@@ -3661,12 +3714,7 @@ function OnPreBreakableBreak(Actor Breakable, Pawn Breaker)
 			item.ItemFlags = locInfo.Flags;
 			item.ItemOwner = locInfo.Player;
 			item.Init();
-			
-			rangeMin = 65536 / 16;
-			rangeMax = 65536 / 8;
-			rot.Yaw = RandRange(65536 * -1,65536);
-			rot.Pitch = 16384 + RandRange(rangeMin,rangeMax);
-			vel = Vector(rot)*RandRange(150,300) + vect(0,0,1)*RandRange(200,500);
+			vel = vect(0,0,1)*RandRange(200,500);
 			item.Bounce(vel);
 		}
 	}
@@ -3677,7 +3725,7 @@ function OnPlayerDeath(Pawn Player)
 	local string message;
 	if (!IsDeathLinkEnabled() || !IsArchipelagoEnabled() || !IsFullyConnected())
 		return;
-
+	
 	// commit myurder
 	message = "[{`cmd`:`Bounce`,`tags`:[`DeathLink`],`data`:{`time`:" $float(TimeStamp()) $",`source`:" $"`" $SlotData.SlotName $"`" $"}}]";
 	message = Repl(message, "`", "\"");
@@ -3760,22 +3808,8 @@ function OnCollectibleSpawned(Object collectible)
 	
 	if (SlotData.DeathWishOnly)
 		return;
-
-	if (IsInSpaceship())
-	{
-		if (collectible.IsA('Hat_Collectible_BadgePart_Sprint'))
-		{
-			// Rumbi yarn
-			Actor(collectible).Destroy();
-			
-			if (!HasAPBit("RumbiYarn", 1))
-			{
-				SendLocationCheck(RumbiYarnCheck);
-				SetAPBits("RumbiYarn", 1);
-			}
-		}
-	}
-	else if (Hat_Collectible_Important(collectible) != None && Actor(collectible).CreationTime > 0)
+	
+	if (Hat_Collectible_Important(collectible) != None && Actor(collectible).CreationTime > 0)
 	{
 		if (Actor(collectible).Owner != None)
 		{
@@ -3823,26 +3857,11 @@ function OnCollectibleSpawned(Object collectible)
 				vel = Vector(rot)*RandRange(150,300) + vect(0,0,1)*RandRange(200,500);
 				item.Bounce(vel);
 				Actor(collectible).Destroy();
+				return;
 			}
 		}
 		
-		if (`GameManager.GetCurrentMapFilename() ~= "subconforest")
-		{
-			DebugMessage("Checking for Subcon bush location");
-			
-			// Subcon bushes
-			if (collectible.IsA('Hat_Collectible_BadgePart_FoxMask'))
-			{
-				SendLocationCheck(SubconBushCheck1);
-				Actor(collectible).Destroy();
-			}
-			else if (collectible.IsA('Hat_Collectible_BadgePart_SuckInOrbs'))
-			{
-				SendLocationCheck(SubconBushCheck2);
-				Actor(collectible).Destroy();
-			}
-		}
-		else if (collectible.IsA('Hat_Collectible_HatPart'))
+		if (collectible.IsA('Hat_Collectible_BadgePart'))
 		{
 			Actor(collectible).Destroy();
 		}
@@ -3885,7 +3904,7 @@ function OnCollectedCollectible(Object collectible)
 
 function OnYarnCollected(optional int amount=1)
 {
-	local int count, cost, index, pons;
+	local int count, cost, index, pons, i;
 	local Hat_PlayerController pc;
 	local Hat_Loadout loadout;
 	local Hat_BackpackItem item;
@@ -3904,9 +3923,20 @@ function OnYarnCollected(optional int amount=1)
 		break;
 	}
 	
+	index = GetAPBits("HatCraftIndex", 1);
+	for (i = index; i <= 5; i++)
+	{
+		if (GetHatYarnCost(GetHatByIndex(i)) <= 0)
+		{
+			// hats can have a cost of 0, this simply means they were put into starting inventory
+			index++;
+		}
+	}
+	
+	SetAPBits("HatCraftIndex", index);
 	abilityClass = GetNextHat();
 	cost = GetHatYarnCost(abilityClass);
-	index = GetAPBits("HatCraftIndex", 1);
+	
 	if (abilityClass != None && index <= 5)
 	{
 		if (amount > 0)
@@ -3924,6 +3954,7 @@ function OnYarnCollected(optional int amount=1)
 			`GameManager.AddBadgePoints(-cost);
 			SetAPBits("TotalYarnCollected", 0);
 			SetAPBits("HatCraftIndex", index+1);
+			SortPlayerHats();
 		}
 	}
 	else if (amount > 0)
@@ -4036,7 +4067,7 @@ function SendLocationCheck(int id, optional bool scout, optional bool hint)
 		
 		if (!IsLocationChecked(id))
 			SlotData.CheckedLocations.AddItem(id);
-
+		
 		PartySyncLocations_Single(id, , true);
 		SaveGame();
 	}

@@ -27,7 +27,7 @@ function OnOpenHUD(HUD H, optional String command)
 	Super.OnOpenHUD(H, command);
 	m = `AP;
 	difficulty = m.SlotData.LogicDifficulty;
-	if (difficulty >= 0)
+	if (difficulty >= `MODERATE)
 	{
 		// Subcon Well without Hookshot
 		HookshotRequiredLocs.RemoveItem(2000324311);
@@ -57,20 +57,20 @@ function OnOpenHUD(HUD H, optional String command)
 		DwellerMaskRequiredLocs.RemoveItem(2000304106);
 	}
 	
-	if (difficulty >= 1)
+	if (difficulty >= `HARD)
 	{
 		// Dweller Floating Rocks
 		DwellerMaskRequiredLocs.RemoveItem(2000324464);
 	}
 	
-	if (difficulty >= 2)
+	if (difficulty >= `EXPERT)
 	{
 		// Mafia Town - Above Boats without Hookshot
 		HookshotRequiredLocs.RemoveItem(2000305218);
 		
 		// Mafia Town - Hot Air Balloon without Ice Hat
 		IceHatRequiredLocs.RemoveItem(2000304829);
-
+		
 		// Mafia Town - Top of Lighthouse without Hookshot
 		HookshotRequiredLocs.RemoveItem(2000304213);
 		
@@ -120,10 +120,10 @@ function UpdateClosestMarker(HUD H)
 	mode = m.SlotData.CompassBadgeMode;
 	onlyImportant = (mode == 2 || mode == 3 && AreImportantItemsLeft(H));
 	
-	if (m.IsInSpaceship() && !m.HasAPBit("RumbiYarn", 1))
+	if (m.IsInSpaceship() && !m.IsLocationChecked(m.const.RumbiYarnCheck))
 	{
 		// Point to Rumbi, most players don't realize that she is a check.
-		if (CanHitObjects() && `SaveManager.GetNumberOfTimePieces() >= 4)
+		if (CanHitObjects())
 		{
 			foreach H.PlayerOwner.DynamicActors(class'Actor', a)
 			{
@@ -291,6 +291,9 @@ function bool IsShopReachable(HUD H, Actor a)
 	lo = Hat_PlayerController(H.PlayerOwner).MyLoadout;
 	difficulty = `AP.SlotData.LogicDifficulty;
 	
+	if (`GameManager.GetCurrentAct() == 8) // Rush Hour
+		return false;
+	
 	switch (a.Name)
 	{
 		// Green Clean Station below the Ice Hat trap door
@@ -299,17 +302,17 @@ function bool IsShopReachable(HUD H, Actor a)
 		
 		// Bluefin Tunnel
 		case 'Hat_NPC_NyakuzaShop_7':  case 'Hat_MetroTicketBooth_2':
-			return difficulty >= 0 && `AP.SlotData.NoTicketSkips == 0
+			return difficulty >= 0 && TicketSkipsAllowed()
 			|| lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteB') 
 			|| lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteC');
 		
 		// Pink Paw Station
 		case 'Hat_NPC_NyakuzaShop_12': case 'Hat_MetroTicketBooth_3':
-			return difficulty >= 0 && `AP.SlotData.NoTicketSkips == 0
-			|| (lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteD')
-			|| lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteA')
-			&& lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteC'))
-			&& (difficulty >= 0 || lo.BackpackHasInventory(class'Hat_Ability_Hookshot') && lo.BackpackHasInventory(class'Hat_Ability_FoxMask'));
+			return difficulty >= `MODERATE && TicketSkipsAllowed()
+			|| (lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteD') || 
+			lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteA') && 
+			lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteC'))
+			&& (difficulty >= `MODERATE || lo.BackpackHasInventory(class'Hat_Ability_Hookshot') && lo.BackpackHasInventory(class'Hat_Ability_FoxMask'));
 	}
 	
 	return true;
@@ -399,7 +402,7 @@ function bool UpdateClosestMarker_Actor(HUD H, Actor item, out float closest_dis
 
 function bool CanReachLocation(int id, HUD H)
 {
-	local bool finale, cannon, hookshot;
+	local bool hookshot, cannon, finale;
 	local int paintingUnlock, difficulty, act;
 	local Archipelago_GameMod m;
 	local string mapName;
@@ -411,14 +414,14 @@ function bool CanReachLocation(int id, HUD H)
 	difficulty = m.SlotData.LogicDifficulty;
 	act = `GameManager.GetCurrentAct();
 	hookshot = lo.BackpackHasInventory(class'Hat_Ability_Hookshot');
-	//nobonk = lo.BackpackHasInventory(class'Hat_Ability_NoBonk');
-	
-	// Mafia Town secret cave item
+
+	// Mafia Town secret cave item (crate blocking the cave is removed in act 6)
 	if (id == 2000305220)
 	{
 		return act == 6 || lo.BackpackHasInventory(class'Hat_Ability_Chemical');
 	}
 	
+	// Is the cannon to Mafia HQ accessible?
 	if (`GameManager.IsCurrentChapter(1))
 	{
 		cannon = act == 4 || act == 5 || act == 6 && CanHitObjects(false, true) || act == 7;
@@ -430,46 +433,51 @@ function bool CanReachLocation(int id, HUD H)
 		return cannon;
 	}
 	
+	// Mafia Town - Above Boats
+	if (id == 2000305218)
+	{
+		// Ice hat slide?
+		if (difficulty >= `MODERATE && lo.BackpackHasInventory(class'Hat_Ability_StatueFall'))
+		{
+			return true;
+		}
+	}
+	
 	// Subcon boss arena chest
 	if (id == 2000323735)
 	{
-		if (difficulty >= 2 && CanSkipPaintings())
+		// Cherry hover
+		if (difficulty >= `EXPERT && CanSkipPaintings())
 			return true;
 		
-		if (difficulty >= 1)
+		// Cherry bridge
+		if (difficulty >= `HARD)
 		{
 			return !m.SlotData.ShuffleSubconPaintings || m.GetPaintingUnlocks() >= 1;
 		}
 		
+		// Hookshot
 		if (act == 3)
 		{
 			return hookshot && (!m.SlotData.ShuffleSubconPaintings || m.GetPaintingUnlocks() >= 1);
 		}
 		
+		// Always accessible here
 		return act == 6;
 	}
 	
 	if (mapName ~= "subconforest" && act == 6)
 	{
-		if (difficulty < 1)
+		// If below Hard, we can't cross the gap between the arena and the village
+		if (difficulty < `HARD)
 			return false;
-	}
-	
-	// Goat Refinery
-	if (id == 2000333635)
-	{
-		if (class'Hat_SeqCond_IsAlpineFinale'.static.IsAlpineFinale())
-		{
-			return difficulty >= 1 || difficulty >= 0 && lo.BackpackHasInventory(class'Hat_Ability_Sprint');
-		}
-		
-		return hookshot && CanHitObjects(false, true);
 	}
 	
 	// Manor rooftop item
 	if (id == 2000325466)
 	{
-		if (difficulty >= 0)
+		// Can we skip the big dweller wall?
+		if (difficulty >= `MODERATE)
 		{
 			return CanSkipPaintings() || m.GetPaintingUnlocks() >= 1;
 		}
@@ -477,30 +485,81 @@ function bool CanReachLocation(int id, HUD H)
 		return (CanSkipPaintings() || m.GetPaintingUnlocks() >= 1) && CanHitObjects(true);
 	}
 	
-	if (mapName ~= "DeadBirdStudio")
+	if (mapName ~= "alpsandsails")
+	{
+		finale = class'Hat_SeqCond_IsAlpineFinale'.static.IsAlpineFinale();
+		
+		// Wait until intro is complete (intro is skipped in Illness)
+		if (!class'Hat_SaveBitHelper'.static.HasLevelBit("Actless_FreeRoam_Intro_Complete", 1, "AlpsAndSails") && !finale)
+			return false;
+		
+		// Goat Refinery
+		if (id == 2000333635)
+		{
+			if (finale)
+			{
+				// In Illness, we start in Goat Village, so we can possibly cross the gap to the Goat Refinery item
+				return difficulty >= `HARD || difficulty >= `MODERATE && lo.BackpackHasInventory(class'Hat_Ability_Sprint');
+			}
+		}
+		
+		// If we're in Illness and have no hookshot, Goat Village items only
+		if (!hookshot)
+			return id == 2000334855 || id == 2000334856;
+		
+		if (finale)
+		{
+			// Only these locations can be reached in Illness with hookshot
+			if (id != 2000334855 && id != 2000334856 && id != 2000335911 
+				&& id != 2000335756 && id != 2000336311 && id != 2000334760 && id != 2000334776)
+			{
+				return false;
+			}
+		}
+			
+		if (m.SlotData.ShuffleZiplines)
+		{
+			if (BirdhousePathLocs.Find(id) != -1 && (!hookshot || !m.HasZipline(Zipline_Birdhouse)))
+				return false;
+			
+			if (LavaCakePathLocs.Find(id) != -1 && (!hookshot || !m.HasZipline(Zipline_LavaCake)))
+				return false;
+			
+			if (WindmillPathLocs.Find(id) != -1 && (!hookshot || !m.HasZipline(Zipline_Windmill)))
+				return false;
+			
+			if (BellPathLocs.Find(id) != -1 && (!hookshot || !m.HasZipline(Zipline_Bell)))
+				return false;
+		}
+	}
+	else if (mapName ~= "DeadBirdStudio")
 	{
 		if (!m.SlotData.UmbrellaLogic)
 		{
-			if (difficulty < 0 && !lo.BackpackHasInventory(class'Archipelago_Weapon_Umbrella', true) 
+			// Can we cross the pit over to the second DJ Grooves area?
+			if (difficulty < `MODERATE && !lo.BackpackHasInventory(class'Archipelago_Weapon_Umbrella', true) 
 				&& !lo.BackpackHasInventory(class'Archipelago_Weapon_BaseballBat', true)
 				&& !lo.BackpackHasInventory(class'Hat_Ability_Chemical', true))
 			{
-				return id == 2000304874 || id == 2000305024 || id == 2000305248 || id == 2000305247;
+				return id == 2000304874 || id == 2000305024 || id == 2000305248 || id == 2000305247 || id == 2000303898;
 			}
 			else
 			{
+				// We can, but if we're in the basement instead, check if we can get past the lever near the elevator
 				if (act == 6)
 				{
-					return difficulty >= 2 || id == 2000304874 || id == 2000305024 || id == 2000305248 || id == 2000305247;
+					return difficulty >= `EXPERT || id == 2000304874 || id == 2000305024 || id == 2000305248 || id == 2000305247;
 				}
 				else
 				{
+					// We can get everything here
 					return true;
 				}
 			}
 		}
 		
-		if (difficulty >= 2)
+		// If UmbrellaLogic is on and we need a weapon to hit the lever near the elevator, see if we can skip that requirement
+		if (difficulty >= `EXPERT)
 		{
 			return true;
 		}
@@ -513,65 +572,31 @@ function bool CanReachLocation(int id, HUD H)
 	{
 		if (!hookshot)
 		{
+			// Nearly impossible without Hookshot
 			return id == 2000346454 || id == 2000346452 || id == 2000346449;
 		}
 	}
 	else if (mapName ~= "dlc_metro" && act == 8)
 	{
+		// We can't grab anything from Rush Hour
 		return false;
 	}
 	else if (mapName ~= "ship_main" && act == 1)
 	{
+		// Bon Voyage is impossible without Hookshot, so only the items at the docks are available
 		if (!hookshot)
 			return id == 2000305321 || id == 2000304313;
 	}
 	
-	if (mapName ~= "alpsandsails")
-	{
-		finale = class'Hat_SeqCond_IsAlpineFinale'.static.IsAlpineFinale();
-		
-		// Wait until intro is complete (intro is skipped in Illness)
-		if (!class'Hat_SaveBitHelper'.static.HasLevelBit("Actless_FreeRoam_Intro_Complete", 1, "AlpsAndSails") && !finale)
-			return false;
-		
-		if (!hookshot)
-			return id == 2000334855 || id == 2000334856;
-		
-		if (finale)
-		{
-			// Only these locations can be reached in Illness
-			if (id != 2000334855 && id != 2000334856 && id != 2000335911 
-			&& id != 2000335756 && id != 2000336311 && id != 2000334760 && id != 2000334776)
-			{
-				return false;
-			}
-		}
-		
-		if (m.SlotData.ShuffleZiplines)
-		{
-			if (BirdhousePathLocs.Find(id) != -1 && !m.HasZipline(Zipline_Birdhouse))
-				return false;
-
-			if (LavaCakePathLocs.Find(id) != -1 && !m.HasZipline(Zipline_LavaCake))
-				return false;
-			
-			if (WindmillPathLocs.Find(id) != -1 && !m.HasZipline(Zipline_Windmill))
-				return false;
-			
-			if (BellPathLocs.Find(id) != -1 && !m.HasZipline(Zipline_Bell))
-				return false;
-		}
-	}
-	
 	// Mystifying Time Mesa buttons
-	if (id == 2000337058)
+	if (id == 2000337058 && m.HasZipline(Zipline_LavaCake))
 	{
-		if (difficulty >= 0)
+		if (difficulty >= `MODERATE) // Can we skip the gap?
 			return true;
 		
 		return lo.BackpackHasInventory(class'Hat_Ability_TimeStop') || lo.BackpackHasInventory(class'Hat_Ability_Sprint');
 	}
-	
+
 	// HUMT
 	if (InStr(mapName, "mafia_town") != -1 && act == 6)
 	{
@@ -589,8 +614,8 @@ function bool CanReachLocation(int id, HUD H)
 		id == 2000304456 ||
 		id == 2000304457 ||
 		id == 2000304606 ||
-		id == 2000303481 && hookshot ||
-		id == 2000304607 && lo.BackpackHasInventory(class'Hat_Ability_StatueFall') ||
+		id == 2000303481 && (hookshot || difficulty >= `MODERATE) ||
+		id == 2000304607 && (difficulty >= `MODERATE || lo.BackpackHasInventory(class'Hat_Ability_StatueFall')) ||
 		id == 2000304212 ||
 		id == 2000302003 ||
 		id == 2000302004 ||
@@ -602,7 +627,8 @@ function bool CanReachLocation(int id, HUD H)
 	// Subcon long tree climb chest/Dweller platforming tree B
 	if ((id == 2000323734 || id == 2000324855) && (CanSkipPaintings() || m.GetPaintingUnlocks() >= 2))
 	{
-		if (difficulty >= 2 || CanSDJ())
+		// Can we skip the climb?
+		if (difficulty >= `EXPERT || CanSDJ())
 			return true;
 	}
 	
@@ -635,33 +661,34 @@ function bool CanReachLocation(int id, HUD H)
 	// Nyakuza Metro
 	if (id == 2000305111) // Bluefin Tunnel item
 	{
-		if (difficulty >= 0 && m.SlotData.NoTicketSkips == 0)
+		if (difficulty >= `MODERATE && TicketSkipsAllowed())
 			return true;
 		
 		// Green or blue ticket
 		return lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteB')
 			|| lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteC');
 	}
-	else if (id == 2000305110)
+	else if (id == 2000305110) // Pink Paw cat vaccuum
 	{
-		if (difficulty >= 0)
+		if (difficulty >= `MODERATE && TicketSkipsAllowed())
 			return true;
 		
-		// Pink or yellow+blue ticket
-		return lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteD') 
+		// Pink or yellow+blue ticket and Dweller+Hookshot
+		return (lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteD') 
 			|| lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteA')
-			&& lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteC');
+			&& lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteC'))
+			&& (difficulty >= `MODERATE || hookshot && lo.BackpackHasInventory(class'Hat_Ability_FoxMask'));
 	}
-	else if (id == 2000304106)
+	else if (id == 2000304106) // Pink Paw Station fan
 	{
-		if (difficulty >= 0 && m.SlotData.NoTicketSkips == 0)
+		if (difficulty >= `MODERATE && TicketSkipsAllowed())
 			return true;
 		
 		// Pink or yellow+blue AND Time Stop
 		return (lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteD')
 			|| lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteA')
 			&& lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteC'))
-			&& (difficulty >= 0 || lo.BackpackHasInventory(class'Hat_Ability_TimeStop'));
+			&& (difficulty >= `MODERATE || lo.BackpackHasInventory(class'Hat_Ability_TimeStop'));
 	}
 	
 	return true;
@@ -684,9 +711,14 @@ static function bool CanHitObjects(optional bool MaskBypass, optional bool Umbre
 	|| MaskBypass && class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_FoxMask');
 }
 
+static function bool TicketSkipsAllowed()
+{
+	return `AP.SlotData.NoTicketSkips == 0;
+}
+
 static function bool CanSDJ()
 {
-	return class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Sprint') && `AP.SlotData.LogicDifficulty >= 1;
+	return class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Sprint') && `AP.SlotData.LogicDifficulty >= `HARD;
 }
 
 static function bool CanSkipPaintings()
@@ -697,7 +729,7 @@ static function bool CanSkipPaintings()
 	if (!m.SlotData.ShuffleSubconPaintings)
 		return true;
 	
-	if (m.SlotData.LogicDifficulty < 0 || m.SlotData.NoPaintingSkips)
+	if (m.SlotData.LogicDifficulty < `MODERATE || m.SlotData.NoPaintingSkips)
 		return false;
 	
 	return true;

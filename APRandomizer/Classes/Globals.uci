@@ -16,3 +16,9 @@
 `define CODE_CONTINUATION_FIN 128 	// (10000000) - Continuation frame with FIN bit set (ends a multi-fragment message)
 
 `define AP class'Archipelago_GameMod'.static.GetGameMod()
+
+// Difficulty values
+`define NORMAL -1
+`define MODERATE 0
+`define HARD 1
+`define EXPERT 2
