@@ -473,6 +473,7 @@ function OnPostInitGame()
 	local Hat_PlayerController ctr;
 	local Hat_NPC npc;
 	local Hat_SubconPainting painting;
+	local Hat_HookPoint_Desert hookPoint;
 	local array<SequenceObject> seqObjects;
 	local Hat_MetroTicketBooth_Base booth;
 	local ShopInventoryItem dummy;
@@ -657,9 +658,27 @@ function OnPostInitGame()
 	{
 		DeleteCameraParticle();
 	}
-	else if (realMapName ~= "alpsandsails" && SlotData.ShuffleZiplines && !class'Hat_SnatcherContract_DeathWish_Speedrun_Illness'.static.IsActive())
+	else if (realMapName ~= "alpsandsails")
 	{
-		SetTimer(0.8, true, NameOf(UpdateZiplineUnlocks));
+		if (!class'Hat_SnatcherContract_DeathWish_Speedrun_Illness'.static.IsActive())
+		{
+			if (SlotData.ShuffleZiplines)
+			{
+				SetTimer(0.8, true, NameOf(UpdateZiplineUnlocks));
+			}
+			
+			foreach DynamicActors(class'Hat_HookPoint_Desert', hookPoint)
+			{
+				if (hookPoint.IsIntro > 0)
+				{
+					hookPoint.MoveSpeed = 3000;
+				}
+				else if (hookPoint.MoveSpeed < 6000)
+				{
+					hookPoint.MoveSpeed = 6000;
+				}
+			}
+		}
 	}
 	else if (realMapName ~= "dlc_metro")
 	{
@@ -769,7 +788,7 @@ function OnPostInitGame()
 			}
 			
 			if (class'Hat_SnatcherContract_DeathWish_Speedrun_Illness'.static.IsActive()
-			|| class'Hat_SnatcherContract_DeathWish_NiceBirdhouse'.static.IsActive())
+				|| class'Hat_SnatcherContract_DeathWish_NiceBirdhouse'.static.IsActive())
 			{
 				foreach DynamicActors(class'Hat_SandStationHorn_Base', horn)
 				{
@@ -3861,7 +3880,7 @@ function OnCollectibleSpawned(Object collectible)
 			}
 		}
 		
-		if (collectible.IsA('Hat_Collectible_BadgePart'))
+		if (collectible.IsA('Hat_Collectible_BadgePart') && !collectible.IsA('Hat_Collectible_BadgePart_Scooter_Subcon'))
 		{
 			Actor(collectible).Destroy();
 		}

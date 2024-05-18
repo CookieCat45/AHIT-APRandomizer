@@ -61,6 +61,9 @@ function OnOpenHUD(HUD H, optional String command)
 	{
 		// Dweller Floating Rocks
 		DwellerMaskRequiredLocs.RemoveItem(2000324464);
+		
+		// Dweller Platforming Tree B
+		DwellerMaskRequiredLocs.RemoveItem(2000324855);
 	}
 	
 	if (difficulty >= `EXPERT)
@@ -624,8 +627,8 @@ function bool CanReachLocation(int id, HUD H)
 		id == 2000305218; 
 	}
 	
-	// Subcon long tree climb chest/Dweller platforming tree B
-	if ((id == 2000323734 || id == 2000324855) && (CanSkipPaintings() || m.GetPaintingUnlocks() >= 2))
+	// Subcon long tree climb chest
+	if ((id == 2000323734) && (CanSkipPaintings() || m.GetPaintingUnlocks() >= 2))
 	{
 		// Can we skip the climb?
 		if (difficulty >= `EXPERT || CanSDJ())
