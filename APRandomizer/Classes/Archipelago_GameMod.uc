@@ -401,7 +401,7 @@ event PreBeginPlay()
 				save.GiveContract(class'Archipelago_SnatcherContract_Dummy2', GetALocalPlayerController());
 			}
 			
-			if (!HasAPBit("SubconBush1", 1) || !HasAPBit("SubconBush2", 1))
+			if (!class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false) && (!HasAPBit("SubconBush1", 1) || !HasAPBit("SubconBush2", 1)))
 			{
 				SetTimer(0.3, true, NameOf(SubconBushCheckTimer));
 			}
@@ -2393,7 +2393,7 @@ function OnTimePieceCollected(string Identifier)
 	local int i, id;
 	local Hat_ChapterActInfo currentAct;
 	local string hourglass;
-	local bool actless, basement;
+	local bool actless, basement, goal;
 	
 	if (!IsArchipelagoEnabled() || SlotData.DeathWishOnly)
 		return;
@@ -2410,6 +2410,7 @@ function OnTimePieceCollected(string Identifier)
 		|| SlotData.Goal == 2 && Identifier ~= "Metro_Escape")
 	{
 		BeatGame();
+		goal = true;
 	}
 	
 	id = GetTimePieceLocationID(Identifier);
@@ -2425,7 +2426,7 @@ function OnTimePieceCollected(string Identifier)
 	// We actually completed this act, so set the Time Piece ID as a level bit
 	if (SlotData.ActRando)
 	{
-		if (actless)
+		if (actless || goal)
 		{
 			hourglass = Identifier;
 			DebugMessage("Completed act: " $GetChapterActInfoFromHourglass(Identifier));
@@ -2439,15 +2440,32 @@ function OnTimePieceCollected(string Identifier)
 			for (i = 0; i < SlotData.ShuffledActList.Length; i++)
 			{
 				if (!basement && SlotData.ShuffledActList[i].NewAct == currentAct 
-				|| basement && SlotData.ShuffledActList[i].IsDeadBirdBasementShuffledAct)
+					|| basement && SlotData.ShuffledActList[i].IsDeadBirdBasementShuffledAct)
 				{
-					if (SlotData.ShuffledActList[i].IsDeadBirdBasementOriginalAct)
+					if (!SlotData.ShuffledActList[i].IsDeadBirdBasementOriginalAct)
 					{
-						hourglass = "chapter3_secret_finale";
+						if (IsActFreeRoam(SlotData.ShuffledActList[i].OriginalAct))
+						{
+							if (IsActFreeRoam(SlotData.ShuffledActList[i].OriginalAct))
+							{
+								if (SlotData.ShuffledActList[i].OriginalAct.ChapterInfo.ChapterID == 4)
+								{
+									hourglass = "AlpineFreeRoam";
+								}
+								else
+								{
+									hourglass = "MetroFreeRoam";
+								}
+							}
+						}
+						else
+						{
+							hourglass = SlotData.ShuffledActList[i].OriginalAct.hourglass;
+						}
 					}
 					else
 					{
-						hourglass = SlotData.ShuffledActList[i].OriginalAct.hourglass;
+						hourglass = "chapter3_secret_finale";
 					}
 					
 					DebugMessage("Completed act: " $SlotData.ShuffledActList[i].OriginalAct);
