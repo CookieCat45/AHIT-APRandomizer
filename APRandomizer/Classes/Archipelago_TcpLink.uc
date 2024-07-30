@@ -480,7 +480,7 @@ function ParseJSON(string json)
 					m.SlotData.PlayerNames[jsonChild.GetIntValue("slot")] = jsonChild.GetStringValue("alias");
 					if (jsonChild.GetIntValue("slot") == m.SlotData.PlayerSlot)
 					{
-						m.SlotData.SlotName = jsonChild.GetStringValue("alias");
+						m.SlotData.SlotName = jsonChild.GetStringValue("name");
 					}
 				}
 				
