@@ -99,7 +99,7 @@ function ConnectToAP()
 {
 	local JsonObject json;
 	local JsonObject jsonVersion;
-	local string message;
+	local string message, slotName;
 	
 	if (FullyConnected)
 		return;
@@ -111,7 +111,10 @@ function ConnectToAP()
 	json = new class'JsonObject';
 	json.SetStringValue("cmd", "Connect");
 	json.SetStringValue("game", "A Hat in Time");
-	json.SetStringValue("name", `AP.SlotData.SlotName);
+
+	slotName = `AP.SlotData.SlotName;
+	slotName = Repl(slotName, "\"", "\\\"", false);
+	json.SetStringValue("name", slotName);
 	json.SetStringValue("password", `AP.SlotData.Password);
 	json.SetStringValue("uuid", "");
 	json.SetStringValue("seed_name", `AP.SlotData.SeedName); // Used by AP client for verification.

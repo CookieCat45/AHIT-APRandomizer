@@ -4655,9 +4655,6 @@ function bool IsArchipelagoEnabled()
 function bool IsCurrentPatch()
 {
 	local string version;
-	if (bool(DebugMode))
-		return false;
-		
 	version = class'Engine'.static.GetBuildDate();
 	
 	// 2021 and later is around the time when TcpLink broke, which means we can't function. We only want 2019 or 2020 builds.
