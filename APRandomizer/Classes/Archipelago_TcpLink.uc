@@ -334,20 +334,22 @@ function ParseJSON(string json)
 	}
 	
 	m.DebugMessage("[ParseJSON] Reformatted command: " $json);
-	
-	// Security
-	for (i = 0; i < Len(json); i++)
+	if (InStr(json, "\"RoomInfo\"") == -1 && InStr(json, "\"Connected\"") == -1)
 	{
-		if (Mid(json, i, 1) == "{")
-			count1++;
-		else if (Mid(json, i, 1) == "}")
-			count2++;
-	}
-	
-	if (count1 != count2)
-	{
-		m.DebugMessage("[ParseJSON] [WARNING] Encountered JSON message with mismatching braces. Cancelling to prevent crash!");
-		return;
+		// Security
+		for (i = 0; i < Len(json); i++)
+		{
+			if (Mid(json, i, 1) == "{")
+				count1++;
+			else if (Mid(json, i, 1) == "}")
+				count2++;
+		}
+		
+		if (count1 != count2)
+		{
+			m.DebugMessage("[ParseJSON] [WARNING] Encountered JSON message with mismatching braces. Cancelling to prevent crash!");
+			return;
+		}
 	}
 	
 	jsonObj = new class'JsonObject';

@@ -3782,7 +3782,8 @@ function OnLoadoutChanged(PlayerController controller, Object loadout, Object ba
 	
 	// remove base game umbrella in favor of our own. This is the umbrella check in Mafia Town.
 	if (class<Hat_Weapon_Umbrella>(item.BackpackClass) != None 
-	&& class<Archipelago_Weapon_Umbrella>(item.BackpackClass) == None)
+	&& class<Archipelago_Weapon_Umbrella>(item.BackpackClass) == None
+	&& class<Archipelago_Weapon_BaseballBat>(item.BackpackClass) == None)
 	{
 		Hat_Loadout(loadout).RemoveBackpack(item);
 		if (`GameManager.GetCurrentMapFilename() ~= "mafia_town" && `GameManager.IsCurrentAct(1))
