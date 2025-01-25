@@ -110,7 +110,7 @@ event OnModLoaded()
 {
 	if (IsCurrentPatch())
 		return;
-	
+
 	HookActorSpawn(class'Hat_Player', 'Player');
 	if (IsArchipelagoEnabled())
 	{
@@ -277,7 +277,6 @@ event OnHookedActorSpawn(Object newActor, Name identifier)
 function EnableConsoleCommands()
 {
 	local PlayerController c;
-	
 	if (!IsArchipelagoEnabled())
 		return;
 	
