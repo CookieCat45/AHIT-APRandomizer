@@ -110,7 +110,7 @@ event OnModLoaded()
 {
 	if (IsCurrentPatch())
 		return;
-	
+
 	HookActorSpawn(class'Hat_Player', 'Player');
 	if (IsArchipelagoEnabled())
 	{
@@ -277,7 +277,6 @@ event OnHookedActorSpawn(Object newActor, Name identifier)
 function EnableConsoleCommands()
 {
 	local PlayerController c;
-	
 	if (!IsArchipelagoEnabled())
 		return;
 	
@@ -1399,6 +1398,12 @@ event OnOnlinePartyCommand(string Command, Name CommandChannel, Hat_GhostPartyPl
 			if (dwSync.GetBoolValue(string(i)))
 				dw.static.ForceUnlockObjective(i);
 		}
+	}
+	else if (CommandChannel == 'APDeathLink')
+	{
+		ScreenMessage(Command);
+		DeathLinked = true;
+		KillEveryone();
 	}
 	
 	SaveGame();
@@ -3534,8 +3539,8 @@ function InitShopItemDisplayName(class<Archipelago_ShopItem_Base> itemClass)
 	if (displayName ~= "")
 		return;
 	
-	if (displayName != "Unknown Item")
-		displayName $= " ("$PlayerIdToName(shopInfo.Player)$")";
+	//if (displayName != "Unknown Item")
+	//	displayName $= " ("$PlayerIdToName(shopInfo.Player)$")";
 	
 	itemClass.static.SetDisplayName(displayName);
 }
@@ -3759,14 +3764,50 @@ function OnPreBreakableBreak(Actor Breakable, Pawn Breaker)
 
 function OnPlayerDeath(Pawn Player)
 {
-	local string message;
+	local string message, deathString;
 	if (!IsDeathLinkEnabled() || !IsArchipelagoEnabled() || !IsFullyConnected())
 		return;
 	
 	// commit myurder
-	message = "[{`cmd`:`Bounce`,`tags`:[`DeathLink`],`data`:{`time`:" $float(TimeStamp()) $",`source`:" $"`" $SlotData.SlotName $"`" $"}}]";
+	DeathLinked = true;
+	message = "[{`cmd`:`Bounce`,`tags`:[`DeathLink`],`data`:{`time`:" $float(class'Hat_Math_Base'.static.GetApproximateTimeStamp_Now()) $",`source`:" $"`" $SlotData.SlotName $"`" $"}}]";
 	message = Repl(message, "`", "\"");
 	client.SendBinaryMessage(message);
+	KillEveryone(); // kill co op players
+	if (IsOnlineParty())
+	{
+		deathString = "You were MYURRDERRRRED by: " $ GetLocalPlayerName(Hat_Player(Player));
+		SendOnlinePartyCommand(deathString, 'APDeathLink', Player); // and online party players in our slot as well
+	}
+}
+
+function String GetLocalPlayerName(Hat_Player ply)
+{
+	local Hat_PlayerController pc;
+	local Array<Object> playerStates;
+	local int i;
+	local Hat_GhostPartyPlayerStateBase playerState;
+
+	pc = Hat_PlayerController(ply.Controller);
+	pc.GetGhostPartyPlayerStates(PlayerStates);
+	for (i = 0; i < PlayerStates.Length; i++)
+	{
+		PlayerState = Hat_GhostPartyPlayerStateBase(PlayerStates[i]);
+		if (PlayerState.IsLocalPlayer())
+			return PlayerState.GetDisplayName();
+	}
+	
+	return "Me";
+}
+
+function KillEveryone()
+{
+	local Hat_Player player;
+	foreach DynamicActors(class'Hat_Player', player)
+	{
+		if (player.Health > 0)
+			player.Suicide();
+	}
 }
 
 function OnLoadoutChanged(PlayerController controller, Object loadout, Object backpackItem)

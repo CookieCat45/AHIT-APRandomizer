@@ -1249,8 +1249,6 @@ function OnBouncedCommand(string json)
 {
 	local JsonObject jsonObj, jsonChild;
 	local string cause, msg, source;
-	local Hat_Player player;
-	
 	jsonObj = class'JsonObject'.static.DecodeJson(json);
 	if (jsonObj == None)
 		return;
@@ -1263,9 +1261,7 @@ function OnBouncedCommand(string json)
 		{
 			// commit myurder
 			`AP.DeathLinked = true;
-			foreach DynamicActors(class'Hat_Player', player)
-				player.Suicide();
-			
+			`AP.KillEveryone();
 			msg = "You were MYURRDERRRRED by: " $source;
 			cause = jsonChild.GetStringValue("cause");
 			if (cause != "")
