@@ -166,15 +166,19 @@ function UpdateClosestMarker(HUD H)
 			UpdateClosestMarker_Actor(H, token, closest_distance, bestindx);
 		}
 
-		foreach H.PlayerOwner.DynamicActors(class'Hat_Collectible_TimeBonus', timeBonus)
+		// we need hookshot for train rush so don't bother with these if not
+		if (class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Hookshot', true))
 		{
-			locId = m.ObjectToLocationId(timeBonus);
-			if (!CanReachLocation(locId, H) || m.IsLocationChecked(locId)) continue;
+			foreach H.PlayerOwner.DynamicActors(class'Hat_Collectible_TimeBonus', timeBonus)
+			{
+				locId = m.ObjectToLocationId(timeBonus);
+				if (!CanReachLocation(locId, H) || m.IsLocationChecked(locId)) continue;
 
-			locInfo = m.GetLocationInfoFromID(locId);
-			if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
+				locInfo = m.GetLocationInfoFromID(locId);
+				if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
 
-			UpdateClosestMarker_Actor(H, timeBonus, closest_distance, bestindx);
+				UpdateClosestMarker_Actor(H, timeBonus, closest_distance, bestindx);
+			}
 		}
 	}
 	
