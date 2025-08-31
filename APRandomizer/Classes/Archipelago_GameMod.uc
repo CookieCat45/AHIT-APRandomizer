@@ -6,6 +6,7 @@ class Archipelago_GameMod extends GameMod
 
 `include(APRandomizer\Classes\Globals.uci);
 const SlotDataVersion = 12;
+const BigParadeMaxTokenChecks = 8;
 
 var Archipelago_TcpLink Client;
 var Archipelago_SlotData SlotData;
@@ -79,6 +80,7 @@ const Chapter3IDRange = 2000320000;
 const Chapter4IDRange = 2000330000;
 const StoryBookPageIDRange = 2000340000;
 const TasksanityIDStart = 2000300204;
+const TokenIDRange = 2000900000;
 
 // Event checks
 const RumbiYarnCheck = 2000301000;
@@ -656,6 +658,20 @@ function OnPostInitGame()
 	if (InStr(realMapName, "mafia_town") != -1)
 	{
 		DeleteCameraParticle();
+	}
+	else if (realMapName ~= "themoon")
+	{
+		if (SlotData.ShuffleDirectorTokens && `GameManager.IsCurrentAct(5) && !class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false))
+		{
+			// Reset the token count if the player doesn't reach the checkpoint that gets set after spinning the dials.
+			// This is to make the umbrella potentially required to clear the latter half of the token checks,
+			// rather than having the player purposefully die to get them as the last four tokens
+			// will only spawn after the dials have been activated.
+			if (`SaveManager.GetCurrentSaveData().CurrentCheckpoint < 2)
+			{
+				class'Hat_SaveBitHelper'.static.SetActBits("BigParadeTokens", 0);
+			}
+		}
 	}
 	else if (realMapName ~= "alpsandsails")
 	{
@@ -1449,6 +1465,7 @@ function LoadSlotData(JsonObject json)
 	SlotData.ShuffleSubconPaintings = json.GetBoolValue("ShuffleSubconPaintings");
 	SlotData.NoPaintingSkips = json.GetBoolValue("NoPaintingSkips");
 	SlotData.CTRLogic = json.GetIntValue("CTRLogic");
+	SlotData.ShuffleDirectorTokens = json.GetBoolValue("ShuffleDirectorTokens");
 	SlotData.DeathLink = json.GetBoolValue("death_link");
 	SlotData.DeathLinkAmnesty = json.GetIntValue("death_link_amnesty");
 	SlotData.DWDeathLinkAmnesty = json.GetIntValue("dw_death_link_amnesty");
@@ -2674,7 +2691,7 @@ function ResetEverything()
 	SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo.maingame.Sand_and_Sails', 14);
 	SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo.maingame.Mu_Finale', 25);
 	SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo_DLC1.ChapterInfos.ChapterInfo_Cruise', 35);
-	
+	ResetShopItemNames();
 	ConsoleCommand("set Hat_IntruderInfo_CookingCat HasIntruderAlert true");
     ConsoleCommand("set hat_snatchercontract_deathwish_riftcollapse PenaltyWaitTimeInSeconds 300");
     ConsoleCommand("set hat_snatchercontract_deathwish_riftcollapse Condition_3Lives true");
@@ -3135,11 +3152,14 @@ function ShuffleCollectibles(optional bool cache)
 				}
 			}
 		}
-		else if (SlotData.ShuffleStorybookPages && a.IsA('Hat_Collectible_StoryBookPage') && a.CreationTime <= 0)
+		else if ((SlotData.ShuffleStorybookPages && a.IsA('Hat_Collectible_StoryBookPage')
+					|| SlotData.ShuffleDirectorTokens && (a.IsA('Hat_Collectible_HighscoreToken') || a.IsA('Hat_Collectible_TimeBonus'))) 
+					&& a.CreationTime <= 0)
 		{
 			locId = ObjectToLocationId(a);
 			locationArray.AddItem(locId);
 			
+			// tokens and time bonuses obviously aren't pages, but this should give us the behavior we want with scouting
 			if (SlotData.PageLocationIDs.Find(locId) == -1)
 				SlotData.PageLocationIDs.AddItem(locId);
 		}
@@ -3485,7 +3505,6 @@ function ShopItemInfo CreateShopItemInfo(class<Archipelago_ShopItem_Base> itemCl
 	SlotData.ShopItemRandStep++;
 	SlotData.ShopItemList.AddItem(shopInfo);
 	InitShopItemDisplayName(itemClass);
-	
 	return shopInfo;
 }
 
@@ -3553,6 +3572,17 @@ function InitShopItemDisplayName(class<Archipelago_ShopItem_Base> itemClass)
 	//	displayName $= " ("$PlayerIdToName(shopInfo.Player)$")";
 	
 	itemClass.static.SetDisplayName(displayName);
+}
+
+function ResetShopItemNames()
+{
+	local array< class<Object> > shopItemClasses;
+	local class<Object> cls;
+	shopItemClasses = class'Hat_ClassHelper'.static.GetAllScriptClasses("Archipelago_ShopItem_Base");
+	foreach shopItemClasses(cls)
+	{
+		class<Archipelago_ShopItem_Base>(cls).static.SetDisplayName("Unknown Item");
+	}
 }
 
 function string GetShopItemID(class<Archipelago_ShopItem_Base> itemClass)
@@ -3985,8 +4015,11 @@ function OnCollectedCollectible(Object collectible)
 {
 	local string message;
 	local Archipelago_RandomizedItem_Base item;
+	local int tokenCount;
 	
-	if (bool(DebugMode) && collectible.IsA('Hat_Collectible_Important'))
+	if (bool(DebugMode) && (collectible.IsA('Hat_Collectible_Important') 
+		|| collectible.IsA('Hat_Collectible_HighscoreToken')
+		|| collectible.IsA('Hat_Collectible_TimeBonus')))
 	{
 		// Show location ID
 		message = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename(string(Actor(collectible).GetLevelName()));
@@ -4000,7 +4033,23 @@ function OnCollectedCollectible(Object collectible)
 	
 	// If this is an Archipelago item or a storybook page, send it
 	// CreationTime > 0 means it was from a chest, in which case we would send the chest instead
-	if (SlotData.ShuffleStorybookPages && collectible.IsA('Hat_Collectible_StoryBookPage')
+	if (SlotData.ShuffleDirectorTokens && (collectible.IsA('Hat_Collectible_HighscoreToken') || collectible.IsA('Hat_Collectible_TimeBonus')))
+	{
+		if (class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false))
+			return;
+
+		tokenCount = class'Hat_SaveBitHelper'.static.GetActBits("BigParadeTokens");
+		if (`GameManager.IsCurrentAct(5) && tokenCount >= BigParadeMaxTokenChecks)
+			return;
+
+		SendLocationCheck(ObjectToLocationId(collectible));
+		if (`GameManager.IsCurrentAct(5))
+		{
+			// keep track of token count for Big Parade
+			class'Hat_SaveBitHelper'.static.SetActBits("BigParadeTokens", tokenCount+1);
+		}
+	}
+	else if (SlotData.ShuffleStorybookPages && collectible.IsA('Hat_Collectible_StoryBookPage')
 		&& Actor(collectible).CreationTime <= 0 && !class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false))
 	{
 		SendLocationCheck(ObjectToLocationId(collectible));
@@ -4967,6 +5016,7 @@ function int GetHatPriority(class<Hat_Ability> hat)
 function int ObjectToLocationId(Object obj)
 {
 	local int i, id;
+	local bool noIdGenerate;
 	local string fullName;
 	
 	if (obj == None)
@@ -4975,12 +5025,26 @@ function int ObjectToLocationId(Object obj)
 		ScriptTrace();
 	}
 	
-	fullName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename(string(Actor(obj).GetLevelName()))$"."$obj.Name;
-	
-	// Convert the object's name to an ID, using the Unicode values of the characters
-	for (i = 0; i < Len(fullName); i++)
+	if (obj.IsA('Hat_Collectible_HighscoreToken') || obj.IsA('Hat_Collectible_TimeBonus'))
 	{
-		id += Asc(Mid(fullName, i, 1));
+		id += TokenIDRange;
+		id += `GameManager.GetCurrentAct() * 100000;
+		if (`GameManager.IsCurrentAct(5))
+		{
+			// for big parade, the tokens spawn gradually, so just count them up
+			id += class'Hat_SaveBitHelper'.static.GetActBits("BigParadeTokens");
+			noIdGenerate = true;
+		}
+	}
+
+	if (!noIdGenerate)
+	{
+		// Convert the object's name to an ID, using the Unicode values of the characters
+		fullName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename(string(Actor(obj).GetLevelName()))$"."$obj.Name;
+		for (i = 0; i < Len(fullName); i++)
+		{
+			id += Asc(Mid(fullName, i, 1));
+		}
 	}
 	
 	if (obj.IsA('Hat_Collectible_StoryBookPage'))
@@ -4991,7 +5055,7 @@ function int ObjectToLocationId(Object obj)
 			id += 1000;
 		}
 	}
-	else
+	else if (!obj.IsA('Hat_Collectible_HighscoreToken') && !obj.IsA('Hat_Collectible_TimeBonus'))
 	{
 		id += GetChapterIDRange(`GameManager.GetChapterInfo());
 	}

@@ -40,6 +40,7 @@ var bool UmbrellaLogic;
 var bool DeathLink;
 var int DeathLinkAmnesty;
 var int DWDeathLinkAmnesty;
+var bool ShuffleDirectorTokens;
 var bool HatItems;
 
 var bool DLC1;

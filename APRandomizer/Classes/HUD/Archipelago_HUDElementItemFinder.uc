@@ -100,6 +100,8 @@ function UpdateClosestMarker(HUD H)
 	local Hat_Collectible_StoryBookPage page;
 	local Hat_TreasureChest_Base chest;
 	local Hat_Collectible_DeathWishLevelToken dwlt;
+	local Hat_Collectible_HighscoreToken token;
+	local Hat_Collectible_TimeBonus timeBonus;
 	local float closest_distance;
 	local int bestindx, i, mode, locId;
 	local bool HasAnyDeathWishLevelTokens, onlyImportant, hasBrewing, valid;
@@ -147,6 +149,33 @@ function UpdateClosestMarker(HUD H)
 		if (onlyImportant && item.ItemFlags == ItemFlag_Garbage) continue;
 		
 		UpdateClosestMarker_Actor(H, item, closest_distance, bestindx);
+	}
+	
+	if (m.SlotData.ShuffleDirectorTokens 
+		&& !class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false)
+		&& !`GameManager.IsCurrentAct(5))
+	{
+		foreach H.PlayerOwner.DynamicActors(class'Hat_Collectible_HighscoreToken', token)
+		{
+			locId = m.ObjectToLocationId(token);
+			if (!CanReachLocation(locId, H) || m.IsLocationChecked(locId)) continue;
+
+			locInfo = m.GetLocationInfoFromID(locId);
+			if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
+
+			UpdateClosestMarker_Actor(H, token, closest_distance, bestindx);
+		}
+
+		foreach H.PlayerOwner.DynamicActors(class'Hat_Collectible_TimeBonus', timeBonus)
+		{
+			locId = m.ObjectToLocationId(timeBonus);
+			if (!CanReachLocation(locId, H) || m.IsLocationChecked(locId)) continue;
+
+			locInfo = m.GetLocationInfoFromID(locId);
+			if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
+
+			UpdateClosestMarker_Actor(H, timeBonus, closest_distance, bestindx);
+		}
 	}
 	
 	foreach H.PlayerOwner.DynamicActors(class'Hat_TreasureChest_Base', chest)
