@@ -18,8 +18,7 @@ enum EItemFlags
 	bbbbb,
 	ccccc,
 	ddddd,
-	eeeee,
-	ItemFlag_ImportantSkipBalancing // 9
+	ItemFlag_SkipBalancing // 8
 };
 
 // Used with slot data

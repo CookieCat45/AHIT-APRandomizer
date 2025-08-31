@@ -2213,7 +2213,7 @@ function CheckShopOverride(Hat_HUD hud)
 		
 		if (!shopInfo.Hinted)
 		{
-			if (shopInfo.ItemFlags == ItemFlag_Important || shopInfo.ItemFlags == ItemFlag_ImportantSkipBalancing)
+			if ((shopInfo.ItemFlags & ItemFlag_Important) != 0)
 			{
 				if (hintIds.Find(shopInfo.ID) == -1)
 					hintIds.AddItem(shopInfo.ID);
@@ -2948,7 +2948,15 @@ function bool IsChapterActInfoUnlocked(Hat_ChapterActInfo ChapterActInfo, option
 	IsFreeRoam = IsActFreeRoam(ChapterActInfo);
 	
 	if (ChapterInfo == None) return false;
-	if (!class'Hat_SeqCond_ChapterUnlocked'.static.IsChapterUnlocked(ChapterInfo)) return false;
+	if (!IsPurpleRift(ChapterActInfo))
+	{
+		if (ChapterInfo.ChapterID != 4 || !ChapterActInfo.IsBonus)
+		{
+			if (!class'Hat_SeqCond_ChapterUnlocked'.static.IsChapterUnlocked(ChapterInfo)) 
+				return false;
+		}
+	}
+	
 	if (!ChapterActInfo.IsBonus && (actid <= 0 || actid > 99)) return false;
 	if (!ChapterActInfo.IsBonus && (actid >= 99 || (ChapterInfo.ActIDAfterIntro > 0 && actid == ChapterInfo.ActIDAfterIntro)) && !IsFreeRoam) return false;
 	if (hourglass == "" && !IsFreeRoam) return false;
@@ -3585,8 +3593,7 @@ function bool DoesShopHaveImportantItems(Archipelago_ShopInventory_Base shop, op
 	{
 		if (GetShopItemInfo(class<Archipelago_ShopItem_Base>(shop.ItemsForSale[i].CollectibleClass), shopInfo))
 		{
-			if ((shopInfo.ItemFlags == ItemFlag_Important || shopInfo.ItemFlags == ItemFlag_ImportantSkipBalancing)
-			&& (!excludePurchased || !pc.HasCollectible(shop.ItemsForSale[i].CollectibleClass)))
+			if ((shopInfo.ItemFlags & ItemFlag_Important) != 0 && (!excludePurchased || !pc.HasCollectible(shop.ItemsForSale[i].CollectibleClass)))
 				return true;
 		}
 	}
@@ -3772,18 +3779,24 @@ function OnPlayerDeath(Pawn Player)
 	if (!IsDeathLinkEnabled() || !IsArchipelagoEnabled() || !IsFullyConnected())
 		return;
 
+	TotalAmnesty = 0;
 	// pick amnesty type based on if a death wish is active
-	if (class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false)) {
+	if (class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false)) 
+	{
 		amnestyType = "DWCurrentDeathLinkAmnesty";
 		TotalAmnesty = SlotData.DWDeathLinkAmnesty;
-	} else {
+	}
+	else 
+	{
 		amnestyType = "CurrentDeathLinkAmnesty";
 		TotalAmnesty = SlotData.DeathLinkAmnesty;
 	}
+
 	CurrentAmnesty = GetAPBits(amnestyType, TotalAmnesty);
 	DebugMessage("[DeathLink] Amnesty type is " $ amnestyType $ " with " $ CurrentAmnesty $ " of " $ TotalAmnesty $ " left");
 	
-	if (TotalAmnesty != 0 && CurrentAmnesty > 0) {
+	if (TotalAmnesty != 0 && CurrentAmnesty > 0) 
+	{
 		SetAPBits(amnestyType, CurrentAmnesty - 1);
 		return;
 	}
