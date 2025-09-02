@@ -8,6 +8,7 @@ var array<LocationInfo> LocationInfoArray;
 var array<ShopItemInfo> ShopItemList;
 var array<ShopItemName> ShopItemNames;
 var array<string> PlayerNames;
+var array<string> ScoutedMaps;
 var bool PlayerNamesInitialized;
 
 var bool ConnectedOnce;

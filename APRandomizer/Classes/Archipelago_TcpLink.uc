@@ -789,7 +789,7 @@ function OnLocationInfoCommand(string json)
 	
 	if (!m.IsMapScouted(mapName))
 	{
-		m.SetAPBits("MapScouted_"$Locs(mapName), 1);
+		m.SlotData.ScoutedMaps.AddItem(Locs(mapName));
 	}
 	
 	m.SaveGame();

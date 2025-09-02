@@ -5,7 +5,7 @@ class Archipelago_GameMod extends GameMod
 	config(Mods);
 
 `include(APRandomizer\Classes\Globals.uci);
-const SlotDataVersion = 13;
+const SlotDataVersion = 14;
 const BigParadeMaxTokenChecks = 8;
 
 var Archipelago_TcpLink Client;
@@ -3415,7 +3415,7 @@ function bool IsLocationIDPage(int id)
 
 function bool IsMapScouted(string map)
 {
-	return HasAPBit("MapScouted_"$Locs(map), 1);
+	return SlotData.ScoutedMaps.Find(Locs(map)) != -1;
 }
 
 function Archipelago_RandomizedItem_Base CreateItem(int locId, string itemId, int flags, int player, 
