@@ -22,9 +22,8 @@ var transient bool ItemSoundCooldown;
 var transient bool DeathLinked;
 var transient string DebugMsg;
 
-var config int DebugMode;
+var int DebugMode;
 var config int DisableInjection;
-var config int VerboseLogging;
 var const editconst Vector SpaceshipSpawnLocation;
 
 var transient array<Hat_SnatcherContract_Selectable> SelectContracts;
@@ -5015,13 +5014,6 @@ function ScreenMessage(String message, optional Name type)
 {
 	local PlayerController pc;
 	
-	if (bool(VerboseLogging))
-	{
-		// Don't ask.
-		DebugMsg = message;
-		ConsoleCommand("getall Archipelago_GameMod DebugMsg");
-	}
-	
 	pc = GetALocalPlayerController();
     if (pc == None)
 		return;
@@ -5032,12 +5024,6 @@ function ScreenMessage(String message, optional Name type)
 function DebugMessage(String message, optional Name type)
 {
 	local PlayerController pc;
-	if (bool(VerboseLogging))
-	{
-		DebugMsg = message;
-		ConsoleCommand("getall Archipelago_GameMod DebugMsg");
-	}
-	
 	if (!bool(DebugMode))
 		return;
 	
