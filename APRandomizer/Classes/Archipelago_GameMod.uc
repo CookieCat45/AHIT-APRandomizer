@@ -5,7 +5,7 @@ class Archipelago_GameMod extends GameMod
 	config(Mods);
 
 `include(APRandomizer\Classes\Globals.uci);
-const SlotDataVersion = 12;
+const SlotDataVersion = 13;
 const BigParadeMaxTokenChecks = 8;
 
 var Archipelago_TcpLink Client;
@@ -671,6 +671,8 @@ function OnPostInitGame()
 			{
 				class'Hat_SaveBitHelper'.static.SetActBits("BigParadeTokens", 0);
 			}
+
+			SetTimer(1.0, true, 'ParadeTokenSpawner');
 		}
 	}
 	else if (realMapName ~= "alpsandsails")
@@ -931,6 +933,47 @@ function OnPostInitGame()
 	SetTimer(2.0, true, NameOf(FixInventoryIssues));
 	if (Client == None)
 		CreateClient();
+}
+
+function ParadeTokenSpawner()
+{
+	// if the player is doing big parade and they reach the last wave, and they're missing token checks
+	// spawn more tokens until they've hit the max so they don't have to redo the level
+	local Hat_NPC_MoonPenguin_Moon peng;
+	local array<Hat_NPC_MoonPenguin_Moon> potentials;
+	local bool TooClose;
+	local Hat_Player p;
+
+	if (`SaveManager.GetCurrentSaveData().CurrentCheckpoint < 3)
+		return;
+
+	if (class'Hat_SaveBitHelper'.static.GetActBits("BigParadeTokens") >= BigParadeMaxTokenChecks)
+	{
+		ClearTimer('ParadeTokenSpawner');
+		return;
+	}
+
+	foreach DynamicActors(class'Hat_NPC_MoonPenguin_Moon', peng)
+	{
+		if (peng.ParadeReward != class'Hat_Collectible_HighscoreToken') continue;
+		if (peng.ParadeRewardInstance != None) return; // don't spawn more than one at a time
+
+		TooClose = false;
+		foreach DynamicActors(class'Hat_Player', p)
+		{
+			if (p.Controller == None) continue;
+			if (!p.Controller.IsA('PlayerController')) continue;
+			if (VSize((p.Location - peng.Location)*vect(1,1,0)) > 1500) continue;
+			TooClose = true;
+			break;
+		}
+		if (TooClose) continue;
+
+		potentials.AddItem(peng);
+	}
+	if (potentials.Length == 0) return;
+
+	potentials[Rand(potentials.Length)].SpawnParadeReward();
 }
 
 function RumbiHitCheckTimer(Actor rumbi)
@@ -2691,6 +2734,7 @@ function ResetEverything()
 	SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo.maingame.Sand_and_Sails', 14);
 	SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo.maingame.Mu_Finale', 25);
 	SetChapterTimePieceRequirement(Hat_ChapterInfo'HatinTime_ChapterInfo_DLC1.ChapterInfos.ChapterInfo_Cruise', 35);
+	SetChapterTimePieceRequirement(Hat_ChapterInfo'hatintime_chapterinfo_dlc2.ChapterInfos.ChapterInfo_Metro', 20);
 	ResetShopItemNames();
 	ConsoleCommand("set Hat_IntruderInfo_CookingCat HasIntruderAlert true");
     ConsoleCommand("set hat_snatchercontract_deathwish_riftcollapse PenaltyWaitTimeInSeconds 300");
