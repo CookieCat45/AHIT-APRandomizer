@@ -968,6 +968,7 @@ function GrantItem(int itemId)
 		if (save.SnatcherContracts.Find(contract) == -1)
 			save.SnatcherContracts.AddItem(contract);
 		
+		`AP.SetAPBits(string(contract), 1);
 		contract.static.UnlockActs(save);
 	}
 	else if (itemId == 2000300204 || itemId == 2000300205 || itemId == 2000300206 || itemId == 2000300207)

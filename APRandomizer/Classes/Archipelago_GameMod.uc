@@ -907,6 +907,26 @@ function OnPostInitGame()
 		// these occasionally get wiped for some reason
 		SlotData.ObtainedContracts[i].static.UnlockActs(save);
 	}
+
+	if (HasAPBit(string(class'Hat_SnatcherContract_IceWall'), 1))
+	{
+		class'Hat_SnatcherContract_IceWall'.static.UnlockActs(save);
+	}
+
+	if (HasAPBit(string(class'Hat_SnatcherContract_Toilet'), 1))
+	{
+		class'Hat_SnatcherContract_Toilet'.static.UnlockActs(save);
+	}
+
+	if (HasAPBit(string(class'Hat_SnatcherContract_Vanessa'), 1))
+	{
+		class'Hat_SnatcherContract_Vanessa'.static.UnlockActs(save);
+	}
+
+	if (HasAPBit(string(class'Hat_SnatcherContract_MailDelivery'), 1))
+	{
+		class'Hat_SnatcherContract_MailDelivery'.static.UnlockActs(save);
+	}
 	
 	// Remove our dummy contracts from earlier.
 	if (save.SnatcherContracts.Find(class'Archipelago_SnatcherContract_Dummy1') != -1)
@@ -1125,7 +1145,7 @@ function HideItems()
 
 function bool DoesPlayerReallyHaveContract(class<Hat_SnatcherContract_Act> contract)
 {
-	return SlotData.ObtainedContracts.Find(contract) != -1;
+	return SlotData.ObtainedContracts.Find(contract) != -1 || HasAPBit(string(contract), 1);
 }
 
 function CheckForNewContracts()
