@@ -2025,12 +2025,14 @@ function OnPreOpenHUD(HUD InHUD, out class<Object> InHUDElement)
 	if (!IsArchipelagoEnabled())
 		return;
 	
+	if (class<Hat_HUDMenuLoadout>(InHUDElement) != None)
+	{
+		Hat_HUD(InHUD).OpenHUD(class'Archipelago_HUDElementInfoButton', , true);
+		return;
+	}
+
 	switch (InHUDElement)
 	{
-		case class'Hat_HUDMenuLoadout':
-			Hat_HUD(InHUD).OpenHUD(class'Archipelago_HUDElementInfoButton', , true);
-			break;
-		
 		case class'Hat_HUDElementGhostPartyJoinAct':
 			if (SlotData == None || SlotData.ActRando)
 				InHUDElement = None;
