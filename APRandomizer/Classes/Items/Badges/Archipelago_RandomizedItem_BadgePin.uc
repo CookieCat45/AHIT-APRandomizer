@@ -21,9 +21,24 @@ defaultproperties
 
 simulated function bool OnCollected(Actor a)
 {
+	local Hat_SaveGame save;
+	local Hat_Loadout lo;
+	lo = Hat_PlayerController(GetALocalPlayerController()).MyLoadout;
 	if (WasFromServer())
 	{
-		`GameManager.AddBadgeSlots(1);
+		save = `SaveManager.GetCurrentSaveData();
+		save.MyBadgeSlots = min(2, save.MyBadgeSlots+1);
+		
+		// make sure to give the player the actual badge pin items or else the game may yeet the slots randomly
+		if (save.MyBadgeSlots >= 1 && !lo.BackpackHasInventory(class'Hat_Collectible_BadgeSlot'))
+		{
+			lo.AddBackpack(lo.MakeBackpackItem(class'Hat_Collectible_BadgeSlot'));
+		}
+
+		if (save.MyBadgeSlots >= 2 && !lo.BackpackHasInventory(class'Hat_Collectible_BadgeSlot2'))
+		{
+			lo.AddBackpack(lo.MakeBackpackItem(class'Hat_Collectible_BadgeSlot2'));
+		}
 	}
 	
 	return Super.OnCollected(a);

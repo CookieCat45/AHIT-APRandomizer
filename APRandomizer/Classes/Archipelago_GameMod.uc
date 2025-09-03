@@ -946,7 +946,7 @@ function OnPostInitGame()
 		
 		// Check for new contracts
 		if (SlotData.ShuffleActContracts)
-			SetTimer(1.0, true, NameOf(CheckForNewContracts));
+			SetTimer(0.7, true, NameOf(CheckForNewContracts));
 	}
 	
 	SetTimer(2.0, true, NameOf(FixInventoryIssues));
@@ -1157,22 +1157,27 @@ function CheckForNewContracts()
 	for (i = 0; i < save.SnatcherContracts.Length; i++)
 	{
 		if (save.SnatcherContracts[i] == None 
-		|| !ContractEventActive && DoesPlayerReallyHaveContract(save.SnatcherContracts[i])
-		|| SlotData.CheckedContracts.Find(save.SnatcherContracts[i]) != -1)
+		|| !ContractEventActive && DoesPlayerReallyHaveContract(save.SnatcherContracts[i]))
 			continue;
-		
-		// We don't have this contract. Remove it and send the check for it.
-		for (j = 0; j < save.SnatcherContracts[i].default.UnlockActIDs.Length; j++)
+
+		if (SlotData.CheckedContracts.Find(save.SnatcherContracts[i]) == -1)
 		{
-			class'Hat_SaveBitHelper'.static.RemoveLevelBit("contract_unlock_actid", save.SnatcherContracts[i].default.UnlockActIDs[j], "subconforest");
+			// we just signed this contract, send the associated location
+			id = class'Archipelago_ItemInfo'.static.GetContractID(save.SnatcherContracts[i]);
+			DebugMessage("Sending contract as location: " $save.SnatcherContracts[i] $" ID: " $id);
+			SlotData.CheckedContracts.AddItem(save.SnatcherContracts[i]);
+			SendLocationCheck(id);
 		}
-		
-		id = class'Archipelago_ItemInfo'.static.GetContractID(save.SnatcherContracts[i]);
-		DebugMessage("Sending contract as location: " $save.SnatcherContracts[i] $" ID: " $id);
-		SendLocationCheck(id);
-		
-		SlotData.CheckedContracts.AddItem(save.SnatcherContracts[i]);
-		save.SnatcherContracts.RemoveItem(save.SnatcherContracts[i]);
+
+		if (!DoesPlayerReallyHaveContract(save.SnatcherContracts[i]))
+		{
+			// we don't actually have the contract itself, so remove it
+			save.SnatcherContracts.RemoveItem(save.SnatcherContracts[i]);
+			for (j = 0; j < save.SnatcherContracts[i].default.UnlockActIDs.Length; j++)
+			{
+				class'Hat_SaveBitHelper'.static.RemoveLevelBit("contract_unlock_actid", save.SnatcherContracts[i].default.UnlockActIDs[j], "subconforest");
+			}
+		}
 	}
 	
 	if (!TrapsDestroyed)
