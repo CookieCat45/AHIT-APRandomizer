@@ -98,7 +98,6 @@ event Opened()
 function ConnectToAP()
 {
 	local JsonObject json;
-	local JsonObject jsonVersion;
 	local string message, slotName;
 	
 	if (FullyConnected)
@@ -111,41 +110,13 @@ function ConnectToAP()
 	json = new class'JsonObject';
 	json.SetStringValue("cmd", "Connect");
 	json.SetStringValue("game", "A Hat in Time");
-
 	slotName = `AP.SlotData.SlotName;
 	slotName = Repl(slotName, "\"", "\\\"", false);
 	json.SetStringValue("name", slotName);
-	json.SetStringValue("password", `AP.SlotData.Password);
-	json.SetStringValue("uuid", "");
 	json.SetStringValue("seed_name", `AP.SlotData.SeedName); // Used by AP client for verification.
-	
-	json.SetIntValue("items_handling", 7);
-	json.SetBoolValue("slot_data", !`AP.SlotData.Initialized);
-	
-	jsonVersion = new class'JsonObject';
-	jsonVersion.SetStringValue("major", "0");
-	jsonVersion.SetStringValue("minor", "4");
-	jsonVersion.SetStringValue("build", "1");
-	jsonVersion.SetStringValue("class", "Version");
-	json.SetObject("version", jsonVersion);
-	
-	if (`AP.SlotData.DeathLink)
-	{
-		json.SetStringValue("tags", "[\"DeathLink\", \"AP\"]");
-	}
-	else
-	{
-		json.SetStringValue("tags", "[\"AP\"]");
-	}
-	
-	// remove "" from tags array
 	message = `AP.EncodeJson2(json);
-	message = Repl(message, "\"[", "[");
-	message = Repl(message, "]\"", "]");
-	
 	SendBinaryMessage(message);
 	json = None;
-	jsonVersion = None;
 }
 
 event Tick(float d)

@@ -3067,6 +3067,27 @@ function bool IsChapterActInfoUnlocked(Hat_ChapterActInfo ChapterActInfo, option
 		{
 			if (HasAPBit("ActComplete_snatcher_boss", 1))
 				return true;
+
+			// yet another act contract fix, ugh
+			if (SlotData.ShuffleActContracts)
+			{
+				if (actid == 2)
+				{
+					return SlotData.ObtainedContracts.Find(class'Hat_SnatcherContract_IceWall') != -1;
+				}
+				else if (actid == 3)
+				{
+					return SlotData.ObtainedContracts.Find(class'Hat_SnatcherContract_Toilet') != -1;
+				}
+				else if (actid == 4)
+				{
+					return SlotData.ObtainedContracts.Find(class'Hat_SnatcherContract_Vanessa') != -1;
+				}
+				else if (actid == 5)
+				{
+					return SlotData.ObtainedContracts.Find(class'Hat_SnatcherContract_MailDelivery') != -1;
+				}
+			}
 		}
 		
 		return class'Hat_SaveBitHelper'.static.HasLevelBit(ChapterInfo.UnlockedByLevelBit, actid, ChapterInfo.GetActMap(1));
