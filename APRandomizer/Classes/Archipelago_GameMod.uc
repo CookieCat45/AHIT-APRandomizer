@@ -3247,6 +3247,9 @@ function ShuffleCollectibles(optional bool cache)
 					|| SlotData.ShuffleDirectorTokens && (a.IsA('Hat_Collectible_HighscoreToken') || a.IsA('Hat_Collectible_TimeBonus'))) 
 					&& a.CreationTime <= 0)
 		{
+			if (a.IsA('Hat_Collectible_HighscoreToken') && `SaveManager.GetCurrentSaveData().CurrentChapter != 2)
+				continue;
+
 			locId = ObjectToLocationId(a);
 			locationArray.AddItem(locId);
 			
@@ -4127,6 +4130,9 @@ function OnCollectedCollectible(Object collectible)
 	if (SlotData.ShuffleDirectorTokens && (collectible.IsA('Hat_Collectible_HighscoreToken') || collectible.IsA('Hat_Collectible_TimeBonus')))
 	{
 		if (class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false))
+			return;
+
+		if (collectible.IsA('Hat_Collectible_HighscoreToken') && `SaveManager.GetCurrentSaveData().CurrentChapter != 2)
 			return;
 
 		tokenCount = class'Hat_SaveBitHelper'.static.GetActBits("BigParadeTokens");
