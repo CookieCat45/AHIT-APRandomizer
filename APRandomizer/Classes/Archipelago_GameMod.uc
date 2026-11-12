@@ -4876,6 +4876,8 @@ function bool IsArchipelagoEnabled()
 
 function bool IsCurrentPatch()
 {
+	return false;
+	/*
 	local string version;
 	version = class'Engine'.static.GetBuildDate();
 	
@@ -4884,6 +4886,7 @@ function bool IsCurrentPatch()
 		return true;
 	
 	return false;
+	*/
 }
 
 function bool IsInTitlescreen()
