@@ -626,6 +626,7 @@ function OnLocationInfoCommand(string json)
 	local array<class< Object > > shopItemClasses;
 	local Actor container;
 	local Archipelago_GameMod m;
+	local class<Hat_SnatcherContract_DeathWish> dw;
 	
 	mapName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename();
 	
@@ -720,6 +721,14 @@ function OnLocationInfoCommand(string json)
 			class'Archipelago_ItemInfo'.static.GetNativeItemData(itemId, locInfo.ItemClass);
 			m.SlotData.LocationInfoArray.AddItem(locInfo);
 			continue;
+		}
+
+		dw = class'Archipelago_ItemInfo'.static.GetDeathWishFromLocationID(locId-300);
+		if (dw != None)
+		{
+			// Death Wish reward visual
+			class'Archipelago_ItemInfo'.static.GetNativeItemData(m.GetStringValue2(jsonChild, "item"), locInfo.ItemClass);
+			ConsoleCommand("set "$dw $" CompletionReward "$locInfo.ItemClass);
 		}
 		
 		if (locId == m.CameraBadgeCheck1 || locId == m.CameraBadgeCheck2)
@@ -892,6 +901,15 @@ function GrantItem(int itemId)
 		{
 			// This is a hat, make sure hats are in the correct order for swapping
 			`AP.SortPlayerHats();
+		}
+		else if (itemId == 2000300054)
+		{
+			`AP.SetAPBits("HasHomingAttack", 1);
+		}
+		else if (itemId == 2000300055)
+		{
+			`AP.SetAPBits("HasObjectGrab", 1);
+			`AP.ToggleCarryAbility();
 		}
 		else
 		{

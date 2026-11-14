@@ -63,6 +63,11 @@ function bool IsDeathWishAvailable(class<Hat_SnatcherContract_DeathWish> DeathWi
 	local int locId, index;
 	local array<int> locIds;
 	local class<Hat_SnatcherContract_DeathWish> prevDw;
+	if (DeathWish.default.TimedEvent != ETimedEvent_None)
+	{
+		// ignore event death wishes
+		return false;
+	}
 	
 	if (mod.SlotData.DeathWishShuffle)
 	{

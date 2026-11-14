@@ -5,7 +5,7 @@ class Archipelago_GameMod extends GameMod
 	config(Mods);
 
 `include(APRandomizer\Classes\Globals.uci);
-const SlotDataVersion = 14;
+const SlotDataVersion = 15;
 const BigParadeMaxTokenChecks = 8;
 
 var Archipelago_TcpLink Client;
@@ -151,6 +151,7 @@ event Tick(float d)
 {
 	local int i;
 	local array<LocalPlayer> players;
+	local Hat_Player p;
 	
 	Super.Tick(d);
 	if (!IsArchipelagoEnabled())
@@ -177,6 +178,15 @@ event Tick(float d)
 				ParadeArray[i].SetTickIsDisabled(false);
 				ParadeArray[i].SetCollision(true);
 			}
+		}
+	}
+
+	if (SlotData.LockHomingAttack && GetAPBits("HasHomingAttack") == 0)
+	{
+		foreach DynamicActors(class'Hat_Player', p)
+		{
+			p.HomingAttackTarget = None;
+			p.NextHomingAttackSeek = 0.5;
 		}
 	}
 }
@@ -480,9 +490,8 @@ function OnPostInitGame()
 	local array<Object> shopInvs;
 	local Hat_BonfireBarrier barrier;
 	local Hat_SandStationHorn_Base horn;
-	local array<class<Object > > DeathWishes;
-	local class<Hat_SnatcherContract_DeathWish> dw;
-	local class<Hat_CosmeticItemQualityInfo> flair;
+	//local class<Hat_SnatcherContract_DeathWish> dw;
+	//local class<Hat_CosmeticItemQualityInfo> flair;
 	local Hat_ImpactInteract_Breakable_ChemicalBadge crate;
 	local Actor a;
 	
@@ -825,24 +834,6 @@ function OnPostInitGame()
 				}
 			}
 		}
-		
-		DeathWishes = class'Hat_ClassHelper'.static.GetAllScriptClasses("Hat_SnatcherContract_DeathWish");
-		for (i = 0; i < DeathWishes.Length; i++)
-		{
-			dw = class<Hat_SnatcherContract_DeathWish>(DeathWishes[i]);
-			if (dw.default.CompletionReward == None)
-				continue;
-				
-			flair = class<Hat_CosmeticItemQualityInfo>(dw.default.CompletionReward);
-			if (flair == None)
-				continue;
-			
-			// Remove Death Wish flair rewards if we don't have the base hat, since the game doesn't bother checking if you have it.
-			if (!class'Hat_Loadout'.static.BackpackHasInventory(flair.static.GetBaseCosmeticItemWeApplyTo()))
-			{
-				ConsoleCommand("set "$dw $" CompletionReward None");
-			}
-		}
 	}
 	
 	if (class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false))
@@ -879,6 +870,11 @@ function OnPostInitGame()
 	if (SlotData.UmbrellaLogic)
 	{
 		ReplaceUnarmedWeapon();
+	}
+
+	if (SlotData.LockObjectGrab)
+	{
+		ToggleCarryAbility();
 	}
 	
 	ctr = Hat_PlayerController(GetALocalPlayerController());
@@ -952,6 +948,23 @@ function OnPostInitGame()
 	SetTimer(2.0, true, NameOf(FixInventoryIssues));
 	if (Client == None)
 		CreateClient();
+}
+
+function OnGetDefaultPlayerClass(Controller C, out class<Pawn> PawnClass)
+{
+	if (!IsArchipelagoEnabled() || !SlotData.Initialized || !SlotData.LockObjectGrab)
+		return;
+
+	ToggleCarryAbility();
+}
+
+function ToggleCarryAbility()
+{
+	local Hat_Player p;
+	foreach DynamicActors(class'Hat_Player', p)
+	{
+		ConsoleCommand("set "$p.Name$" CanCarryObjects "$bool(GetAPBits("HasObjectGrab")));
+	}
 }
 
 function ParadeTokenSpawner()
@@ -1529,9 +1542,12 @@ function LoadSlotData(JsonObject json)
 	SlotData.ShuffleActContracts = json.GetBoolValue("ShuffleActContracts");
 	SlotData.ShuffleZiplines = json.GetBoolValue("ShuffleAlpineZiplines");
 	SlotData.UmbrellaLogic = json.GetBoolValue("UmbrellaLogic");
+	SlotData.LockHomingAttack = json.GetBoolValue("LockHomingAttack");
+	SlotData.LockObjectGrab = json.GetBoolValue("LockObjectGrab");
 	SlotData.ShuffleSubconPaintings = json.GetBoolValue("ShuffleSubconPaintings");
 	SlotData.NoPaintingSkips = json.GetBoolValue("NoPaintingSkips");
 	SlotData.CTRLogic = json.GetIntValue("CTRLogic");
+	SlotData.DeadBirdWinner = json.GetIntValue("DeadBirdWinner");
 	SlotData.ShuffleDirectorTokens = json.GetBoolValue("ShuffleDirectorTokens");
 	SlotData.DeathLink = json.GetBoolValue("death_link");
 	SlotData.DeathLinkAmnesty = json.GetIntValue("death_link_amnesty");
@@ -1753,6 +1769,7 @@ function LoadSlotData(JsonObject json)
 	
 	SlotData.Initialized = true;
 	UpdateChapterInfo();
+	ReplaceDeathWishRewards();
 }
 
 function ShuffledAct CreateShuffledAct(Hat_ChapterActInfo originalAct, Hat_ChapterActInfo newAct)
@@ -2014,13 +2031,6 @@ function OnPreOpenHUD(HUD InHUD, out class<Object> InHUDElement)
 {
 	local Archipelago_HUDElementLocationBanner_Metro banner;
 	local Name locName;
-
-	if (IsCurrentPatch())
-		return;
-	
-	// These get extremely annoying as they pop up every time a new save file is present when going into the save select screen
-	if (InHUDElement == class'Hat_HUDMenuDLCSplash')
-		InHUDElement = None;
 	
 	if (!IsArchipelagoEnabled())
 		return;
@@ -2106,8 +2116,13 @@ function CheckDeathWishObjectives()
 		if (SlotData.PerfectedDeathWishes.Find(dws[i]) != -1)
 			continue;
 		
-		if (dws[i].static.IsContractPerfected() || dws[i].static.IsContractComplete() && SlotData.CompletedDeathWishes.Find(dws[i]) == -1)
+		if (dws[i].static.IsContractPerfected() 
+			|| dws[i].static.IsContractComplete() && SlotData.CompletedDeathWishes.Find(dws[i]) == -1
+			|| dws[i].static.IsRewardAvailable() && dws[i].static.HasObtainedReward() 
+			&& SlotData.ObtainedDeathWishRewards.Find(dws[i]) == -1)
+		{
 			OnDeathWishObjectiveCompleted(dws[i]);
+		}
 	}
 }
 
@@ -2123,7 +2138,7 @@ function OnDeathWishObjectiveCompleted(class<Hat_SnatcherContract_DeathWish> dw)
 		return;
 	}
 	
-	if (dw.static.IsContractComplete() && SlotData.CompletedDeathWishes.Find(dw) == -1)
+	if (SlotData.CompletedDeathWishes.Find(dw) == -1 && dw.static.IsContractComplete())
 	{
 		if (SlotData.AutoCompleteBonuses)
 		{
@@ -2143,6 +2158,12 @@ function OnDeathWishObjectiveCompleted(class<Hat_SnatcherContract_DeathWish> dw)
 		SlotData.CompletedDeathWishes.AddItem(dw);
 		update = true;
 		locIds.AddItem(id);
+	}
+
+	if (SlotData.ObtainedDeathWishRewards.Find(dw) == -1 && dw.static.IsRewardAvailable() && dw.static.HasObtainedReward())
+	{
+		SlotData.ObtainedDeathWishRewards.AddItem(dw);
+		locIds.AddItem(id+300);
 	}
 	
 	if (SlotData.AutoCompleteBonuses || dw.static.IsContractPerfected() && !dw.static.IsDeathWishEasyMode())
@@ -2198,6 +2219,43 @@ function UpdateCompletedDeathWishes(class<Hat_SnatcherContract_DeathWish> dw)
 	else if (SlotData.PendingCompletedDeathWishes.Find(dw) == -1)
 	{
 		SlotData.PendingCompletedDeathWishes.AddItem(dw);
+	}
+}
+
+function ReplaceDeathWishRewards()
+{
+	local array<class<Object > > DeathWishes;
+	local class<Hat_SnatcherContract_DeathWish> dw;
+	local int i, id;
+	local array<int> locIds;
+	if (!SlotData.Initialized || !SlotData.DeathWish)
+	{
+		return;
+	}
+
+	DeathWishes = class'Hat_ClassHelper'.static.GetAllScriptClasses("Hat_SnatcherContract_DeathWish");
+	for (i = 0; i < DeathWishes.Length; i++)
+	{
+		dw = class<Hat_SnatcherContract_DeathWish>(DeathWishes[i]);
+		if (dw.default.CompletionReward == None)
+			continue;
+		
+		if (SlotData.DeathWishShuffle && SlotData.ShuffledDeathWishes.Find(dw) == -1)
+			continue;
+
+		id = class'Archipelago_ItemInfo'.static.GetDeathWishLocationID(dw);
+		if (id <= 0)
+			continue;
+
+		locIds.AddItem(id+300);
+
+		// just in case
+		ConsoleCommand("set "$dw $" CompletionReward APRandomizer.Archipelago_RandomizedItem_Misc");
+	}
+
+	if (locIds.Length > 0)
+	{
+		SendMultipleLocationChecks(locIds, true);
 	}
 }
 
@@ -2688,6 +2746,7 @@ function UpdateChapterInfo()
 		OpenBedroomDoor();
 	}
 	
+	class'Hat_SeqCond_DeadBirdWinner'.static.SetDeadBirdWinner(SlotData.DeadBirdWinner);
 	SaveGame();
 }
 
@@ -2766,6 +2825,26 @@ function ResetEverything()
     ConsoleCommand("set hat_snatchercontract_deathwish_riftcollapse PenaltyWaitTimeInSeconds 300");
     ConsoleCommand("set hat_snatchercontract_deathwish_riftcollapse Condition_3Lives true");
 	ConsoleCommand("set hat_snatchercontract_deathwish neverobscureobjectives false");
+	ConsoleCommand("set hat_snatchercontract_deathwish_heatingupharder completionreward hatintimegamecontent.Hat_Collectible_Skin_HatKid64");
+	ConsoleCommand("set Hat_SnatcherContract_DeathWish_RiftCollapse_MafiaTown completionreward hatintimegamecontent.Hat_CosmeticItemQualityInfo_Sprint_Ribbon");
+	ConsoleCommand("set Hat_SnatcherContract_DeathWish_MafiaBossEX completionreward hatintimegamecontent.Hat_CosmeticItemQualityInfo_Chemical_ChefHat");
+	ConsoleCommand("set Hat_SnatcherContract_DeathWish_MovingVault completionreward hatintimegamecontent.Hat_Collectible_Skin_Raincoat");
+	ConsoleCommand("set Hat_SnatcherContract_DeathWish_Tokens_MafiaTown completionreward hatintimegamecontent.Hat_Collectible_Skin_Cardboard");
+	ConsoleCommand("set Hat_SnatcherContract_DeathWish_RiftCollapse_Birds completionreward hatintimegamecontent.Hat_Collectible_Skin_BodyMaterial_Metal");
+	ConsoleCommand("set Hat_SnatcherContract_DeathWish_BirdBossEX completionreward hatintimegamecontent.Hat_Collectible_Skin_Parade");
+	ConsoleCommand("set Hat_SnatcherContract_DeathWish_Tokens_Birds completionreward hatintimegamecontent.Hat_Collectible_Skin_Detective");
+	ConsoleCommand("set Hat_SnatcherContract_DeathWish_NoAPresses completionreward hatintimegamecontent.Hat_Ability_Nostalgia");
+	ConsoleCommand("set Hat_SnatcherContract_DeathWish_BossRush completionreward hatintimegamecontent.Hat_Collectible_CameraFilter_Manga");
+	ConsoleCommand("set Hat_SnatcherContract_DeathWish_SnatcherEX completionreward hatintimegamecontent.Hat_Collectible_Skin_WitchDress");
+	ConsoleCommand("set Hat_SnatcherContract_DeathWish_Tokens_Subcon completionreward hatintimegamecontent.Hat_Collectible_Skin_QueenDress_Green");
+	ConsoleCommand("set Hat_SnatcherContract_DeathWish_Tokens_Alps completionreward hatintimegamecontent.Hat_Collectible_Skin_Hiking");
+	ConsoleCommand("set Hat_SnatcherContract_DeathWish_Speedrun_Illness completionreward hatintimegamecontent.Hat_Collectible_Skin_BodyMaterial_Space");
+	ConsoleCommand("set Hat_SnatcherContract_DeathWish_CameraTourist_1 completionreward hatintimegamecontent.Hat_Collectible_CameraFilter_Poster");
+	ConsoleCommand("set Hat_SnatcherContract_DeathWish_HardCastle completionreward hatintimegamecontent.Hat_CosmeticItemQualityInfo_IceHat_Knight");
+	ConsoleCommand("set Hat_SnatcherContract_DeathWish_MuGirlEX completionreward hatintimegamecontent.Hat_Collectible_Skin_BodyMaterial_Gold");
+	ConsoleCommand("set Hat_SnatcherContract_DeathWish_RiftCollapse_Cruise completionreward hatintimegamecontent.Hat_Ability_Mirror");
+	ConsoleCommand("set Hat_SnatcherContract_DeathWish_EndlessTasks completionreward hatintimegamecontent.Hat_CosmeticItemQualityInfo_Sprint_Captain");
+	ConsoleCommand("set Hat_SnatcherContract_DeathWish_BossRushEX completionreward hatintimegamecontent.Hat_Collectible_Skin_BodyMaterial_Shadow");
 }
 
 function OpenBedroomDoor()
@@ -2805,11 +2884,19 @@ function UpdateActUnlocks()
 
 function bool IsActCompletable(Hat_ChapterActInfo act, Hat_Loadout lo, optional bool basement)
 {
-	local int difficulty;
-	local bool canHit, canHitMaskBypass, hookshot, umbrella, sdj;
+	local int difficulty, paintingUnlock;
+	local bool canHit, canHurtMostEnemies, canHitMaskBypass, hookshot, umbrella, sdj, canGrab;
 	
 	if (SlotData.DeathWishOnly)
 		return true;
+	
+	paintingUnlock = GetPaintingUnlocks();
+	canGrab = class'Archipelago_HUDElementItemFinder'.static.CanGrabObjects();
+	if (!canGrab)
+	{
+		// If we can't grab the paintings, we effectively have zero
+		paintingUnlock = 0;
+	}
 	
 	difficulty = SlotData.LogicDifficulty; // -1 = Normal, 0 = Moderate, 1 = Hard, 2 = Expert
 	
@@ -2824,16 +2911,33 @@ function bool IsActCompletable(Hat_ChapterActInfo act, Hat_Loadout lo, optional 
 				|| lo.BackpackHasInventory(class'Archipelago_Weapon_BaseballBat', true);
 	
 	sdj = class'Archipelago_HUDElementItemFinder'.static.CanSDJ();
-	
+
+	canHurtMostEnemies = !SlotData.LockHomingAttack || GetAPBits("HasHomingAttack") > 0
+		|| lo.BackpackHasInventory(class'Archipelago_Weapon_Umbrella', true) 
+		|| lo.BackpackHasInventory(class'Hat_Ability_Chemical')
+		|| lo.BackpackHasInventory(class'Hat_Ability_StatueFall');
+
 	if (basement)
 	{
-		return hookshot;
+		return (difficulty >= `EXPERT || hookshot) && (canHurtMostEnemies || umbrella);
 	}
 	
 	switch (act.hourglass)
 	{
-		case "mafiatown_lava": case "moon_parade": case "snatcher_boss":
+		case "chapter1_tutorial":
+			return difficulty >= `MODERATE || canHurtMostEnemies;
+
+		case "chapter1_barrelboss":
+			return canHurtMostEnemies;
+
+		case "chapter1_boss":
+			return canHurtMostEnemies && canGrab;
+
+		case "mafiatown_lava": case "moon_parade":
 			return umbrella;
+
+		case "snatcher_boss":
+			return umbrella && canGrab;
 		
 		case "DeadBirdStudio":
 			if (!SlotData.UmbrellaLogic && difficulty < `MODERATE)
@@ -2841,7 +2945,7 @@ function bool IsActCompletable(Hat_ChapterActInfo act, Hat_Loadout lo, optional 
 			
 			return difficulty >= `EXPERT || canHit;
 		
-		case "Cruise_Boarding": case "Cruise_WaterRift_Slide": case "TimeRift_Water_Subcon_Hookshot": case "trainwreck_selfdestruct":
+		case "Cruise_WaterRift_Slide": case "TimeRift_Water_Subcon_Hookshot": case "trainwreck_selfdestruct":
 			return hookshot;
 		
 		case "Metro_Escape":
@@ -2873,42 +2977,55 @@ function bool IsActCompletable(Hat_ChapterActInfo act, Hat_Loadout lo, optional 
 				&& lo.HasCollectible(class'Hat_Collectible_MetroTicket_RouteD');
 		
 		case "subcon_village_icewall":
-			return !SlotData.ShuffleSubconPaintings || GetPaintingUnlocks() >= 1;
+			return !SlotData.ShuffleSubconPaintings || paintingUnlock >= 1;
 		
 		case "subcon_cave":
-			if (!class'Archipelago_HUDElementItemFinder'.static.CanSkipPaintings() && GetPaintingUnlocks() <= 0)
+			if (!canGrab || !class'Archipelago_HUDElementItemFinder'.static.CanSkipPaintings() && paintingUnlock <= 0)
 				return false;
 			
 			return difficulty >= `MODERATE || canHit && hookshot;
 		
 		case "chapter2_toiletboss":
 			if ((difficulty < `EXPERT || !class'Archipelago_HUDElementItemFinder'.static.CanSkipPaintings()) 
-			&& SlotData.ShuffleSubconPaintings && GetPaintingUnlocks() <= 0)
+			&& SlotData.ShuffleSubconPaintings && paintingUnlock <= 0)
 				return false;
 			
-			return hookshot && canHit;
+			return hookshot && canHit && canGrab;
 		
 		case "vanessa_manor_attic":
-			if (!class'Archipelago_HUDElementItemFinder'.static.CanSkipPaintings() && GetPaintingUnlocks() <= 0)
+			if (!class'Archipelago_HUDElementItemFinder'.static.CanSkipPaintings() && paintingUnlock <= 0)
 				return false;
-			
+
 			return canHitMaskBypass || difficulty >= `MODERATE;
 		
 		case "TheFinale_FinalBoss":
-			return (difficulty >= `MODERATE || hookshot) && lo.BackpackHasInventory(class'Hat_Ability_FoxMask');
+			return (canHurtMostEnemies || umbrella) && (difficulty >= `MODERATE || hookshot) 
+				&& canGrab && lo.BackpackHasInventory(class'Hat_Ability_FoxMask');
 		
 		case "Spaceship_WaterRift_Gallery":
 			return difficulty >= `MODERATE || lo.BackpackHasInventory(class'Hat_Ability_Chemical');
 		
+		case "Cruise_Boarding":
+			return canGrab && hookshot;
+
+		case "Cruise_Working":
+			return canGrab;
+
 		case "Cruise_Sinking":
+			if (!canGrab)
+				return false;
+
 			return difficulty >= `MODERATE || lo.BackpackHasInventory(class'Hat_Ability_StatueFall');
 		
 		case "Cruise_CaveRift_Aquarium":
+			if (!canHurtMostEnemies && !umbrella)
+				return false;
+
 			return hookshot && (difficulty >= `MODERATE || lo.BackpackHasInventory(class'Hat_Ability_StatueFall'))
 					&& (difficulty >= 1 || lo.BackpackHasInventory(class'Hat_Ability_FoxMask'));
 		
 		case "AlpineSkyline_Finale":
-			return hookshot &&
+			return hookshot && canHurtMostEnemies &&
 				(!SlotData.ShuffleZiplines || HasZipline(Zipline_Birdhouse) && HasZipline(Zipline_LavaCake) && HasZipline(Zipline_Windmill));
 		
 		case "TimeRift_Water_AlpineSkyline_Cats":
@@ -2938,6 +3055,18 @@ function bool IsActCompletable(Hat_ChapterActInfo act, Hat_Loadout lo, optional 
 				|| lo.BackpackHasInventory(class'Archipelago_Weapon_Umbrella', true)
 				|| lo.BackpackHasInventory(class'Archipelago_Weapon_BaseballBat', true));
 		
+		case "TimeRift_Cave_Tour":
+			if (!canHurtMostEnemies && !umbrella)
+				return false;
+
+			return canGrab 
+				|| lo.BackpackHasInventory(class'Hat_Ability_FoxMask')
+				|| lo.BackpackHasInventory(class'Hat_Ability_Chemical')
+				|| difficulty >= `MODERATE && lo.BackpackHasInventory(class'Hat_Collectible_BadgePart_SuckInOrbs');
+
+		case "TimeRift_Cave_Alps": case "TimeRift_Cave_Mafia": case "TimeRift_Cave_BirdBasement": case "TimeRift_Cave_Raccoon":
+			return canHurtMostEnemies || umbrella;
+
 		default:
 			return true;
 	}
@@ -3829,6 +3958,25 @@ function bool IsLocationIDContainer(int id, optional out Actor container)
 	return false;
 }
 
+function OnPrePawnCombatTakeDamage(Pawn PawnCombat, int Damage, Controller InstigatedBy, Vector HitLocation, Vector Momentum, class<Object> DamageType, optional TraceHitInfo HitInfo, optional Actor DamageCauser)
+{
+	if (!IsArchipelagoEnabled() || !SlotData.Initialized || !SlotData.LockHomingAttack)
+		return;
+
+	if (!PawnCombat.IsA('Hat_Enemy') || !InstigatedBy.IsA('Hat_PlayerController'))
+		return;
+
+	if (DamageType == class'Hat_DamageType_Jump' || DamageType == class'Hat_DamageType_HomingAttack')
+	{
+		if (GetAPBits("HasHomingAttack") == 0 
+			&& !Hat_Player(InstigatedBy.Pawn).HasStatusEffect(class'Hat_StatusEffect_StatueFall', true)) // Ice Hat can ignore this
+		{
+			// No damage
+			Hat_PawnCombat(PawnCombat).BlinkTime += 0.1;
+		}
+	}
+}
+
 // for breakable objects that contain important items
 function OnPreBreakableBreak(Actor Breakable, Pawn Breaker)
 {
@@ -3981,11 +4129,28 @@ function OnLoadoutChanged(PlayerController controller, Object loadout, Object ba
 	
 	// remove base game umbrella in favor of our own. This is the umbrella check in Mafia Town.
 	if (class<Hat_Weapon_Umbrella>(item.BackpackClass) != None 
-	&& class<Archipelago_Weapon_Umbrella>(item.BackpackClass) == None
-	&& class<Archipelago_Weapon_BaseballBat>(item.BackpackClass) == None)
+		&& class<Archipelago_Weapon_Umbrella>(item.BackpackClass) == None
+		&& class<Archipelago_Weapon_BaseballBat>(item.BackpackClass) == None)
 	{
 		Hat_Loadout(loadout).RemoveBackpack(item);
-		if (`GameManager.GetCurrentMapFilename() ~= "mafia_town" && `GameManager.IsCurrentAct(1))
+		Hat_Loadout(loadout).RemoveLoadout(item.BackpackClass, true); // To get rid of those pesky Steam weapon skins
+		if (!Hat_Loadout(loadout).BackpackHasInventory(class'Archipelago_Weapon_Umbrella', true))
+		{
+			ReplaceUnarmedWeapon();
+			if (Hat_Loadout(loadout).MyLoadout.Weapon == None)
+			{
+				item.BackpackClass = class'Hat_Weapon_Unarmed';
+				Hat_PlayerController(controller).MyLoadout.AddBackpack(item, true, true, Hat_Player(controller.Pawn));
+			}
+		}
+		else
+		{
+			item.BackpackClass = SlotData.BaseballBat ? class'Archipelago_Weapon_BaseballBat' : class'Archipelago_Weapon_Umbrella';
+			Hat_PlayerController(controller).MyLoadout.AddBackpack(item, true, true, Hat_Player(controller.Pawn));
+		}
+
+		if (`GameManager.GetCurrentMapFilename() ~= "mafia_town" && `GameManager.IsCurrentAct(1)
+			&& item.BackpackClass == class'Hat_Weapon_Umbrella')
 		{
 			SendLocationCheck(UmbrellaCheck);
 			SetAPBits("UmbrellaCheck", 1);
@@ -4876,6 +5041,8 @@ function bool IsArchipelagoEnabled()
 
 function bool IsCurrentPatch()
 {
+	return false;
+	/*
 	local string version;
 	version = class'Engine'.static.GetBuildDate();
 	
@@ -4884,6 +5051,7 @@ function bool IsCurrentPatch()
 		return true;
 	
 	return false;
+	*/
 }
 
 function bool IsInTitlescreen()
@@ -5219,7 +5387,8 @@ function UnlockAlmostEverything()
 	lo.AddBackpack(class'Hat_Loadout'.static.MakeBackpackItem(class'Hat_Ability_Hookshot'), true);
 	lo.AddBackpack(class'Hat_Loadout'.static.MakeBackpackItem(class'Hat_Badge_OneHitDeath'));
 	lo.AddBackpack(class'Hat_Loadout'.static.MakeBackpackItem(class'Hat_Ability_Camera'));
-	
+	SetAPBits("HasHomingAttack", 1);
+	SetAPBits("HasObjectGrab", 1);
 	`GameManager.AddBadgeSlots(2);
 	`GameManager.AddEnergyBits(99999);
 }

@@ -19,6 +19,9 @@ var array<int> VillagePaintingLocs;
 var array<int> SwampPaintingLocs;
 var array<int> CourtyardPaintingLocs;
 
+// Other
+var array<int> GrabRequiredLocs;
+
 function OnOpenHUD(HUD H, optional String command)
 {
 	local Archipelago_GameMod m;
@@ -70,12 +73,6 @@ function OnOpenHUD(HUD H, optional String command)
 	{
 		// Mafia Town - Above Boats without Hookshot
 		HookshotRequiredLocs.RemoveItem(2000305218);
-		
-		// Mafia Town - Hot Air Balloon without Ice Hat
-		IceHatRequiredLocs.RemoveItem(2000304829);
-		
-		// Mafia Town - Top of Lighthouse without Hookshot
-		HookshotRequiredLocs.RemoveItem(2000304213);
 		
 		// Some Subcon locations without Hookshot
 		HookshotRequiredLocs.RemoveItem(2000324766);
@@ -438,7 +435,7 @@ function bool UpdateClosestMarker_Actor(HUD H, Actor item, out float closest_dis
 
 function bool CanReachLocation(int id, HUD H)
 {
-	local bool hookshot, cannon, finale;
+	local bool hookshot, cannon, finale, canHurtMostEnemies;
 	local int paintingUnlock, difficulty, act;
 	local Archipelago_GameMod m;
 	local string mapName;
@@ -450,11 +447,32 @@ function bool CanReachLocation(int id, HUD H)
 	difficulty = m.SlotData.LogicDifficulty;
 	act = `GameManager.GetCurrentAct();
 	hookshot = lo.BackpackHasInventory(class'Hat_Ability_Hookshot');
+	paintingUnlock = m.GetPaintingUnlocks();
+	if (!CanGrabObjects())
+	{
+		// If we can't grab the paintings, we effectively have zero
+		paintingUnlock = 0;
+	}
+
+	canHurtMostEnemies = !m.SlotData.LockHomingAttack || m.GetAPBits("HasHomingAttack") > 0
+		|| lo.BackpackHasInventory(class'Archipelago_Weapon_Umbrella', true) 
+		|| lo.BackpackHasInventory(class'Hat_Ability_Chemical')
+		|| lo.BackpackHasInventory(class'Hat_Ability_StatueFall');
 
 	// Mafia Town secret cave item (crate blocking the cave is removed in act 6)
 	if (id == 2000305220)
 	{
 		return act == 6 || lo.BackpackHasInventory(class'Hat_Ability_Chemical');
+	}
+
+	// Old guys in Mafia Town
+	if (id == 2000303832)
+	{
+		return canHurtMostEnemies;
+	}
+	else if (id == 2000303833)
+	{
+		return canHurtMostEnemies || difficulty >= `MODERATE;
 	}
 	
 	// Is the cannon to Mafia HQ accessible?
@@ -466,22 +484,37 @@ function bool CanReachLocation(int id, HUD H)
 	// Chest behind Mafia HQ
 	if (id == 2000303486)
 	{
-		return cannon;
+		return cannon || act != 6 && difficulty >= `EXPERT && CanGrabObjects();
 	}
 	
 	// Mafia Town - Above Boats
 	if (id == 2000305218)
 	{
 		// Ice hat slide?
-		if (difficulty >= `MODERATE && lo.BackpackHasInventory(class'Hat_Ability_StatueFall'))
+		if (difficulty >= `MODERATE && (act == 6 || lo.BackpackHasInventory(class'Hat_Ability_StatueFall')))
 		{
 			return true;
 		}
+	}
+
+	// Mafia Town - Hot Air Balloon
+	if (id == 2000304829)
+	{
+		return difficulty >= `EXPERT && CanGrabObjects() || lo.BackpackHasInventory(class'Hat_Ability_StatueFall');
+	}
+	
+	// Mafia Town - Top of Lighthouse
+	if (id == 2000304213)
+	{
+		return difficulty >= `EXPERT && CanGrabObjects() || hookshot;
 	}
 	
 	// Subcon boss arena chest
 	if (id == 2000323735)
 	{
+		if (!CanGrabObjects())
+			return false;
+
 		// Cherry hover
 		if (difficulty >= `EXPERT && CanSkipPaintings())
 			return true;
@@ -489,13 +522,13 @@ function bool CanReachLocation(int id, HUD H)
 		// Cherry bridge
 		if (difficulty >= `HARD)
 		{
-			return !m.SlotData.ShuffleSubconPaintings || m.GetPaintingUnlocks() >= 1;
+			return !m.SlotData.ShuffleSubconPaintings || paintingUnlock >= 1;
 		}
 		
 		// Hookshot
 		if (act == 3)
 		{
-			return hookshot && (!m.SlotData.ShuffleSubconPaintings || m.GetPaintingUnlocks() >= 1);
+			return hookshot && (!m.SlotData.ShuffleSubconPaintings || paintingUnlock >= 1);
 		}
 		
 		// Always accessible here
@@ -504,8 +537,8 @@ function bool CanReachLocation(int id, HUD H)
 	
 	if (mapName ~= "subconforest" && act == 6)
 	{
-		// If below Hard, we can't cross the gap between the arena and the village
-		if (difficulty < `HARD)
+		// If below Hard or we can't grab, we can't cross the gap between the arena and the village
+		if (difficulty < `HARD || !CanGrabObjects())
 			return false;
 	}
 	
@@ -515,10 +548,21 @@ function bool CanReachLocation(int id, HUD H)
 		// Can we skip the big dweller wall?
 		if (difficulty >= `MODERATE)
 		{
-			return CanSkipPaintings() || m.GetPaintingUnlocks() >= 1;
+			return CanSkipPaintings() || paintingUnlock >= 1;
 		}
 		
-		return (CanSkipPaintings() || m.GetPaintingUnlocks() >= 1) && CanHitObjects(true);
+		return (CanSkipPaintings() || paintingUnlock >= 1) && CanHitObjects(true);
+	}
+
+	if (id == 2000345087)
+	{
+		// Tour finale page
+		if (CanGrabObjects())
+			return true;
+
+		return lo.BackpackHasInventory(class'Hat_Ability_FoxMask')
+			|| lo.BackpackHasInventory(class'Hat_Ability_Chemical')
+			|| difficulty >= `MODERATE && lo.BackpackHasInventory(class'Hat_Collectible_BadgePart_SuckInOrbs');
 	}
 	
 	if (mapName ~= "alpsandsails")
@@ -661,10 +705,10 @@ function bool CanReachLocation(int id, HUD H)
 	}
 	
 	// Subcon long tree climb chest
-	if ((id == 2000323734) && (CanSkipPaintings() || m.GetPaintingUnlocks() >= 2))
+	if ((id == 2000323734) && (CanSkipPaintings() || paintingUnlock >= 2))
 	{
 		// Can we skip the climb?
-		if (difficulty >= `EXPERT || CanSDJ())
+		if (difficulty >= `EXPERT && CanGrabObjects() || CanSDJ())
 			return true;
 	}
 	
@@ -682,8 +726,6 @@ function bool CanReachLocation(int id, HUD H)
 	
 	if (m.SlotData.ShuffleSubconPaintings && mapName ~= "subconforest")
 	{
-		paintingUnlock = m.GetPaintingUnlocks();
-		
 		if (VillagePaintingLocs.Find(id) != -1)
 			return paintingUnlock >= 1 || CanSkipPaintings();
 		
@@ -692,6 +734,11 @@ function bool CanReachLocation(int id, HUD H)
 		
 		if (CourtyardPaintingLocs.Find(id) != -1)
 			return paintingUnlock >= 3 || CanSkipPaintings();
+	}
+
+	if (m.SlotData.LockObjectGrab && GrabRequiredLocs.Find(id) != -1 && !CanGrabObjects())
+	{
+		return false;
 	}
 	
 	// Nyakuza Metro
@@ -771,30 +818,36 @@ static function bool CanSkipPaintings()
 	return true;
 }
 
+static function bool CanGrabObjects()
+{
+	if (!`AP.SlotData.LockObjectGrab)
+		return true;
+
+	return bool(`AP.GetAPBits("HasObjectGrab"));
+}
+
 defaultproperties
 {
 	IceHatRequiredLocs[0] = 2000304607;
 	IceHatRequiredLocs[1] = 2000304831;
-	IceHatRequiredLocs[2] = 2000304829;
-	IceHatRequiredLocs[3] = 2000304979;
-	IceHatRequiredLocs[4] = 2000304049;
+	IceHatRequiredLocs[2] = 2000304979;
+	IceHatRequiredLocs[3] = 2000304049;
 	
 	HookshotRequiredLocs[0] = 2000305218;
 	HookshotRequiredLocs[1] = 2000303481;
-	HookshotRequiredLocs[2] = 2000304213;
-	HookshotRequiredLocs[3] = 2000324766;
-	HookshotRequiredLocs[4] = 2000324856;
-	HookshotRequiredLocs[5] = 2000305432;
-	HookshotRequiredLocs[6] = 2000305059;
-	HookshotRequiredLocs[7] = 2000305057;
-	HookshotRequiredLocs[8] = 2000305061;
-	HookshotRequiredLocs[9] = 2000304813;
-	HookshotRequiredLocs[10] = 2000305058;
-	HookshotRequiredLocs[11] = 2000305431;
-	HookshotRequiredLocs[12] = 2000305819;
-	HookshotRequiredLocs[13] = 2000305110;
-	HookshotRequiredLocs[14] = 2000304106;
-	HookshotRequiredLocs[15] = 2000324311;
+	HookshotRequiredLocs[2] = 2000324766;
+	HookshotRequiredLocs[3] = 2000324856;
+	HookshotRequiredLocs[4] = 2000305432;
+	HookshotRequiredLocs[5] = 2000305059;
+	HookshotRequiredLocs[6] = 2000305057;
+	HookshotRequiredLocs[7] = 2000305061;
+	HookshotRequiredLocs[8] = 2000304813;
+	HookshotRequiredLocs[9] = 2000305058;
+	HookshotRequiredLocs[10] = 2000305431;
+	HookshotRequiredLocs[11] = 2000305819;
+	HookshotRequiredLocs[12] = 2000305110;
+	HookshotRequiredLocs[13] = 2000304106;
+	HookshotRequiredLocs[14] = 2000324311;
 	
 	DwellerMaskRequiredLocs[0] = 2000324767;
 	DwellerMaskRequiredLocs[1] = 2000324464;
@@ -882,4 +935,19 @@ defaultproperties
 	CourtyardPaintingLocs[7] = 2000325082;
 	CourtyardPaintingLocs[8] = 2000324463;
 	CourtyardPaintingLocs[9] = 2000324766;
+
+	GrabRequiredLocs[0] = 2000303483;
+	GrabRequiredLocs[1] = 2000305387;
+	GrabRequiredLocs[2] = 2000303241;
+	GrabRequiredLocs[3] = 2000324761;
+	GrabRequiredLocs[4] = 2000325078;
+	GrabRequiredLocs[5] = 2000325077;
+	GrabRequiredLocs[6] = 2000325469;
+	GrabRequiredLocs[7] = 2000324465;
+	GrabRequiredLocs[8] = 2000323735;
+	GrabRequiredLocs[9] = 2000324114;
+	GrabRequiredLocs[10] = 2000304108;
+	GrabRequiredLocs[11] = 2000304048;
+	GrabRequiredLocs[12] = 2000304046;
+	GrabRequiredLocs[13] = 2000304049;
 }

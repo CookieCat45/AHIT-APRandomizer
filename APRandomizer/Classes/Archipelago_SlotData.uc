@@ -36,6 +36,9 @@ var bool ShuffleActContracts;
 var bool ShuffleZiplines;
 var bool ShuffleSubconPaintings;
 var bool NoPaintingSkips;
+var bool LockHomingAttack;
+var bool LockObjectGrab;
+var int DeadBirdWinner;
 var int CTRLogic;
 var bool UmbrellaLogic;
 var bool DeathLink;
@@ -66,6 +69,7 @@ var int DeathWishTPRequirement;
 var array<class<Hat_SnatcherContract_DeathWish> > ShuffledDeathWishes;
 var array<class<Hat_SnatcherContract_DeathWish> > CompletedDeathWishes;
 var array<class<Hat_SnatcherContract_DeathWish> > PerfectedDeathWishes;
+var array<class<Hat_SnatcherContract_DeathWish> > ObtainedDeathWishRewards;
 var array<class<Hat_SnatcherContract_DeathWish> > ExcludedContracts;
 var array<class<Hat_SnatcherContract_DeathWish> > ExcludedBonuses;
 
