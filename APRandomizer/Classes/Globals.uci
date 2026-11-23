@@ -18,6 +18,7 @@
 `define AP class'Archipelago_GameMod'.static.GetGameMod()
 
 // Difficulty values
+`define EASY -2
 `define NORMAL -1
 `define MODERATE 0
 `define HARD 1

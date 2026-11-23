@@ -2,7 +2,7 @@ class Archipelago_RandomizedItem_BadgeRelicFinder extends Archipelago_Randomized
 
 defaultproperties
 {
-	InventoryClass = class'Archipelago_Ability_ItemFinder';
+	InvClass = class'Archipelago_Ability_ItemFinder';
   HUDIcon = Texture2D'HatInTime_Hud_ItemIcons.Badges.badge_relicfinder';
 	
   Begin Object Name=Model2

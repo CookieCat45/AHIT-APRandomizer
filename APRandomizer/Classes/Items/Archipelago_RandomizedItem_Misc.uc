@@ -8,4 +8,5 @@ defaultproperties
 	End Object
 	
 	HUDIcon = Texture2D'APRandomizer_contentNew.logo_new';
+	DisplayName = "Archipelago Item"
 }

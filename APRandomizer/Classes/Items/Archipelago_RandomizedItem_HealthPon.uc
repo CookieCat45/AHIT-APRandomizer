@@ -44,4 +44,5 @@ defaultproperties
 	CollectSound = SoundCue'HatinTime_SFX_Player.HP_Gain_cue';
 	HUDIcon = Texture2D'HatInTime_Hud2.Textures.health_pon';
 	ScaleOnCollect = 0.25;
+	DisplayName = "Health Pon"
 }

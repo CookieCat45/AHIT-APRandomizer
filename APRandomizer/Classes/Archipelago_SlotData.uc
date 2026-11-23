@@ -46,6 +46,7 @@ var int DeathLinkAmnesty;
 var int DWDeathLinkAmnesty;
 var bool ShuffleDirectorTokens;
 var bool HatItems;
+var int ShuffleRiftPons;
 
 var bool DLC1;
 var bool Tasksanity;
@@ -55,6 +56,7 @@ var int TasksanityTaskStep;
 var int TasksanityCheckCount;
 var int TaskStep;
 var int CompletedTasks;
+var int CompletedTasksDW;
 
 var bool DLC2;
 var int NoTicketSkips; // 2 means only Rush Hour ticket skips are allowed in logic
@@ -66,12 +68,14 @@ var bool BonusRewards;
 var bool DeathWishShuffle;
 var bool DeathWishOnly;
 var int DeathWishTPRequirement;
+var int LockDeathWishes;
 var array<class<Hat_SnatcherContract_DeathWish> > ShuffledDeathWishes;
 var array<class<Hat_SnatcherContract_DeathWish> > CompletedDeathWishes;
 var array<class<Hat_SnatcherContract_DeathWish> > PerfectedDeathWishes;
 var array<class<Hat_SnatcherContract_DeathWish> > ObtainedDeathWishRewards;
 var array<class<Hat_SnatcherContract_DeathWish> > ExcludedContracts;
 var array<class<Hat_SnatcherContract_DeathWish> > ExcludedBonuses;
+var array<DeathWishRewardInfo> DeathWishRewardItems;
 
 var bool StartWithCompassBadge;
 var int CompassBadgeMode;

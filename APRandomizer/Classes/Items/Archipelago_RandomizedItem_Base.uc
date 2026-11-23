@@ -3,7 +3,7 @@
  * Generally serves as a proxy to send locations to the server and a visual to show what the item is, 
  * but is also used to play item collection effects as well.
  */
-class Archipelago_RandomizedItem_Base extends Hat_Collectible
+class Archipelago_RandomizedItem_Base extends Hat_Collectible_Important
 	abstract
 	dependson(Archipelago_ItemInfo);
 	
@@ -11,11 +11,12 @@ class Archipelago_RandomizedItem_Base extends Hat_Collectible
 
 var int LocationId;
 var string ItemId;
+var string DisplayName;
+var string Desc;
 var int ItemOwner;
 var int ItemFlags;
-var Surface HUDIcon;
 var bool DoSpinEffect;
-var class<object> InventoryClass;
+var class<Object> InvClass;
 var string OriginalCollectibleName;
 
 var AudioComponent IdleAudioComponent;
@@ -81,14 +82,14 @@ simulated function bool OnCollected(Actor Collector)
 	
 	if (WasFromServer())
 	{
-		if (InventoryClass != None)
+		if (InvClass != None)
 		{
 			pc = Hat_PlayerController(Pawn(Collector).controller);
-			item = class'Hat_Loadout'.static.MakeLoadoutItem(InventoryClass);
+			item = class'Hat_Loadout'.static.MakeLoadoutItem(InvClass);
 			loadout = pc.GetLoadout();
 			autoEquip = true;
 			
-			if (class'Hat_Loadout'.static.IsClassBadge(InventoryClass))
+			if (class'Hat_Loadout'.static.IsClassBadge(InvClass))
 			{
 				for (i = 0; i < loadout.MyLoadout.Badges.Length; i++)
 				{
@@ -100,18 +101,18 @@ simulated function bool OnCollected(Actor Collector)
 				
 				autoEquip = (count < `SaveManager.GetNumberOfBadgeSlots());
 			}
-			else if (class'Hat_Loadout'.static.IsClassHat(InventoryClass))
+			else if (class'Hat_Loadout'.static.IsClassHat(InvClass))
 			{
 				autoEquip = false;
 			}
 			
-			if (loadout.AddBackpack(item, autoEquip, true, Hat_Player(Collector)) || loadout.AddCollectible(InventoryClass))
+			if (loadout.AddBackpack(item, autoEquip, true, Hat_Player(Collector)) || loadout.AddCollectible(InvClass))
 			{
 				OnAddedToInventory();
 			}
 			else
 			{
-				`AP.ScreenMessage("Failed to create inventory item for " $InventoryClass $", please report");
+				`AP.ScreenMessage("Failed to create inventory item for " $InvClass $", please report");
 			}
 		}
 	}
@@ -126,12 +127,43 @@ simulated function bool OnCollected(Actor Collector)
 		SetOriginalLevelBit();
 	}
 	
-	return Super.OnCollected(Collector);
+	//return Super.OnCollected(Collector);
+	if (AttractActor != None) UpdateAttractActorIndices(AttractActor);
+	AttractActor = None;
+    PickupActor = Collector;
+	SetCollision(false,false);
+	bCollideWorld = false;
+    
+	CallCollectMiniMission();
+    CallInteractionEvent(Collector);
+	if (TickOptimize == TickOptimize_None)
+		SetTickIsDisabled(false);
+	`NPCManager.SetIsInTickSensitiveAction(self, true);
+	Moving = false;
+	TriggerCollectedDelegates();
+
+	`if(`isdefined(WITH_GHOSTPARTY))
+	ConditionalSyncGhostParty(Collector);
+	ConditionalAwardGhostPartyScore(Collector);
+	`endif
+    OnCollectedDisappear(Collector);
+	
+	if (ScaleOnCollect > 0)
+		Mesh.SetScale(ScaleOnCollect);
+	
+	`if(`isdefined(WITH_DLC1))
+	if (Pawn(Collector) != None && Pawn(Collector).Controller != None)
+	{
+		class'Hat_HUDElementCoopVersus'.static.AddPoints(Pawn(Collector).Controller, class);
+	}
+	`endif
+
+	return false;
 }
 
 function OnAddedToInventory()
 {
-	`AP.SetAPBits(string(InventoryClass), 1);
+	`AP.SetAPBits(string(InvClass), 1);
 }
 
 function SetOriginalLevelBit()
@@ -178,6 +210,48 @@ simulated function OnCollectedDisappear(Actor a)
 	DoCollectEffects(a);
 }
 
+simulated static function string GetLocalizedItemName()
+{
+	if (default.DisplayName != "")
+	{
+		return default.DisplayName;
+	}
+	else if (class<Hat_Collectible_Important>(default.InvClass) != None)
+	{
+		return GetLocalizedString(default.Header, class<Hat_Collectible_Important>(default.InvClass).default.ItemName);
+	}
+	else if (class<Hat_Ability>(default.InvClass) != None)
+	{
+		return class<Hat_Ability>(default.InvClass).static.GetLocalizedName();
+	}
+	
+	return "???";
+}
+
+simulated static function Array<string> GetLocalizedItemDesc()
+{
+	local array<string> r;
+	local int i;
+	if (default.Desc != "")
+	{
+		r.AddItem(default.Desc);
+		return r;
+	}
+	else if (class<Hat_Collectible_Important>(default.InvClass) != None)
+	{
+		for (i = 0; i < default.ItemDescription.Length; i++)
+		{
+			r.AddItem(GetLocalizedString(default.Header, class<Hat_Collectible_Important>(default.InvClass).default.ItemDescription[i]));
+		}
+	}
+	else if (class<Hat_Ability>(default.InvClass) != None)
+	{
+		return class<Hat_Ability>(default.InvClass).static.GetLocalizedDescription();
+	}
+	
+	return r;
+}
+
 function Destroy2()
 {
 	Destroy();
@@ -198,6 +272,41 @@ simulated function DoCollectEffects(Actor a)
 function bool ShouldDoSpinEffect()
 {
 	return DoSpinEffect && (!IsOwnItem() || WasFromServer());
+}
+
+simulated function bool WantsToSkipMessage(Actor Collector)
+{
+	return true;	
+}
+
+function bool CanCollect(Actor A)
+{
+	local Controller MyController;
+	local bool IsNonPlayer;
+    if (!Enabled) return false;
+    if (bHidden) return false;
+	if (PickupActor != None) return false;
+    if (GetPlayerFromActor(A) == None) return false;
+	if (a.IsA('Hat_GhostPartyPlayerBase')) return false;
+	if (A.IsA('Vehicle')) return false;
+	if (!A.IsA('Hat_Player') && A.Physics != Phys_Walking && A.Physics != Phys_Falling && A.Physics != Phys_Swimming) return false; // this prevents hookshot collect if enabled on Hat_Player
+	MyController = Pawn(A) != None ? PlayerController(Pawn(A).Controller) : None;
+	if (MyController == None && Pawn(A) != None && Pawn(A).DrivenVehicle != None)
+		MyController = Pawn(A).DrivenVehicle.Controller;
+	if (MyController != None && MyController.IsA('PlayerController') && PlayerController(MyController).bCinematicMode && AttractActor != A) return false;
+	if (Pawn(A) != None && Pawn(A).Health <= 0) return false;
+	if (Hat_Player(A) != None && Hat_Player(A).IsDead) return false;
+	IsNonPlayer = MyController == None || !MyController.IsA('PlayerController');
+	if (Hat_Player(A) != None && (!Hat_Player(A).CanCollectCollectiblesEvenIfNotPlayer && IsNonPlayer)) return false;
+    if (SpawnWaitTime < 1.0 && AttractActor != A) return false;
+	if (Base != None && Base.IsA('Hat_Enemy')) return false;
+	if (CollectedByCoopPlayer && AttractActor == A) return false;
+    return true;
+}
+
+simulated function bool GiveCollectible(Pawn p)
+{
+	return false;	
 }
 
 defaultproperties
@@ -269,6 +378,8 @@ defaultproperties
 	bAlwaysTick = true;
 	bNoDelete = false;
 	bCanBeDamaged = false;
+	IsBackpackItem = false;
+	bUseLevelBit = false;
 	TickOptimize = TickOptimize_Distance;
 	LocationId = 0;
 }

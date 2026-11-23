@@ -292,7 +292,7 @@ function ParseJSON(string json)
 		}
 	}
 	
-	m.DebugMessage("[ParseJSON] Received command: " $json);
+	m.DebugMessage("[ParseJSON] Received command: " $json, , 2);
 	
 	// UnrealScript's JSON parser does not like []
 	json = Repl(json, "[{", "{");
@@ -304,7 +304,7 @@ function ParseJSON(string json)
 		m.ReplOnce(json, "slot", "my_slot", json);
 	}
 	
-	m.DebugMessage("[ParseJSON] Reformatted command: " $json);
+	m.DebugMessage("[ParseJSON] Reformatted command: " $json, , 2);
 	if (InStr(json, "\"RoomInfo\"") == -1 && InStr(json, "\"Connected\"") == -1)
 	{
 		// Security
@@ -627,17 +627,12 @@ function OnLocationInfoCommand(string json)
 	local Actor container;
 	local Archipelago_GameMod m;
 	local class<Hat_SnatcherContract_DeathWish> dw;
-	
-	mapName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename();
-	
-	// Fix for Rock the Boat
-	if (`GameManager.GetCurrentMapFilename() ~= "ship_sinking")
-		mapName = "ship_sinking";
+	local DeathWishRewardInfo dwReward;
 	
 	m = `AP;
+	mapName = m.GetMapName();
 	m.ReplOnce(json, "locations", "locations_0", json, true);
 	count = 0;
-	
 	while (m.ReplOnce(json, ",{", ",\"locations_" $count+1 $"\":{", s, false))
 	{
 		json = s;
@@ -723,12 +718,14 @@ function OnLocationInfoCommand(string json)
 			continue;
 		}
 
-		dw = class'Archipelago_ItemInfo'.static.GetDeathWishFromLocationID(locId-300);
+		dw = class'Archipelago_ItemInfo'.static.GetDeathWishFromLocationID(locId-class'Archipelago_GameMod'.const.DWRewardIDOffset);
 		if (dw != None)
 		{
 			// Death Wish reward visual
 			class'Archipelago_ItemInfo'.static.GetNativeItemData(m.GetStringValue2(jsonChild, "item"), locInfo.ItemClass);
-			ConsoleCommand("set "$dw $" CompletionReward "$locInfo.ItemClass);
+			dwReward.DeathWish = dw;
+			dwReward.RewardClass = locInfo.ItemClass;
+			m.SlotData.DeathWishRewardItems.AddItem(dwReward);
 		}
 		
 		if (locId == m.CameraBadgeCheck1 || locId == m.CameraBadgeCheck2)
@@ -772,6 +769,7 @@ function OnLocationInfoCommand(string json)
 		m.SlotData.ScoutedMaps.AddItem(Locs(mapName));
 	}
 	
+	m.ReplaceDeathWishRewards();
 	m.SaveGame();
 	
 	jsonObj = None;
@@ -870,7 +868,7 @@ function GrantItem(int itemId)
 		if (item != None)
 		{
 			if (invOverride != None) // override? (probably a relic)
-				item.InventoryClass = invOverride;
+				item.InvClass = invOverride;
 		
 			item.PickupActor = player;
 			item.OnCollected(player);
@@ -910,6 +908,16 @@ function GrantItem(int itemId)
 		{
 			`AP.SetAPBits("HasObjectGrab", 1);
 			`AP.ToggleCarryAbility();
+		}
+		else if (itemId == 2000340000)
+		{
+			// Progressive Death Wish Contract
+			`AP.SetAPBits("ProgressiveDeathWish", `AP.GetAPBits("ProgressiveDeathWish") + 1);
+		}
+		else if (itemId >= 2000350000 && itemId <= 2000350074)
+		{
+			// Death Wish individual contract unlock
+			`AP.SetAPBits("DeathWishUnlocked_"$itemId, 1);
 		}
 		else
 		{

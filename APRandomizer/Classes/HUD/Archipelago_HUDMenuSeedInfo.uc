@@ -246,6 +246,10 @@ function bool Render(HUD H)
             text = "GOAL: Complete Seal the Deal";
             break;
         
+        case 4:
+            text = "GOAL: All Death Wish Stamps";
+            break;
+        
         default:
             text = "GOAL: ???";
             break;

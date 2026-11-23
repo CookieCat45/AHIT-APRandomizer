@@ -43,4 +43,5 @@ defaultproperties
 	
 	HUDIcon = Texture2D'HatInTime_Hud.Textures.EnergyBit';
 	ScaleOnCollect = 0.25;
+	DisplayName = "Pons"
 }

@@ -2,7 +2,7 @@ class Archipelago_RandomizedItem_BadgeNoFallDamage extends Archipelago_Randomize
 
 defaultproperties
 {
-	InventoryClass = class'Hat_Ability_NoFallDamage';
+	InvClass = class'Hat_Ability_NoFallDamage';
   HUDIcon = Texture2D'HatInTime_Hud_Loadout.Item_Icons.itemicon_badge_hover'
 	
     Begin Object Name=Model2

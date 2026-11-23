@@ -7,4 +7,6 @@ defaultproperties
 	End Object
 	
 	HUDIcon = Texture2D'HatInTime_Hud_ItemIcons.Paintings.bonfire_painting_purple'
+	DisplayName = "Progressive Painting Unlock"
+	Desc = "Unlocks Subcon Forest paintings"
 }

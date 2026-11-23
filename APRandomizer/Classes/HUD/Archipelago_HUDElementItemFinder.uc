@@ -30,6 +30,14 @@ function OnOpenHUD(HUD H, optional String command)
 	Super.OnOpenHUD(H, command);
 	m = `AP;
 	difficulty = m.SlotData.LogicDifficulty;
+	
+	if (difficulty <= `NORMAL)
+	{
+		// Twilight Travels
+		BrewingHatRequiredLocs.AddItem(2000354158);
+		BrewingHatRequiredLocs.AddItem(2000346231);
+	}
+	
 	if (difficulty >= `MODERATE)
 	{
 		// Subcon Well without Hookshot
@@ -58,6 +66,10 @@ function OnOpenHUD(HUD H, optional String command)
 		HookshotRequiredLocs.RemoveItem(2000304106);
 		DwellerMaskRequiredLocs.RemoveItem(2000305110);
 		DwellerMaskRequiredLocs.RemoveItem(2000304106);
+		
+		// Deep Sea
+		DwellerMaskRequiredLocs.RemoveItem(2000356260);
+		DwellerMaskRequiredLocs.RemoveItem(2000361260);
 	}
 	
 	if (difficulty >= `HARD)
@@ -67,6 +79,10 @@ function OnOpenHUD(HUD H, optional String command)
 		
 		// Dweller Platforming Tree B
 		DwellerMaskRequiredLocs.RemoveItem(2000324855);
+		
+		// Deep Sea
+		DwellerMaskRequiredLocs.RemoveItem(2000358262);
+		DwellerMaskRequiredLocs.RemoveItem(2000358308);
 	}
 	
 	if (difficulty >= `EXPERT)
@@ -95,6 +111,7 @@ function UpdateClosestMarker(HUD H)
 {
 	local Archipelago_RandomizedItem_Base item;
 	local Hat_Collectible_StoryBookPage page;
+	local Hat_Collectible_TreasureBit bit;
 	local Hat_TreasureChest_Base chest;
 	local Hat_Collectible_DeathWishLevelToken dwlt;
 	local Hat_Collectible_HighscoreToken token;
@@ -107,7 +124,7 @@ function UpdateClosestMarker(HUD H)
 	local Archipelago_ShopInventory_Base shop;
 	local Archipelago_GameMod m;
 	local LocationInfo locInfo;
-	local Actor a;
+	local Actor a, base;
 	
 	m = `AP;
 	if (m == None || m.SlotData == None)
@@ -148,9 +165,7 @@ function UpdateClosestMarker(HUD H)
 		UpdateClosestMarker_Actor(H, item, closest_distance, bestindx);
 	}
 	
-	if (m.SlotData.ShuffleDirectorTokens 
-		&& !class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false)
-		&& !`GameManager.IsCurrentAct(5))
+	if (m.SlotData.ShuffleDirectorTokens && !`GameManager.IsCurrentAct(5) && (`GameManager.IsCurrentAct(2) || class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Hookshot', true)))
 	{
 		foreach H.PlayerOwner.DynamicActors(class'Hat_Collectible_HighscoreToken', token)
 		{
@@ -162,20 +177,16 @@ function UpdateClosestMarker(HUD H)
 
 			UpdateClosestMarker_Actor(H, token, closest_distance, bestindx);
 		}
-
-		// we need hookshot for train rush so don't bother with these if not
-		if (class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Hookshot', true))
+		
+		foreach H.PlayerOwner.DynamicActors(class'Hat_Collectible_TimeBonus', timeBonus)
 		{
-			foreach H.PlayerOwner.DynamicActors(class'Hat_Collectible_TimeBonus', timeBonus)
-			{
-				locId = m.ObjectToLocationId(timeBonus);
-				if (!CanReachLocation(locId, H) || m.IsLocationChecked(locId)) continue;
+			locId = m.ObjectToLocationId(timeBonus);
+			if (!CanReachLocation(locId, H) || m.IsLocationChecked(locId)) continue;
 
-				locInfo = m.GetLocationInfoFromID(locId);
-				if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
+			locInfo = m.GetLocationInfoFromID(locId);
+			if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
 
-				UpdateClosestMarker_Actor(H, timeBonus, closest_distance, bestindx);
-			}
+			UpdateClosestMarker_Actor(H, timeBonus, closest_distance, bestindx);
 		}
 	}
 	
@@ -190,21 +201,77 @@ function UpdateClosestMarker(HUD H)
 		
 		locInfo = m.GetLocationInfoFromID(locId);
 		
-		if (class<Hat_Collectible_StoryBookPage>(chest.Content) == None)
-			if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
+		if (!m.SlotData.ShuffleStorybookPages && class<Hat_Collectible_StoryBookPage>(chest.Content) != None)
+			continue;
+			
+		if (class<Hat_Collectible_TreasureBit>(chest.Content) != None)
+		{
+			if (m.SlotData.ShuffleRiftPons == 0)
+				continue;
+				
+			if (m.SlotData.ShuffleRiftPons != 2 && class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false))
+				continue;
+		}
+		
+		/*
+		if (class<Hat_Collectible_StoryBookPage>(chest.Content) == None && class<Hat_Collectible_TreasureBit>(chest.Content) == None)
+		{
+			if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) 
+				continue;
+		}
+		*/
+		
+		if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) 
+			continue;
 		
 		UpdateClosestMarker_Actor(H, chest, closest_distance, bestindx);
 	}
 	
-	foreach H.PlayerOwner.DynamicActors(class'Hat_Collectible_StoryBookPage', page)
+	if (m.SlotData.ShuffleStorybookPages)
 	{
-		locId = m.ObjectToLocationId(page);
-		if (!CanReachLocation(locId, H) || m.IsLocationChecked(locId)) continue;
-		
-		locInfo = m.GetLocationInfoFromID(locId);
-		if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
-		
-		UpdateClosestMarker_Actor(H, page, closest_distance, bestindx);
+		foreach H.PlayerOwner.DynamicActors(class'Hat_Collectible_StoryBookPage', page)
+		{
+			locId = m.ObjectToLocationId(page);
+			if (!CanReachLocation(locId, H) || m.IsLocationChecked(locId)) continue;
+			
+			locInfo = m.GetLocationInfoFromID(locId);
+			if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
+			
+			UpdateClosestMarker_Actor(H, page, closest_distance, bestindx);
+		}
+	}
+	
+	if (m.SlotData.ShuffleRiftPons > 0)
+	{
+		if (m.SlotData.ShuffleRiftPons == 2 || !class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false))
+		{
+			foreach H.PlayerOwner.DynamicActors(class'Hat_Collectible_TreasureBit', bit)
+			{
+				if (!bit.CanBeMagnetized)
+				{
+					// attached to an enemy
+					if (!CanHurtMostEnemies())
+						continue;
+						
+					if (!class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_FoxMask', true))
+					{
+						base = bit.GetBaseMost();
+						if (base != None && base != bit && base.IsA('Hat_Enemy') && Hat_Enemy(base).OnlyVulnerableIfFoxMaskEquipped)
+						{
+							continue;
+						}
+					}
+				}
+				
+				locId = m.ObjectToLocationId(bit);
+				if (!CanReachLocation(locId, H) || m.IsLocationChecked(locId)) continue;
+				
+				locInfo = m.GetLocationInfoFromID(locId);
+				if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
+				
+				UpdateClosestMarker_Actor(H, bit, closest_distance, bestindx);
+			}
+		}
 	}
 	
 	hasBrewing = class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Chemical', true);
@@ -454,10 +521,7 @@ function bool CanReachLocation(int id, HUD H)
 		paintingUnlock = 0;
 	}
 
-	canHurtMostEnemies = !m.SlotData.LockHomingAttack || m.GetAPBits("HasHomingAttack") > 0
-		|| lo.BackpackHasInventory(class'Archipelago_Weapon_Umbrella', true) 
-		|| lo.BackpackHasInventory(class'Hat_Ability_Chemical')
-		|| lo.BackpackHasInventory(class'Hat_Ability_StatueFall');
+	canHurtMostEnemies = class'Archipelago_HUDElementItemFinder'.static.CanHurtMostEnemies();
 
 	// Mafia Town secret cave item (crate blocking the cave is removed in act 6)
 	if (id == 2000305220)
@@ -490,9 +554,9 @@ function bool CanReachLocation(int id, HUD H)
 	// Mafia Town - Above Boats
 	if (id == 2000305218)
 	{
-		// Ice hat slide?
-		if (difficulty >= `MODERATE && (act == 6 || lo.BackpackHasInventory(class'Hat_Ability_StatueFall')))
+		if (difficulty >= `MODERATE && act == 6)
 		{
+			// Can bounce across lava to get this
 			return true;
 		}
 	}
@@ -653,7 +717,20 @@ function bool CanReachLocation(int id, HUD H)
 		if (!hookshot)
 		{
 			// Nearly impossible without Hookshot
-			return id == 2000346454 || id == 2000346452 || id == 2000346449;
+			if (id != 2000346454 && id != 2000346452 && id != 2000346449 && id != 2000355258 && id != 2000355260 && id != 2000355331
+				&& id != 2000360276 && id != 2000360321 && id != 2000360325)
+			{
+				return false;
+			}
+		}
+		
+		if (id == 2000355331)
+		{
+			// Can get w/Magnet
+			if (difficulty >= `NORMAL && lo.BackpackHasInventory(class'Hat_Collectible_BadgePart_SuckInOrbs'))
+			{
+				return true;
+			}
 		}
 	}
 	else if (mapName ~= "dlc_metro" && act == 8)
@@ -674,7 +751,13 @@ function bool CanReachLocation(int id, HUD H)
 		if (difficulty >= `MODERATE) // Can we skip the gap?
 			return true;
 		
-		return lo.BackpackHasInventory(class'Hat_Ability_TimeStop') || lo.BackpackHasInventory(class'Hat_Ability_Sprint');
+		return lo.BackpackHasInventory(class'Hat_Ability_TimeStop') || difficulty >= `NORMAL && lo.BackpackHasInventory(class'Hat_Ability_Sprint');
+	}
+	
+	// Mystifying Time Mesa gate puzzle
+	if (id == 2000336052 && difficulty == `EASY && !lo.BackpackHasInventory(class'Hat_Ability_TimeStop'))
+	{
+		return false;
 	}
 
 	// HUMT
@@ -712,6 +795,36 @@ function bool CanReachLocation(int id, HUD H)
 			return true;
 	}
 	
+	// Twilight Travels
+	if (id == 2000346231 || id == 2000354158)
+	{
+		// We need something to hit the bell to cross the gap
+		if (!lo.BackpackHasInventory(class'Hat_Ability_Chemical') 
+		&& (!lo.BackpackHasInventory(class'Archipelago_Weapon_Umbrella', true) || !lo.BackpackHasInventory(class'Hat_Badge_Weapon_Projectile')))
+		{
+			return false;
+		}
+	}
+	else if (id == 2000349912)
+	{
+		// Spider with a rift pon that's too high to hit with umbrella
+		if (m.SlotData.LockHomingAttack)
+		{
+			if (m.GetAPBits("HasHomingAttack") == 0
+				&& !lo.BackpackHasInventory(class'Hat_Ability_Chemical')
+				&& !lo.BackpackHasInventory(class'Hat_Ability_StatueFall'))
+			{
+				return false;
+			}
+		}
+	}
+	
+	// Murder on the Owl Express rec room token
+	if (difficulty == `EASY && id == 2001104768 && !lo.BackpackHasInventory(class'Hat_Ability_StatueFall'))
+	{
+		return false;
+	}
+	
 	if (HookshotRequiredLocs.Find(id) != -1 && !hookshot)
 		return false;
 	
@@ -723,6 +836,11 @@ function bool CanReachLocation(int id, HUD H)
 	
 	if (BrewingHatRequiredLocs.Find(id) != -1 && !lo.BackpackHasInventory(class'Hat_Ability_Chemical'))
 		return false;
+	
+	if (difficulty == `EASY && CourtyardPaintingLocs.Find(id) != -1 && !lo.BackpackHasInventory(class'Hat_Ability_FoxMask'))
+	{
+		return false;
+	}
 	
 	if (m.SlotData.ShuffleSubconPaintings && mapName ~= "subconforest")
 	{
@@ -794,6 +912,14 @@ static function bool CanHitObjects(optional bool MaskBypass, optional bool Umbre
 	|| MaskBypass && class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_FoxMask');
 }
 
+static function bool CanHurtMostEnemies()
+{
+	return !`AP.SlotData.LockHomingAttack || `AP.GetAPBits("HasHomingAttack") > 0
+		|| class'Hat_Loadout'.static.BackpackHasInventory(class'Archipelago_Weapon_Umbrella', true) 
+		|| class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Chemical')
+		|| class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_StatueFall');
+}
+
 static function bool TicketSkipsAllowed()
 {
 	return `AP.SlotData.NoTicketSkips == 0;
@@ -848,6 +974,8 @@ defaultproperties
 	HookshotRequiredLocs[12] = 2000305110;
 	HookshotRequiredLocs[13] = 2000304106;
 	HookshotRequiredLocs[14] = 2000324311;
+	HookshotRequiredLocs[15] = 2000345896;
+	HookshotRequiredLocs[16] = 2000345901;
 	
 	DwellerMaskRequiredLocs[0] = 2000324767;
 	DwellerMaskRequiredLocs[1] = 2000324464;
@@ -862,6 +990,11 @@ defaultproperties
 	DwellerMaskRequiredLocs[10] = 2000335826;
 	DwellerMaskRequiredLocs[11] = 2000305110;
 	DwellerMaskRequiredLocs[12] = 2000304106;
+	DwellerMaskRequiredLocs[13] = 2000345942;
+	DwellerMaskRequiredLocs[14] = 2000345892;
+	DwellerMaskRequiredLocs[15] = 2000345941;
+	DwellerMaskRequiredLocs[16] = 2000345896;
+	DwellerMaskRequiredLocs[17] = 2000345901;
 	
 	BrewingHatRequiredLocs[0] = 2000305701;
 	BrewingHatRequiredLocs[1] = 2000334758;

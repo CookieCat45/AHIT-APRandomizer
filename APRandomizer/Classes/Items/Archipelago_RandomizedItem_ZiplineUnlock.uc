@@ -7,4 +7,5 @@ defaultproperties
 	End Object
 	
 	HUDIcon = Texture2D'HatInTime_Hud_LocationBanner.Textures.vikinghorn'
+	DisplayName = "Zipline Unlock"
 }

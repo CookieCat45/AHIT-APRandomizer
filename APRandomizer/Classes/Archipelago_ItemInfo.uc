@@ -130,6 +130,13 @@ static function bool GetNativeItemData(string itemId, // Archipelago item ID
 optional out class<Actor> worldClass, // Item in the world
 optional out class<Actor> inventoryOverride) // Item inventory class override. Mainly for relics.
 {
+	if (int(itemId) == 2000340000 || int(itemId) >= 2000350000 && int(itemId) <= 2000350074)
+	{
+		// Death Wish contract unlock
+		worldClass = class'Archipelago_RandomizedItem_Contract';
+		return true;
+	}
+	
 	switch (int(itemId))
 	{
 		case YarnItem:

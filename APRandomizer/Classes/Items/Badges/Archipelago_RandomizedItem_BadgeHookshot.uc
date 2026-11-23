@@ -2,7 +2,7 @@ class Archipelago_RandomizedItem_BadgeHookshot extends Archipelago_RandomizedIte
 
 defaultproperties
 {
-	InventoryClass = class'Hat_Ability_Hookshot';
+	InvClass = class'Hat_Ability_Hookshot';
   HUDIcon = Texture2D'HatInTime_Hud_ItemIcons.Badges.badge_hookshot'
 
     Begin Object Name=Model2

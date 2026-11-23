@@ -2,7 +2,7 @@ class Archipelago_RandomizedItem_BadgeProjectile extends Archipelago_RandomizedI
 
 defaultproperties
 {
-	InventoryClass = class'Hat_Badge_Weapon_Projectile';
+	InvClass = class'Hat_Badge_Weapon_Projectile';
   HUDIcon = Texture2D'HatInTime_Hud_ItemIcons.Badges.badge_projectile'
 	
     Begin Object Name=Model2
