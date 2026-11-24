@@ -4330,9 +4330,11 @@ function OnLoadoutChanged(PlayerController controller, Object loadout, Object ba
 		return;
 	
 	// remove base game umbrella in favor of our own. This is the umbrella check in Mafia Town.
+	// Also remove weapons from mods
 	if (class<Hat_Weapon_Umbrella>(item.BackpackClass) != None 
 		&& class<Archipelago_Weapon_Umbrella>(item.BackpackClass) == None
-		&& class<Archipelago_Weapon_BaseballBat>(item.BackpackClass) == None)
+		&& class<Archipelago_Weapon_BaseballBat>(item.BackpackClass) == None
+	|| class<Hat_Weapon_Unarmed>(item.BackpackClass) != None && item.BackpackClass != class'Hat_Weapon_Unarmed' && item.BackpackClass != class'Archipelago_Weapon_Unarmed')
 	{
 		Hat_Loadout(loadout).RemoveBackpack(item);
 		Hat_Loadout(loadout).RemoveLoadout(item.BackpackClass, true); // To get rid of those pesky Steam weapon skins
