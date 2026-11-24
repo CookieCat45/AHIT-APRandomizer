@@ -229,6 +229,7 @@ event OnHookedActorSpawn(Object newActor, Name identifier)
 			
 		// Need to do this on a timer to prevent the game from overriding our actions
 		SetTimer(0.3, false, NameOf(EnableConsoleCommands));
+		ToggleCarryAbility();
 	}
 	
 	if (IsArchipelagoEnabled())
@@ -360,7 +361,6 @@ event PreBeginPlay()
 	if (class'Engine'.static.BasicLoadObject(SlotData, path, false, SlotDataVersion))
 	{
 		SlotData.Initialized = true;
-		ReplaceDeathWishRewards();
 		UpdateChapterInfo();
 	}
 	
@@ -629,7 +629,7 @@ function OnPostInitGame()
 			if (SlotData.ShuffleRiftPons == 0)
 				continue;
 				
-			if (SlotData.ShuffleRiftPons != 2 && class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false))
+			if (SlotData.ShuffleRiftPons < 2 && class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false))
 				continue;
 		}
 		
@@ -977,17 +977,12 @@ function OnPostInitGame()
 		CreateClient();
 }
 
-function OnGetDefaultPlayerClass(Controller C, out class<Pawn> PawnClass)
-{
-	if (!IsArchipelagoEnabled() || !SlotData.Initialized || !SlotData.LockObjectGrab)
-		return;
-
-	ToggleCarryAbility();
-}
-
 function ToggleCarryAbility()
 {
 	local Hat_Player p;
+	if (!SlotData.Initialized || !SlotData.LockObjectGrab)
+		return;
+	
 	foreach DynamicActors(class'Hat_Player', p)
 	{
 		ConsoleCommand("set "$p.Name$" CanCarryObjects "$bool(GetAPBits("HasObjectGrab")));
@@ -1158,10 +1153,12 @@ function HideItems()
 {
 	local Hat_Collectible_Important a;
 	local bool deathWish;
-	
 	deathWish = class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false);
 	foreach DynamicActors(class'Hat_Collectible_Important', a)
 	{
+		if (a.IsA('Archipelago_RandomizedItem_Base'))
+			continue;
+		
 		if (a.IsA('Hat_Collectible_VaultCode_Base') || a.IsA('Hat_Collectible_Sticker')
 			|| a.IsA('Hat_Collectible_MetroTicket_Base'))
 			continue;
@@ -1377,6 +1374,13 @@ function OnFullyConnected()
 		UpdateCompletedActs(SlotData.PendingCompletedActs[i]);
 	}
 	
+	if (SlotData.SkipAlpineIntro)
+	{
+		class'Hat_SaveBitHelper'.static.SetLevelBits("Actless_FreeRoam_Intro_Complete", 1, "AlpsAndSails");
+	}
+	
+	ToggleCarryAbility();
+	ReplaceDeathWishRewards();
 	SlotData.PendingCompletedActs.Length = 0;
 	SetTimer(180.0, true, NameOf(KeepConnectionAlive));
 }
@@ -1572,6 +1576,7 @@ function LoadSlotData(JsonObject json)
 	SlotData.UmbrellaLogic = json.GetBoolValue("UmbrellaLogic");
 	SlotData.LockHomingAttack = json.GetBoolValue("LockHomingAttack");
 	SlotData.LockObjectGrab = json.GetBoolValue("LockObjectGrab");
+	SlotData.SkipAlpineIntro = json.GetBoolValue("SkipAlpineIntro");
 	SlotData.ShuffleSubconPaintings = json.GetBoolValue("ShuffleSubconPaintings");
 	SlotData.NoPaintingSkips = json.GetBoolValue("NoPaintingSkips");
 	SlotData.CTRLogic = json.GetIntValue("CTRLogic");
@@ -1613,14 +1618,14 @@ function LoadSlotData(JsonObject json)
 	{
 		SlotData.Chapter6Cost = json.GetIntValue("Chapter6Cost");
 		SlotData.ShipShapeCustomTaskGoal = json.GetIntValue("ShipShapeCustomTaskGoal");
-		SlotData.Tasksanity = json.GetBoolValue("Tasksanity");
 		SlotData.ExcludeTour = json.GetBoolValue("ExcludeTour");
-		
-		if (SlotData.Tasksanity)
-		{
-			SlotData.TasksanityTaskStep = json.GetIntValue("TasksanityTaskStep");
-			SlotData.TasksanityCheckCount = json.GetIntValue("TasksanityCheckCount");
-		}
+	}
+	
+	SlotData.Tasksanity = json.GetBoolValue("Tasksanity");
+	if (SlotData.Tasksanity)
+	{
+		SlotData.TasksanityTaskStep = json.GetIntValue("TasksanityTaskStep");
+		SlotData.TasksanityCheckCount = json.GetIntValue("TasksanityCheckCount");
 	}
 	
 	if (SlotData.DLC2)
@@ -1644,7 +1649,7 @@ function LoadSlotData(JsonObject json)
 	if (SlotData.DeathWish)
 	{
 		SlotData.BonusRewards = json.GetBoolValue("DWEnableBonus");
-		SlotData.AutoCompleteBonuses = json.GetBoolValue("DWAutoCompleteBonuses");
+		//SlotData.AutoCompleteBonuses = json.GetBoolValue("DWAutoCompleteBonuses");
 		SlotData.DeathWishTPRequirement = json.GetIntValue("DWTimePieceRequirement");
 		SlotData.DeathWishShuffle = json.GetBoolValue("DWShuffle");
 		SlotData.LockDeathWishes = json.GetIntValue("LockDeathWishes");
@@ -1799,7 +1804,6 @@ function LoadSlotData(JsonObject json)
 	
 	SlotData.Initialized = true;
 	UpdateChapterInfo();
-	ReplaceDeathWishRewards();
 	CheckDeathWishUnlock();
 }
 
@@ -1826,7 +1830,7 @@ function OnPreActSelectMapChange(Object ChapterInfo, out int ActID, out string M
 		SaveGame();
 	}
 	
-	if (InStr(MapName, "timerift_", false, true) == 0)
+	if (SlotData.DeathWishOnly || InStr(MapName, "timerift_", false, true) == 0)
 		return;
 	
 	ActMapChange = true;
@@ -2170,7 +2174,7 @@ function OnDeathWishObjectiveCompleted(class<Hat_SnatcherContract_DeathWish> dw)
 {
 	local int id, totalStamps;
 	local array<int> locIds;
-	local bool update;
+	local bool update, autoBonus;
 	
 	id = class'Archipelago_ItemInfo'.static.GetDeathWishLocationID(dw);
 	if (id <= 0) // likely a mod
@@ -2178,9 +2182,10 @@ function OnDeathWishObjectiveCompleted(class<Hat_SnatcherContract_DeathWish> dw)
 		return;
 	}
 	
+	autoBonus = bool(SlotData.ExcludedBonuses.Find(dw) != -1);
 	if (SlotData.CompletedDeathWishes.Find(dw) == -1 && dw.static.IsContractComplete())
 	{
-		if (SlotData.AutoCompleteBonuses)
+		if (autoBonus)
 		{
 			dw.static.SetObjectiveFailed(1, false);
 			dw.static.SetObjectiveFailed(2, false);
@@ -2200,7 +2205,7 @@ function OnDeathWishObjectiveCompleted(class<Hat_SnatcherContract_DeathWish> dw)
 		locIds.AddItem(id);
 	}
 	
-	if (SlotData.AutoCompleteBonuses || dw.static.IsContractPerfected() && !dw.static.IsDeathWishEasyMode())
+	if (autoBonus || dw.static.IsContractPerfected() && !dw.static.IsDeathWishEasyMode())
 	{
 		SlotData.PerfectedDeathWishes.AddItem(dw);
 		update = true;
@@ -3371,6 +3376,9 @@ function ShuffleCollectibles(optional bool cache)
 		if (isDw)
 			break;
 		
+		if (collectible.IsA('Archipelago_RandomizedItem_Base'))
+			continue;
+		
 		if (collectible.IsA('Hat_Collectible_VaultCode_Base') || collectible.IsA('Hat_Collectible_InstantCamera')
 		|| collectible.IsA('Hat_Collectible_Sticker') || collectible.IsA('Hat_Collectible_MetroTicket_Base'))
 			continue;
@@ -3481,7 +3489,7 @@ function ShuffleCollectibles(optional bool cache)
 			locId = ObjectToLocationId(a);
 			if (a.IsA('Hat_Collectible_TreasureBit'))
 			{
-				if (SlotData.ShuffleRiftPons != 2 && class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false))
+				if (SlotData.ShuffleRiftPons < 2 && class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false))
 				{
 					continue;
 				}
@@ -3540,7 +3548,7 @@ function ShuffleCollectibles(optional bool cache)
 	{
 		foreach DynamicActors(class'Hat_Enemy', enemy)
 		{
-			if (isDw && SlotData.ShuffleRiftPons != 2)
+			if (isDw && SlotData.ShuffleRiftPons < 2)
 				break;
 			
 			if (enemy.bHidden)
@@ -3559,9 +3567,6 @@ function ShuffleCollectibles(optional bool cache)
 	shopInvClasses = class'Hat_ClassHelper'.static.GetAllScriptClasses("Archipelago_ShopInventory_Base");
 	foreach shopInvClasses(shopInvClass)
 	{
-		if (isDw)
-			break;
-		
 		shopInv = new class<Archipelago_ShopInventory_Base>(shopInvClass);
 		
 		if (shopInv.ItemsForSale.Length <= 0)
@@ -3628,6 +3633,9 @@ function ShuffleCollectibles(optional bool cache)
 			
 			foreach DynamicActors(class'Hat_Collectible_Important', collectible)
 			{
+				if (collectible.IsA('Archipelago_RandomizedItem_Base'))
+					continue;
+				
 				if (collectible.IsA('Hat_Collectible_VaultCode_Base') || collectible.IsA('Hat_Collectible_Sticker')
 				 	|| collectible.IsA('Hat_Collectible_MetroTicket_Base') || collectible.IsA('Hat_Collectible_InstantCamera'))
 					continue;
@@ -4523,7 +4531,7 @@ function OnCollectedCollectible(Object collectible)
 	}
 	else if ((SlotData.ShuffleStorybookPages && collectible.IsA('Hat_Collectible_StoryBookPage')
 			|| SlotData.ShuffleRiftPons > 0 && collectible.IsA('Hat_Collectible_TreasureBit') && Hat_Collectible(collectible).CanBeMagnetized 
-			&& (SlotData.ShuffleRiftPons == 2 || !class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false)))
+			&& (SlotData.ShuffleRiftPons >= 2 || !class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false)))
 		&& Actor(collectible).CreationTime <= 0)
 	{
 		SendLocationCheck(ObjectToLocationId(collectible));
@@ -4679,6 +4687,11 @@ function int GetHatYarnCost(class<Hat_Ability> hatClass)
 	return 0;
 }
 
+function bool DoesLocationExist(int id)
+{
+	return SlotData.Initialized && SlotData.ExistingLocations.Find(id) != -1;
+}
+
 function SendLocationCheck(int id, optional bool scout, optional bool hint)
 {
 	local string jsonMessage;
@@ -4709,6 +4722,12 @@ function SendLocationCheck(int id, optional bool scout, optional bool hint)
 	}
 	else
 	{
+		if (!DoesLocationExist(id))
+		{
+			DebugMessage("[LocationScouts] IGNORING non existent ID: "$id);
+			return;
+		}
+		
 		DebugMessage("Scouting location ID: " $id, , 2);
 		if (hint)
 		{
@@ -4727,7 +4746,7 @@ function SendLocationCheck(int id, optional bool scout, optional bool hint)
 function SendMultipleLocationChecks(array<int> locationArray, optional bool scout, optional bool hint)
 {
 	local string jsonMessage;
-	local int i;
+	local int i, totalLocations;
 	local Actor a;
 	
 	if (!IsFullyConnected())
@@ -4749,6 +4768,7 @@ function SendMultipleLocationChecks(array<int> locationArray, optional bool scou
 		for (i = 0; i < locationArray.Length; i++)
 		{
 			jsonMessage $= locationArray[i];
+			totalLocations++;
 			DebugMessage("Sending location ID: " $locationArray[i]);
 			
 			if (!IsLocationChecked(locationArray[i]))
@@ -4766,7 +4786,20 @@ function SendMultipleLocationChecks(array<int> locationArray, optional bool scou
 		jsonMessage = "[{`cmd`:`LocationScouts`,`locations`:[";
 		for (i = 0; i < locationArray.Length; i++)
 		{
+			if (!DoesLocationExist(locationArray[i]))
+			{
+				DebugMessage("[LocationScouts] IGNORING non existent ID: "$locationArray[i]);
+				if (i+1 >= locationArray.Length)
+				{
+					// strip the last comma, since this is the end of the list
+					jsonMessage = Left(jsonMessage, Len(jsonMessage)-1);
+				}
+				
+				continue;
+			}
+			
 			jsonMessage $= locationArray[i];
+			totalLocations++;
 			DebugMessage("Scouting location ID: " $locationArray[i], , 2);
 			if (DebugMode >= 2)
 			{
@@ -4782,6 +4815,11 @@ function SendMultipleLocationChecks(array<int> locationArray, optional bool scou
 				jsonMessage $= ",";
 			}
 		}
+	}
+	
+	if (totalLocations <= 0)
+	{
+		return;
 	}
 	
 	if (scout && hint)
@@ -4910,6 +4948,7 @@ function BabyTrapTimer()
 		}
 		
 		stack = Spawn(stackClass, , , player.Location);
+		ConsoleCommand("set "$player.Name$" CanCarryObjects true"); // temporarily re-enable
 		if (!player.BeginCarry(stack, true))
 		{
 			stack.Destroy();
@@ -4953,6 +4992,7 @@ function DropAllBabies(Pawn Player)
 	
 	Hat_PawnCarryable(Player).SetAnimCarryMode(ECarryMode_None);
 	Hat_HUD(PlayerController(player.Controller).MyHUD).CloseHUD(class'Hat_HUDElementCarryHelp');
+	ToggleCarryAbility();
 }
 
 function LaserTrapTimer()
@@ -5818,7 +5858,7 @@ function string GetMapName()
 	if (isDw)
 	{
 		// because some DWs have new checks, but use the same map
-		if (SlotData.ShuffleRiftPons == 2 && class'Hat_SnatcherContract_DeathWish_RiftCollapse'.static.IsActive(true))
+		if (SlotData.ShuffleRiftPons >= 2 && class'Hat_SnatcherContract_DeathWish_RiftCollapse'.static.IsActive(true))
 		{
 			mapName $= "_RiftCollapse";
 		}

@@ -22,10 +22,13 @@ function RenderStampCounter(HUD H, float posx)
 	local float XL, YL, posy, IconSize, space;
 	local Color C;
 	
-	StampString = NumStamps $ " / " $ TotalStamps;
 	if (mod.SlotData.DeathWishShuffle)
 	{
-		StampString $= " (" $ string(mod.SlotData.ShuffledDeathWishes.Length) $ ")";
+		StampString = NumStamps $ " / " $mod.SlotData.ShuffledDeathWishes.Length*3 $" (" $ string(mod.SlotData.ShuffledDeathWishes.Length) $ ")";
+	}
+	else
+	{
+		StampString = NumStamps $ " / " $ TotalStamps;
 	}
 	
 	H.Canvas.Font = class'Hat_FontInfo'.static.GetDefaultFont(StampString);

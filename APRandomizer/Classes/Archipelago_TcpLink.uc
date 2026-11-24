@@ -122,9 +122,9 @@ function ConnectToAP()
 event Tick(float d)
 {
 	local byte byteMessage[255];
-	local int count, i, a, k, bracket, attempts;
-	local string character, pong, msg, nullChar;
-	local bool b, validMsg;
+	local int count, i, bracket, attempts;
+	local string character, msg;
+	local bool validMsg;
 	
 	Super.Tick(d);
 	
@@ -148,121 +148,54 @@ event Tick(float d)
 		else
 		{
 			EmptyCount = 0;
-			
-			// Check for a ping
-			if (!ParsingMessage && count <= 10)
-			{
-				for (i = 0; i < count; i++)
-				{
-					// UnrealScript doesn't allow null characters in strings, so we need to do this crap
-					if (byteMessage[i] == byte(0))
-					{
-						if (nullChar != "")
-						{
-							msg $= nullChar;
-							continue;
-						}
-						
-						for (a = 33; a <= 255; a++)
-						{
-							b = false;
-							
-							for (k = 0; k < count; k++)
-							{
-								if (byteMessage[k] == byte(a))
-								{
-									b = true;
-									break;
-								}
-							}
-							
-							if (!b)
-							{
-								nullChar = Chr(a);
-								msg $= nullChar;
-								break;
-							}
-						}
-						
-						continue;
-					}
-					
-					msg $= Chr(byteMessage[i]);
-				}
-				
-				for (i = 0; i < Len(msg); i++)
-				{
-					if (Asc(Mid("a"$msg, i, 1)) == `CODE_PING)
-					{
-						// Need to send the same data back as a pong
-						// This is a dumb way to do it, but whatever works.
-						pong = Mid(msg, InStr(msg, Chr(`CODE_PING), false, true));
-						pong = Mid(pong, 2);
-						SendBinaryMessage(pong, false, true, nullChar);
-						break;
-					}
-				}
-				
-				if (pong != "")
-					return;
-			}
-			
 			for (i = 0; i < count; i++)
 			{
 				character = Chr(byteMessage[i]);
 				CurrentMessage.AddItem(character);
-				
-				if (character == "[")
+				if (character == "[" && !ParsingMessage)
 				{
-					if (!ParsingMessage)
-					{
-						CurrentMessage.Length = 0;
-						ParsingMessage = true;
-					}
+					CurrentMessage.Length = 0;
+					ParsingMessage = true;
 				}
 			}
 		}
 	}
 	
-	if (ParsingMessage)
+	if (ParsingMessage && EmptyCount > 5)
 	{
-		if (EmptyCount > 5)
+		// We've got a JSON message, parse it
+		msg = "";
+		for (i = 0; i < CurrentMessage.Length; i++)
 		{
-			// We've got a JSON message, parse it
-			msg = "";
-			
-			for (i = 0; i < CurrentMessage.Length; i++)
+			if (CurrentMessage[i] == "{")
 			{
-				if (CurrentMessage[i] == "{")
-				{
-					if (!validMsg && CurrentMessage[i+1] == "\"")
-						validMsg = true;
-					
-					if (validMsg)
-						bracket--;
-				}
-				else if (validMsg && CurrentMessage[i] == "}")
-				{
-					bracket++;
-				}
+				if (!validMsg && CurrentMessage[i+1] == "\"")
+					validMsg = true;
 				
 				if (validMsg)
-				{
-					msg $= CurrentMessage[i];
-					if (bracket >= 0)
-					{
-						ParseJSON(msg);
-						msg = "";
-						validMsg = false;
-						bracket = 0;
-					}
-				}
+					bracket--;
+			}
+			else if (validMsg && CurrentMessage[i] == "}")
+			{
+				bracket++;
 			}
 			
-			CurrentMessage.Length = 0;
-			ParsingMessage = false;
-			EmptyCount = 0;
+			if (validMsg)
+			{
+				msg $= CurrentMessage[i];
+				if (bracket >= 0)
+				{
+					ParseJSON(msg);
+					msg = "";
+					validMsg = false;
+					bracket = 0;
+				}
+			}
 		}
+		
+		CurrentMessage.Length = 0;
+		ParsingMessage = false;
+		EmptyCount = 0;
 	}
 }
 
@@ -371,6 +304,11 @@ function ParseJSON(string json)
 					if (len(num) > 0 && s == ",")
 					{
 						locId = int(num);
+						if (m.SlotData.ExistingLocations.Find(locId) == -1)
+						{
+							m.SlotData.ExistingLocations.AddItem(locId);
+						}
+						
 						for (a = 0; a < m.SlotData.LocationInfoArray.Length; a++)
 						{
 							if (m.SlotData.LocationInfoArray[a].ID == locId)
@@ -406,6 +344,11 @@ function ParseJSON(string json)
 					if (len(num) > 0 && s == ",")
 					{
 						locId = int(num);
+						if (m.SlotData.ExistingLocations.Find(locId) == -1)
+						{
+							m.SlotData.ExistingLocations.AddItem(locId);
+						}
+						
 						if (!m.IsLocationChecked(locId) && missingLocs.Find(locId) == -1)
 						{
 							m.SlotData.CheckedLocations.AddItem(locId);
@@ -665,6 +608,9 @@ function OnLocationInfoCommand(string json)
 		
 		foreach DynamicActors(class'Hat_Collectible_Important', collectible)
 		{
+			if (collectible.IsA('Archipelago_RandomizedItem_Base'))
+				continue;
+			
 			if (collectible.IsA('Hat_Collectible_VaultCode_Base') || collectible.IsA('Hat_Collectible_InstantCamera')
 				|| collectible.IsA('Hat_Collectible_Sticker') || collectible.IsA('Hat_Collectible_MetroTicket_Base'))
 				continue;
@@ -809,8 +755,8 @@ function OnReceivedItemsCommand(string json)
 	
 	// This means we are reconnecting to a previous session, and the server is giving us our entire list of items,
 	// so we need to begin from the next new item in our list or don't give anything otherwise
-	m.DebugMessage("serverIndex: "$serverIndex);
-	m.DebugMessage("index: "$index);
+	//m.DebugMessage("serverIndex: "$serverIndex);
+	//m.DebugMessage("index: "$index);
 	if (serverIndex == 0 && index > 0)
 	{
 		if (index > count)
@@ -828,7 +774,7 @@ function OnReceivedItemsCommand(string json)
 		start = 0;
 	}
 	
-	m.DebugMessage("start: "$start);
+	//m.DebugMessage("start: "$start);
 	for (i = start; i <= count; i++)
 	{
 		jsonChild = jsonObj.GetObject("items_"$i);
@@ -1195,9 +1141,12 @@ function bool GiveRandomFlair(array<class< Object > > flairs)
 	if (candidates.Length > 0)
 	{
 		chosen = candidates[RandRange(0, candidates.Length-1)];
-		`AP.ScreenMessage("Got Flair: "$class<Hat_Ability>(chosen.default.CosmeticItemWeApplyTo).static.GetLocalizedName(chosen));
-		lo.AddBackpack(lo.MakeLoadoutItem(chosen.static.GetBaseCosmeticItemWeApplyTo(), chosen), false);
-		return true;
+		if (lo.AddBackpack(lo.MakeLoadoutItem(chosen.static.GetBaseCosmeticItemWeApplyTo(), chosen), false))
+		{
+			`AP.ScreenMessage("Got Flair: "$class<Hat_Ability>(chosen.default.CosmeticItemWeApplyTo).static.GetLocalizedName(chosen));
+			Hat_SaveGame(`SaveManager.SaveData).MyBackpack2017.Hats[Hat_SaveGame(`SaveManager.SaveData).MyBackpack2017.Hats.Length-1].LastUseTime = 0; // fix auto equip
+			return true;
+		}
 	}
 	
 	return false;

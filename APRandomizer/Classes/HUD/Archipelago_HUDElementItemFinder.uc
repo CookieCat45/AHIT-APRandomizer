@@ -36,6 +36,8 @@ function OnOpenHUD(HUD H, optional String command)
 		// Twilight Travels
 		BrewingHatRequiredLocs.AddItem(2000354158);
 		BrewingHatRequiredLocs.AddItem(2000346231);
+		BrewingHatRequiredLocs.AddItem(2000352042);
+		BrewingHatRequiredLocs.AddItem(2000346229);
 	}
 	
 	if (difficulty >= `MODERATE)
@@ -81,8 +83,8 @@ function OnOpenHUD(HUD H, optional String command)
 		DwellerMaskRequiredLocs.RemoveItem(2000324855);
 		
 		// Deep Sea
-		DwellerMaskRequiredLocs.RemoveItem(2000358262);
-		DwellerMaskRequiredLocs.RemoveItem(2000358308);
+		DwellerMaskRequiredLocs.RemoveItem(2000358266);
+		DwellerMaskRequiredLocs.RemoveItem(2000358319);
 	}
 	
 	if (difficulty >= `EXPERT)
@@ -139,7 +141,7 @@ function UpdateClosestMarker(HUD H)
 	mode = m.SlotData.CompassBadgeMode;
 	onlyImportant = (mode == 2 || mode == 3 && AreImportantItemsLeft(H));
 	
-	if (m.IsInSpaceship() && !m.IsLocationChecked(m.const.RumbiYarnCheck))
+	if (m.IsInSpaceship() && !m.IsLocationChecked(m.const.RumbiYarnCheck) && m.DoesLocationExist(m.const.RumbiYarnCheck))
 	{
 		// Point to Rumbi, most players don't realize that she is a check.
 		if (CanHitObjects())
@@ -209,7 +211,7 @@ function UpdateClosestMarker(HUD H)
 			if (m.SlotData.ShuffleRiftPons == 0)
 				continue;
 				
-			if (m.SlotData.ShuffleRiftPons != 2 && class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false))
+			if (m.SlotData.ShuffleRiftPons < 2 && class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false))
 				continue;
 		}
 		
@@ -243,7 +245,7 @@ function UpdateClosestMarker(HUD H)
 	
 	if (m.SlotData.ShuffleRiftPons > 0)
 	{
-		if (m.SlotData.ShuffleRiftPons == 2 || !class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false))
+		if (m.SlotData.ShuffleRiftPons >= 2 || !class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false))
 		{
 			foreach H.PlayerOwner.DynamicActors(class'Hat_Collectible_TreasureBit', bit)
 			{
@@ -509,6 +511,9 @@ function bool CanReachLocation(int id, HUD H)
 	local Hat_Loadout lo;
 	
 	m = `AP;
+	if (!m.DoesLocationExist(id))
+		return false;
+	
 	mapName = `GameManager.GetCurrentMapFilename();
 	lo = Hat_PlayerController(H.PlayerOwner).MyLoadout;
 	difficulty = m.SlotData.LogicDifficulty;
@@ -618,15 +623,23 @@ function bool CanReachLocation(int id, HUD H)
 		return (CanSkipPaintings() || paintingUnlock >= 1) && CanHitObjects(true);
 	}
 
-	if (id == 2000345087)
+	// Tour
+	if (id == 2000345087 || id == 2000344925 || id == 2000344917 || id == 2000344919 || id == 2000344921 || id == 2000344923)
 	{
-		// Tour finale page
 		if (CanGrabObjects())
 			return true;
 
 		return lo.BackpackHasInventory(class'Hat_Ability_FoxMask')
 			|| lo.BackpackHasInventory(class'Hat_Ability_Chemical')
-			|| difficulty >= `MODERATE && lo.BackpackHasInventory(class'Hat_Collectible_BadgePart_SuckInOrbs');
+			|| difficulty >= `NORMAL && lo.BackpackHasInventory(class'Hat_Collectible_BadgePart_SuckInOrbs');
+	}
+	else if (id == 2000344910)
+	{
+		return CanGrabObjects() || difficulty >= `NORMAL && lo.BackpackHasInventory(class'Hat_Collectible_BadgePart_SuckInOrbs');
+	}
+	else if (id == 2000344927 || id == 2000344920)
+	{
+		return lo.BackpackHasInventory(class'Hat_Ability_FoxMask') || difficulty >= `NORMAL && lo.BackpackHasInventory(class'Hat_Collectible_BadgePart_SuckInOrbs');
 	}
 	
 	if (mapName ~= "alpsandsails")
@@ -795,24 +808,57 @@ function bool CanReachLocation(int id, HUD H)
 			return true;
 	}
 	
-	// Twilight Travels
-	if (id == 2000346231 || id == 2000354158)
+	if (id == 2000323730)
 	{
-		// We need something to hit the bell to cross the gap
-		if (!lo.BackpackHasInventory(class'Hat_Ability_Chemical') 
-		&& (!lo.BackpackHasInventory(class'Archipelago_Weapon_Umbrella', true) || !lo.BackpackHasInventory(class'Hat_Badge_Weapon_Projectile')))
+		if (paintingUnlock >= 1 && act != 6 || (CanSkipPaintings() || act == 6) && CanGrabObjects() && difficulty >= `EXPERT)
 		{
-			return false;
+			return true;
+		}
+		
+		return false;
+	}
+	
+	// Twilight Travels
+	if (mapName ~= "TimeRift_Cave_TwilightTravels")
+	{
+		if (!hookshot || !lo.BackpackHasInventory(class'Hat_Ability_FoxMask'))
+		{
+			if (id != 2000346232)
+			{
+				return false;
+			}
+		}
+		
+		if (id == 2000346231 || id == 2000354158)
+		{
+			// We need something to hit the bell to cross the gap
+			if (!lo.BackpackHasInventory(class'Hat_Ability_Chemical') 
+			&& (!lo.BackpackHasInventory(class'Archipelago_Weapon_Umbrella', true) || !lo.BackpackHasInventory(class'Hat_Badge_Weapon_Projectile')))
+			{
+				return false;
+			}
+		}
+		else if (id == 2000349912)
+		{
+			// Spider with a rift pon that's too high to hit with umbrella
+			if (m.SlotData.LockHomingAttack)
+			{
+				if (m.GetAPBits("HasHomingAttack") == 0
+					&& !lo.BackpackHasInventory(class'Hat_Ability_Chemical')
+					&& !lo.BackpackHasInventory(class'Hat_Ability_StatueFall'))
+				{
+					return false;
+				}
+			}
 		}
 	}
-	else if (id == 2000349912)
+	else if (mapName ~= "TimeRift_Cave_MountainRift")
 	{
-		// Spider with a rift pon that's too high to hit with umbrella
-		if (m.SlotData.LockHomingAttack)
+		// Mountain Rift
+		if (!lo.BackpackHasInventory(class'Hat_Ability_FoxMask'))
 		{
-			if (m.GetAPBits("HasHomingAttack") == 0
-				&& !lo.BackpackHasInventory(class'Hat_Ability_Chemical')
-				&& !lo.BackpackHasInventory(class'Hat_Ability_StatueFall'))
+			if (id != 2000351701 && id != 2000351703 && id != 2000351709
+			&& id != 2000345895 && id != 2000345894 && id != 2000345943)
 			{
 				return false;
 			}
@@ -958,6 +1004,8 @@ defaultproperties
 	IceHatRequiredLocs[1] = 2000304831;
 	IceHatRequiredLocs[2] = 2000304979;
 	IceHatRequiredLocs[3] = 2000304049;
+	IceHatRequiredLocs[4] = 2000354228;
+	IceHatRequiredLocs[5] = 2000355236;
 	
 	HookshotRequiredLocs[0] = 2000305218;
 	HookshotRequiredLocs[1] = 2000303481;
@@ -976,6 +1024,16 @@ defaultproperties
 	HookshotRequiredLocs[14] = 2000324311;
 	HookshotRequiredLocs[15] = 2000345896;
 	HookshotRequiredLocs[16] = 2000345901;
+	HookshotRequiredLocs[17] = 2000345896;
+	HookshotRequiredLocs[18] = 2000345901;
+	HookshotRequiredLocs[19] = 2000352713;
+	HookshotRequiredLocs[20] = 2000352776;
+	HookshotRequiredLocs[21] = 2000353814;
+	HookshotRequiredLocs[22] = 2000353766;
+	HookshotRequiredLocs[23] = 2000353821;
+	HookshotRequiredLocs[24] = 2000353856;
+	HookshotRequiredLocs[25] = 2000353775;
+	HookshotRequiredLocs[26] = 2000353830;
 	
 	DwellerMaskRequiredLocs[0] = 2000324767;
 	DwellerMaskRequiredLocs[1] = 2000324464;
@@ -995,6 +1053,10 @@ defaultproperties
 	DwellerMaskRequiredLocs[15] = 2000345941;
 	DwellerMaskRequiredLocs[16] = 2000345896;
 	DwellerMaskRequiredLocs[17] = 2000345901;
+	DwellerMaskRequiredLocs[18] = 2000358266;
+	DwellerMaskRequiredLocs[19] = 2000358319;
+	DwellerMaskRequiredLocs[20] = 2000356260;
+	DwellerMaskRequiredLocs[21] = 2000361260;
 	
 	BrewingHatRequiredLocs[0] = 2000305701;
 	BrewingHatRequiredLocs[1] = 2000334758;
@@ -1006,6 +1068,8 @@ defaultproperties
 	BrewingHatRequiredLocs[7] = 2000335492;
 	BrewingHatRequiredLocs[8] = 2000325479;
 	BrewingHatRequiredLocs[9] = 2000325478;
+	BrewingHatRequiredLocs[10] = 2000347214;
+	BrewingHatRequiredLocs[11] = 2000357270;
 	
 	BirdhousePathLocs[0] = 2000335911;
 	BirdhousePathLocs[1] = 2000335756;
