@@ -240,6 +240,10 @@ event OnHookedActorSpawn(Object newActor, Name identifier)
 			{
 				SetTimer(0.1, true, NameOf(RumbiHitCheckTimer), self, newActor);
 			}
+			else if (newActor.IsA('Hat_Enemy_TimeRiftBall_Base'))
+			{
+				SetTimer(0.1, true, NameOf(RiftBallBrewingFixTimer), self, Hat_Enemy_TimeRiftBall(newActor));
+			}
 			else if (SlotData.ShuffleActContracts)
 			{
 				if (newActor.IsA('Hat_SnatcherContractEvent'))
@@ -1036,6 +1040,17 @@ function RumbiHitCheckTimer(Actor rumbi)
 	{
 		SendLocationCheck(RumbiYarnCheck);
 		ClearTimer(NameOf(RumbiHitCheckTimer));
+	}
+}
+
+function RiftBallBrewingFixTimer(Hat_Enemy_TimeRiftBall_Base ball)
+{
+	if (ball.PlayerHasEnteredFloor && ball.TouchCylinder != None)
+	{
+		ball.TouchCylinder.SetActorCollision(false,false,false);
+		ball.TouchCylinder.DetachFromAny();
+		ball.TouchCylinder = None;
+		ClearTimer(NameOf(RiftBallBrewingFixTimer), ball);
 	}
 }
 
@@ -2182,7 +2197,7 @@ function OnDeathWishObjectiveCompleted(class<Hat_SnatcherContract_DeathWish> dw)
 		return;
 	}
 	
-	autoBonus = bool(SlotData.ExcludedBonuses.Find(dw) != -1);
+	autoBonus = SlotData.ExcludedBonuses.Find(dw) != -1;
 	if (SlotData.CompletedDeathWishes.Find(dw) == -1 && dw.static.IsContractComplete())
 	{
 		if (autoBonus)
@@ -3287,19 +3302,19 @@ function bool IsChapterActInfoUnlocked(Hat_ChapterActInfo ChapterActInfo, option
 			{
 				if (actid == 2)
 				{
-					return SlotData.ObtainedContracts.Find(class'Hat_SnatcherContract_IceWall') != -1;
+					return DoesPlayerReallyHaveContract(class'Hat_SnatcherContract_IceWall');
 				}
 				else if (actid == 3)
 				{
-					return SlotData.ObtainedContracts.Find(class'Hat_SnatcherContract_Toilet') != -1;
+					return DoesPlayerReallyHaveContract(class'Hat_SnatcherContract_Toilet');
 				}
 				else if (actid == 4)
 				{
-					return SlotData.ObtainedContracts.Find(class'Hat_SnatcherContract_Vanessa') != -1;
+					return DoesPlayerReallyHaveContract(class'Hat_SnatcherContract_Vanessa');
 				}
 				else if (actid == 5)
 				{
-					return SlotData.ObtainedContracts.Find(class'Hat_SnatcherContract_MailDelivery') != -1;
+					return DoesPlayerReallyHaveContract(class'Hat_SnatcherContract_MailDelivery');
 				}
 			}
 		}
