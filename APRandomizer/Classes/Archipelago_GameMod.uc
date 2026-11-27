@@ -4343,29 +4343,23 @@ function OnLoadoutChanged(PlayerController controller, Object loadout, Object ba
 		return;
 	
 	// remove base game umbrella in favor of our own. This is the umbrella check in Mafia Town.
-	// Also remove weapons from mods
-	if (class<Hat_Weapon_Umbrella>(item.BackpackClass) != None 
+	// Also remove weapons from mods if we have no Umbrella item.
+	if (class<Hat_Weapon>(item.BackpackClass) != None && class<Hat_Weapon_Unarmed>(item.BackpackClass) == None
 		|| class<Hat_Weapon_Unarmed>(item.BackpackClass) != None && item.BackpackClass != class'Hat_Weapon_Unarmed' && item.BackpackClass != class'Archipelago_Weapon_Unarmed')
 	{
-		Hat_Loadout(loadout).RemoveBackpack(item);
-		Hat_Loadout(loadout).RemoveLoadout(item.BackpackClass, true); // To get rid of those pesky Steam weapon skins
 		if (!Hat_Loadout(loadout).BackpackHasInventory(class'Archipelago_Weapon_Umbrella', true))
 		{
+			Hat_Loadout(loadout).RemoveBackpack(item);
+			Hat_Loadout(loadout).RemoveLoadout(item.BackpackClass, true); // To get rid of those pesky Steam weapon skins
 			ReplaceUnarmedWeapon();
-			if (Hat_Loadout(loadout).MyLoadout.Weapon == None)
+			if (Hat_Loadout(loadout).MyLoadout.Weapon == None) // This probably means UmbrellaLogic is off, so equip default fists
 			{
 				item.BackpackClass = class'Hat_Weapon_Unarmed';
 				Hat_PlayerController(controller).MyLoadout.AddBackpack(item, true, true, Hat_Player(controller.Pawn));
 			}
 		}
-		else
-		{
-			item.BackpackClass = SlotData.BaseballBat ? class'Archipelago_Weapon_BaseballBat' : class'Archipelago_Weapon_Umbrella';
-			Hat_PlayerController(controller).MyLoadout.AddBackpack(item, true, true, Hat_Player(controller.Pawn));
-		}
 
-		if (`GameManager.GetCurrentMapFilename() ~= "mafia_town" && `GameManager.IsCurrentAct(1)
-			&& item.BackpackClass == class'Hat_Weapon_Umbrella')
+		if (item.BackpackClass == class'Hat_Weapon_Umbrella' && `GameManager.GetCurrentMapFilename() ~= "mafia_town" && `GameManager.IsCurrentAct(1))
 		{
 			SendLocationCheck(UmbrellaCheck);
 			SetAPBits("UmbrellaCheck", 1);
