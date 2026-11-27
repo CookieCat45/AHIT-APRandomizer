@@ -151,7 +151,6 @@ function SaveGame()
 	}
 	
 	`SaveManager.SaveToFile(true);
-	//DebugMessage("Saved the game");
 }
 
 event Tick(float d)
