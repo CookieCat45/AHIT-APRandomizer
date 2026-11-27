@@ -31,4 +31,5 @@ defaultproperties
 	IdleAudioComponent = IdleAudioComponent0;
 	
 	HUDIcon = Texture2D'HatInTime_Hud.Textures.Collectibles.collectible_timepiece';
+	DisplayName = "Time Piece"
 }

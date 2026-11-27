@@ -2,7 +2,7 @@ class Archipelago_RandomizedItem_BadgeOneHitDeath extends Archipelago_Randomized
 
 defaultproperties
 {
-	InventoryClass = class'Hat_Badge_OneHitDeath';
+	InvClass = class'Hat_Badge_OneHitDeath';
     HUDIcon = Texture2D'HatInTime_Hud_ItemIcons.Badges.badge_onehithero'
 	
     Begin Object Name=Model2

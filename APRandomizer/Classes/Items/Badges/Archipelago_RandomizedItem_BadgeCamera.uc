@@ -2,7 +2,7 @@ class Archipelago_RandomizedItem_BadgeCamera extends Archipelago_RandomizedItem_
 
 defaultproperties
 {
-  InventoryClass = class'Hat_Ability_Camera';
+  InvClass = class'Hat_Ability_Camera';
   HUDIcon = Texture2D'HatInTime_Hud_ItemIcons.Badges.badge_camera'
 
   Begin Object Name=Model2

@@ -10,7 +10,7 @@ defaultproperties
 		MaxDrawDistance = 99900;
 	End Object
 	
-	InventoryClass = class'Archipelago_Weapon_Umbrella';
+	InvClass = class'Archipelago_Weapon_Umbrella';
 	HUDIcon = Texture2D'HatInTime_Hud_Loadout.Item_Icons.umbrella_large';
 	HUDIcon2 = Texture2D'HatInTime_Hud_ItemIcons3.NyakuzaBat';
 }

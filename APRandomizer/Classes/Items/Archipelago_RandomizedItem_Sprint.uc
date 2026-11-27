@@ -2,7 +2,7 @@ class Archipelago_RandomizedItem_Sprint extends Archipelago_RandomizedItem_Base;
 
 defaultproperties
 {
-    InventoryClass = class'Hat_Ability_Sprint';
+    InvClass = class'Hat_Ability_Sprint';
     HUDIcon = Texture2D'HatInTime_Hud_ItemIcons.Hats.sprint_hat'
     Begin Object Class=SkeletalMeshComponent Name=Mesh0
         SkeletalMesh = SkeletalMesh'HatInTime_Costumes.models.sprint_hat_2017'

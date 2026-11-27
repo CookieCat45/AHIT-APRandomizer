@@ -1,0 +1,1 @@
+class Archipelago_Collectible_TreasureBit extends Hat_Collectible_TreasureBit; // dummy class, see Archipelago_GameMod::OnPreBreakableBreak()

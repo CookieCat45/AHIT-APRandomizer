@@ -21,6 +21,6 @@ defaultproperties
 	RotationComponents.Add(Mesh1);
 	Mesh=Mesh1
 
-	InventoryClass = class'Hat_Collectible_MetroTicket_RouteD';
+	InvClass = class'Hat_Collectible_MetroTicket_RouteD';
 	HUDIcon = Texture2D'HatInTime_Hud_ItemIcons3.MetroTicket_Red';
 }

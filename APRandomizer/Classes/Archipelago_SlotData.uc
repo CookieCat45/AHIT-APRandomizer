@@ -14,6 +14,7 @@ var bool PlayerNamesInitialized;
 var bool ConnectedOnce;
 
 var int PlayerSlot;
+var int Team;
 var string SlotName;
 var string Password;
 var string Host;
@@ -22,10 +23,12 @@ var int ShopItemRandStep;
 var string Seed;
 var string SeedName;
 var array<int> CheckedLocations;
+var array<int> ExistingLocations;
 var array<int> PageLocationIDs;
 var array<string> PendingCompletedActs;
 var array<class< Hat_SnatcherContract_DeathWish > > PendingCompletedDeathWishes;
 var Vector LastSpaceshipLocation;
+var JsonObject DWCompletedObjectives;
 
 var int Goal;
 var int TotalLocations;
@@ -36,6 +39,10 @@ var bool ShuffleActContracts;
 var bool ShuffleZiplines;
 var bool ShuffleSubconPaintings;
 var bool NoPaintingSkips;
+var bool LockHomingAttack;
+var bool LockObjectGrab;
+var bool SkipAlpineIntro;
+var int DeadBirdWinner;
 var int CTRLogic;
 var bool UmbrellaLogic;
 var bool DeathLink;
@@ -43,6 +50,7 @@ var int DeathLinkAmnesty;
 var int DWDeathLinkAmnesty;
 var bool ShuffleDirectorTokens;
 var bool HatItems;
+var int ShuffleRiftPons;
 
 var bool DLC1;
 var bool Tasksanity;
@@ -52,6 +60,7 @@ var int TasksanityTaskStep;
 var int TasksanityCheckCount;
 var int TaskStep;
 var int CompletedTasks;
+var int CompletedTasksDW;
 
 var bool DLC2;
 var int NoTicketSkips; // 2 means only Rush Hour ticket skips are allowed in logic
@@ -63,11 +72,14 @@ var bool BonusRewards;
 var bool DeathWishShuffle;
 var bool DeathWishOnly;
 var int DeathWishTPRequirement;
+var int LockDeathWishes;
 var array<class<Hat_SnatcherContract_DeathWish> > ShuffledDeathWishes;
 var array<class<Hat_SnatcherContract_DeathWish> > CompletedDeathWishes;
 var array<class<Hat_SnatcherContract_DeathWish> > PerfectedDeathWishes;
+var array<class<Hat_SnatcherContract_DeathWish> > ObtainedDeathWishRewards;
 var array<class<Hat_SnatcherContract_DeathWish> > ExcludedContracts;
 var array<class<Hat_SnatcherContract_DeathWish> > ExcludedBonuses;
+var array<DeathWishRewardInfo> DeathWishRewardItems;
 
 var bool StartWithCompassBadge;
 var int CompassBadgeMode;

@@ -2,7 +2,7 @@ class Archipelago_RandomizedItem_BadgeScooter extends Archipelago_RandomizedItem
 
 defaultproperties
 {
-	InventoryClass = class'Hat_Badge_Scooter';
+	InvClass = class'Hat_Badge_Scooter';
   HUDIcon = Texture2D'HatInTime_Hud_Loadout.Item_Icons.itemicon_badge_scooter';
 	
     Begin Object Name=Model2

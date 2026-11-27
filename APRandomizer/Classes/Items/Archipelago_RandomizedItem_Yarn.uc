@@ -44,9 +44,10 @@ defaultproperties
 	Components.Add(Model2);
 	RotationComponents.Add(Model2);
 	
-	InventoryClass = None;
+	InvClass = None;
 	
 	BadgeSnapParticle = ParticleSystem'HatInTime_PlayerAssets.Particles.ClothPointSnap';
 	CollectSound = SoundCue'HatinTime_SFX_UI.Badge_Pickup_SnappingCoin_cue';
 	HUDIcon = Texture2D'HatInTime_Hud_Loadout.Overview.cloth_points';
+	DisplayName = "Yarn"
 }

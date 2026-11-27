@@ -29,4 +29,5 @@ defaultproperties
 	RotationComponents.Add(Model2);
 	
 	HUDIcon = Texture2D'HatInTime_HUD_Contracts.Textures.itemicon_contract';
+	DisplayName = "Contract"
 }

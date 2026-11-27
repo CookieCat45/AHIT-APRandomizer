@@ -19,6 +19,9 @@ var array<int> VillagePaintingLocs;
 var array<int> SwampPaintingLocs;
 var array<int> CourtyardPaintingLocs;
 
+// Other
+var array<int> GrabRequiredLocs;
+
 function OnOpenHUD(HUD H, optional String command)
 {
 	local Archipelago_GameMod m;
@@ -27,6 +30,16 @@ function OnOpenHUD(HUD H, optional String command)
 	Super.OnOpenHUD(H, command);
 	m = `AP;
 	difficulty = m.SlotData.LogicDifficulty;
+	
+	if (difficulty <= `NORMAL)
+	{
+		// Twilight Travels
+		BrewingHatRequiredLocs.AddItem(2000354158);
+		BrewingHatRequiredLocs.AddItem(2000346231);
+		BrewingHatRequiredLocs.AddItem(2000352042);
+		BrewingHatRequiredLocs.AddItem(2000346229);
+	}
+	
 	if (difficulty >= `MODERATE)
 	{
 		// Subcon Well without Hookshot
@@ -55,6 +68,10 @@ function OnOpenHUD(HUD H, optional String command)
 		HookshotRequiredLocs.RemoveItem(2000304106);
 		DwellerMaskRequiredLocs.RemoveItem(2000305110);
 		DwellerMaskRequiredLocs.RemoveItem(2000304106);
+		
+		// Deep Sea
+		DwellerMaskRequiredLocs.RemoveItem(2000356260);
+		DwellerMaskRequiredLocs.RemoveItem(2000361260);
 	}
 	
 	if (difficulty >= `HARD)
@@ -64,18 +81,16 @@ function OnOpenHUD(HUD H, optional String command)
 		
 		// Dweller Platforming Tree B
 		DwellerMaskRequiredLocs.RemoveItem(2000324855);
+		
+		// Deep Sea
+		DwellerMaskRequiredLocs.RemoveItem(2000358266);
+		DwellerMaskRequiredLocs.RemoveItem(2000358319);
 	}
 	
 	if (difficulty >= `EXPERT)
 	{
 		// Mafia Town - Above Boats without Hookshot
 		HookshotRequiredLocs.RemoveItem(2000305218);
-		
-		// Mafia Town - Hot Air Balloon without Ice Hat
-		IceHatRequiredLocs.RemoveItem(2000304829);
-		
-		// Mafia Town - Top of Lighthouse without Hookshot
-		HookshotRequiredLocs.RemoveItem(2000304213);
 		
 		// Some Subcon locations without Hookshot
 		HookshotRequiredLocs.RemoveItem(2000324766);
@@ -98,6 +113,7 @@ function UpdateClosestMarker(HUD H)
 {
 	local Archipelago_RandomizedItem_Base item;
 	local Hat_Collectible_StoryBookPage page;
+	local Hat_Collectible_TreasureBit bit;
 	local Hat_TreasureChest_Base chest;
 	local Hat_Collectible_DeathWishLevelToken dwlt;
 	local Hat_Collectible_HighscoreToken token;
@@ -110,7 +126,7 @@ function UpdateClosestMarker(HUD H)
 	local Archipelago_ShopInventory_Base shop;
 	local Archipelago_GameMod m;
 	local LocationInfo locInfo;
-	local Actor a;
+	local Actor a, base;
 	
 	m = `AP;
 	if (m == None || m.SlotData == None)
@@ -125,7 +141,7 @@ function UpdateClosestMarker(HUD H)
 	mode = m.SlotData.CompassBadgeMode;
 	onlyImportant = (mode == 2 || mode == 3 && AreImportantItemsLeft(H));
 	
-	if (m.IsInSpaceship() && !m.IsLocationChecked(m.const.RumbiYarnCheck))
+	if (m.IsInSpaceship() && !m.IsLocationChecked(m.const.RumbiYarnCheck) && m.DoesLocationExist(m.const.RumbiYarnCheck))
 	{
 		// Point to Rumbi, most players don't realize that she is a check.
 		if (CanHitObjects())
@@ -151,9 +167,7 @@ function UpdateClosestMarker(HUD H)
 		UpdateClosestMarker_Actor(H, item, closest_distance, bestindx);
 	}
 	
-	if (m.SlotData.ShuffleDirectorTokens 
-		&& !class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false)
-		&& !`GameManager.IsCurrentAct(5))
+	if (m.SlotData.ShuffleDirectorTokens && !`GameManager.IsCurrentAct(5) && (`GameManager.IsCurrentAct(2) || class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Hookshot', true)))
 	{
 		foreach H.PlayerOwner.DynamicActors(class'Hat_Collectible_HighscoreToken', token)
 		{
@@ -165,20 +179,16 @@ function UpdateClosestMarker(HUD H)
 
 			UpdateClosestMarker_Actor(H, token, closest_distance, bestindx);
 		}
-
-		// we need hookshot for train rush so don't bother with these if not
-		if (class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Hookshot', true))
+		
+		foreach H.PlayerOwner.DynamicActors(class'Hat_Collectible_TimeBonus', timeBonus)
 		{
-			foreach H.PlayerOwner.DynamicActors(class'Hat_Collectible_TimeBonus', timeBonus)
-			{
-				locId = m.ObjectToLocationId(timeBonus);
-				if (!CanReachLocation(locId, H) || m.IsLocationChecked(locId)) continue;
+			locId = m.ObjectToLocationId(timeBonus);
+			if (!CanReachLocation(locId, H) || m.IsLocationChecked(locId)) continue;
 
-				locInfo = m.GetLocationInfoFromID(locId);
-				if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
+			locInfo = m.GetLocationInfoFromID(locId);
+			if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
 
-				UpdateClosestMarker_Actor(H, timeBonus, closest_distance, bestindx);
-			}
+			UpdateClosestMarker_Actor(H, timeBonus, closest_distance, bestindx);
 		}
 	}
 	
@@ -193,21 +203,95 @@ function UpdateClosestMarker(HUD H)
 		
 		locInfo = m.GetLocationInfoFromID(locId);
 		
-		if (class<Hat_Collectible_StoryBookPage>(chest.Content) == None)
-			if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
+		if (!m.SlotData.ShuffleStorybookPages && class<Hat_Collectible_StoryBookPage>(chest.Content) != None)
+			continue;
+			
+		if (class<Hat_Collectible_TreasureBit>(chest.Content) != None)
+		{
+			if (m.SlotData.ShuffleRiftPons == 0)
+				continue;
+				
+			if (m.SlotData.ShuffleRiftPons < 2 && class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false))
+				continue;
+		}
+		
+		/*
+		if (class<Hat_Collectible_StoryBookPage>(chest.Content) == None && class<Hat_Collectible_TreasureBit>(chest.Content) == None)
+		{
+			if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) 
+				continue;
+		}
+		*/
+		
+		if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) 
+			continue;
 		
 		UpdateClosestMarker_Actor(H, chest, closest_distance, bestindx);
 	}
 	
-	foreach H.PlayerOwner.DynamicActors(class'Hat_Collectible_StoryBookPage', page)
+	if (m.SlotData.ShuffleStorybookPages)
 	{
-		locId = m.ObjectToLocationId(page);
-		if (!CanReachLocation(locId, H) || m.IsLocationChecked(locId)) continue;
-		
-		locInfo = m.GetLocationInfoFromID(locId);
-		if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
-		
-		UpdateClosestMarker_Actor(H, page, closest_distance, bestindx);
+		foreach H.PlayerOwner.DynamicActors(class'Hat_Collectible_StoryBookPage', page)
+		{
+			locId = m.ObjectToLocationId(page);
+			if (!CanReachLocation(locId, H) || m.IsLocationChecked(locId)) continue;
+			
+			locInfo = m.GetLocationInfoFromID(locId);
+			if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
+			
+			UpdateClosestMarker_Actor(H, page, closest_distance, bestindx);
+		}
+	}
+	
+	if (m.SlotData.ShuffleRiftPons > 0)
+	{
+		if (m.SlotData.ShuffleRiftPons >= 2 || !class'Hat_SnatcherContract_DeathWish'.static.IsAnyActive(false))
+		{
+			foreach H.PlayerOwner.DynamicActors(class'Hat_Collectible_TreasureBit', bit)
+			{
+				// attached to an enemy?
+				base = bit.GetBaseMost();
+				if (base != None && base.IsA('Hat_Enemy'))
+				{
+					if (!CanHurtMostEnemies())
+						continue;
+					
+					if (Hat_Enemy(base).OnlyVulnerableIfFoxMaskEquipped && !class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_FoxMask', true))
+					{
+						continue;
+					}
+					
+					if (base.IsA('Hat_Enemy_Mobster_Base') && !CanKillMafia())
+					{
+						continue;
+					}
+					
+					if (base.IsA('Hat_Enemy_MadCrow_Red') && m.SlotData.LockHomingAttack)
+					{
+						// Mad Crows can't be hurt by Ice Hat
+						if (`AP.GetAPBits("HasHomingAttack") == 0
+							&& !class'Hat_Loadout'.static.BackpackHasInventory(class'Archipelago_Weapon_Umbrella', true)
+							&& !class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Chemical'))
+						{
+							continue;
+						}
+					}
+					
+					locId = m.ObjectToLocationId(base);
+				}
+				else
+				{
+					locId = m.ObjectToLocationId(bit);
+				}
+				
+				if (!CanReachLocation(locId, H) || m.IsLocationChecked(locId)) continue;
+				
+				locInfo = m.GetLocationInfoFromID(locId);
+				if (locInfo.ID <= 0 || onlyImportant && locInfo.Flags == ItemFlag_Garbage) continue;
+				
+				UpdateClosestMarker_Actor(H, bit, closest_distance, bestindx);
+			}
+		}
 	}
 	
 	hasBrewing = class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Chemical', true);
@@ -438,23 +522,45 @@ function bool UpdateClosestMarker_Actor(HUD H, Actor item, out float closest_dis
 
 function bool CanReachLocation(int id, HUD H)
 {
-	local bool hookshot, cannon, finale;
+	local bool hookshot, cannon, finale, canHurtMostEnemies;
 	local int paintingUnlock, difficulty, act;
 	local Archipelago_GameMod m;
 	local string mapName;
 	local Hat_Loadout lo;
 	
 	m = `AP;
+	if (!m.DoesLocationExist(id))
+		return false;
+	
 	mapName = `GameManager.GetCurrentMapFilename();
 	lo = Hat_PlayerController(H.PlayerOwner).MyLoadout;
 	difficulty = m.SlotData.LogicDifficulty;
 	act = `GameManager.GetCurrentAct();
 	hookshot = lo.BackpackHasInventory(class'Hat_Ability_Hookshot');
+	paintingUnlock = m.GetPaintingUnlocks();
+	if (!CanGrabObjects())
+	{
+		// If we can't grab the paintings, we effectively have zero
+		paintingUnlock = 0;
+	}
+
+	canHurtMostEnemies = class'Archipelago_HUDElementItemFinder'.static.CanHurtMostEnemies();
 
 	// Mafia Town secret cave item (crate blocking the cave is removed in act 6)
 	if (id == 2000305220)
 	{
 		return act == 6 || lo.BackpackHasInventory(class'Hat_Ability_Chemical');
+	}
+
+	// Old guys in Mafia Town
+	if (id == 2000303832)
+	{
+		return CanKillMafia();
+	}
+	else if (id == 2000303833)
+	{
+		// You can easily kick a can at the ones near Seaside Spaghetti, but that means knowing of it
+		return CanKillMafia() || difficulty >= `MODERATE;
 	}
 	
 	// Is the cannon to Mafia HQ accessible?
@@ -466,22 +572,37 @@ function bool CanReachLocation(int id, HUD H)
 	// Chest behind Mafia HQ
 	if (id == 2000303486)
 	{
-		return cannon;
+		return cannon || act != 6 && difficulty >= `EXPERT && CanGrabObjects();
 	}
 	
 	// Mafia Town - Above Boats
 	if (id == 2000305218)
 	{
-		// Ice hat slide?
-		if (difficulty >= `MODERATE && lo.BackpackHasInventory(class'Hat_Ability_StatueFall'))
+		if (difficulty >= `MODERATE && act == 6)
 		{
+			// Can bounce across lava to get this
 			return true;
 		}
+	}
+
+	// Mafia Town - Hot Air Balloon
+	if (id == 2000304829)
+	{
+		return difficulty >= `EXPERT && CanGrabObjects() || lo.BackpackHasInventory(class'Hat_Ability_StatueFall');
+	}
+	
+	// Mafia Town - Top of Lighthouse
+	if (id == 2000304213)
+	{
+		return difficulty >= `EXPERT && CanGrabObjects() || hookshot;
 	}
 	
 	// Subcon boss arena chest
 	if (id == 2000323735)
 	{
+		if (!CanGrabObjects())
+			return false;
+
 		// Cherry hover
 		if (difficulty >= `EXPERT && CanSkipPaintings())
 			return true;
@@ -489,13 +610,13 @@ function bool CanReachLocation(int id, HUD H)
 		// Cherry bridge
 		if (difficulty >= `HARD)
 		{
-			return !m.SlotData.ShuffleSubconPaintings || m.GetPaintingUnlocks() >= 1;
+			return !m.SlotData.ShuffleSubconPaintings || paintingUnlock >= 1;
 		}
 		
 		// Hookshot
 		if (act == 3)
 		{
-			return hookshot && (!m.SlotData.ShuffleSubconPaintings || m.GetPaintingUnlocks() >= 1);
+			return hookshot && (!m.SlotData.ShuffleSubconPaintings || paintingUnlock >= 1);
 		}
 		
 		// Always accessible here
@@ -504,8 +625,8 @@ function bool CanReachLocation(int id, HUD H)
 	
 	if (mapName ~= "subconforest" && act == 6)
 	{
-		// If below Hard, we can't cross the gap between the arena and the village
-		if (difficulty < `HARD)
+		// If below Hard or we can't grab, we can't cross the gap between the arena and the village
+		if (difficulty < `HARD || !CanGrabObjects())
 			return false;
 	}
 	
@@ -515,10 +636,29 @@ function bool CanReachLocation(int id, HUD H)
 		// Can we skip the big dweller wall?
 		if (difficulty >= `MODERATE)
 		{
-			return CanSkipPaintings() || m.GetPaintingUnlocks() >= 1;
+			return CanSkipPaintings() || paintingUnlock >= 1;
 		}
 		
-		return (CanSkipPaintings() || m.GetPaintingUnlocks() >= 1) && CanHitObjects(true);
+		return (CanSkipPaintings() || paintingUnlock >= 1) && CanHitObjects(true);
+	}
+
+	// Tour
+	if (id == 2000345087 || id == 2000344925 || id == 2000344917 || id == 2000344919 || id == 2000344921 || id == 2000344923)
+	{
+		if (CanGrabObjects())
+			return true;
+
+		return lo.BackpackHasInventory(class'Hat_Ability_FoxMask')
+			|| lo.BackpackHasInventory(class'Hat_Ability_Chemical')
+			|| difficulty >= `NORMAL && lo.BackpackHasInventory(class'Hat_Collectible_BadgePart_SuckInOrbs');
+	}
+	else if (id == 2000344910)
+	{
+		return CanGrabObjects() || difficulty >= `NORMAL && lo.BackpackHasInventory(class'Hat_Collectible_BadgePart_SuckInOrbs');
+	}
+	else if (id == 2000344927 || id == 2000344920)
+	{
+		return lo.BackpackHasInventory(class'Hat_Ability_FoxMask') || difficulty >= `NORMAL && lo.BackpackHasInventory(class'Hat_Collectible_BadgePart_SuckInOrbs');
 	}
 	
 	if (mapName ~= "alpsandsails")
@@ -609,7 +749,20 @@ function bool CanReachLocation(int id, HUD H)
 		if (!hookshot)
 		{
 			// Nearly impossible without Hookshot
-			return id == 2000346454 || id == 2000346452 || id == 2000346449;
+			if (id != 2000346454 && id != 2000346452 && id != 2000346449 && id != 2000355258 && id != 2000355260 && id != 2000355331
+				&& id != 2000360276 && id != 2000360321 && id != 2000360325)
+			{
+				return false;
+			}
+		}
+		
+		if (id == 2000355331)
+		{
+			// Can get w/Magnet
+			if (difficulty >= `NORMAL && lo.BackpackHasInventory(class'Hat_Collectible_BadgePart_SuckInOrbs'))
+			{
+				return true;
+			}
 		}
 	}
 	else if (mapName ~= "dlc_metro" && act == 8)
@@ -630,7 +783,13 @@ function bool CanReachLocation(int id, HUD H)
 		if (difficulty >= `MODERATE) // Can we skip the gap?
 			return true;
 		
-		return lo.BackpackHasInventory(class'Hat_Ability_TimeStop') || lo.BackpackHasInventory(class'Hat_Ability_Sprint');
+		return lo.BackpackHasInventory(class'Hat_Ability_TimeStop') || difficulty >= `NORMAL && lo.BackpackHasInventory(class'Hat_Ability_Sprint');
+	}
+	
+	// Mystifying Time Mesa gate puzzle
+	if (id == 2000336052 && difficulty == `EASY && !lo.BackpackHasInventory(class'Hat_Ability_TimeStop'))
+	{
+		return false;
 	}
 
 	// HUMT
@@ -661,11 +820,74 @@ function bool CanReachLocation(int id, HUD H)
 	}
 	
 	// Subcon long tree climb chest
-	if ((id == 2000323734) && (CanSkipPaintings() || m.GetPaintingUnlocks() >= 2))
+	if ((id == 2000323734) && (CanSkipPaintings() || paintingUnlock >= 2))
 	{
 		// Can we skip the climb?
-		if (difficulty >= `EXPERT || CanSDJ())
+		if (difficulty >= `EXPERT && CanGrabObjects() || CanSDJ())
 			return true;
+	}
+	
+	if (id == 2000323730)
+	{
+		if (paintingUnlock >= 1 && act != 6 || (CanSkipPaintings() || act == 6) && CanGrabObjects() && difficulty >= `EXPERT)
+		{
+			return true;
+		}
+		
+		return false;
+	}
+	
+	// Twilight Travels
+	if (mapName ~= "TimeRift_Cave_TwilightTravels")
+	{
+		if (!hookshot || !lo.BackpackHasInventory(class'Hat_Ability_FoxMask'))
+		{
+			if (id != 2000346232)
+			{
+				return false;
+			}
+		}
+		
+		if (id == 2000346231 || id == 2000354158)
+		{
+			// We need something to hit the bell to cross the gap
+			if (!lo.BackpackHasInventory(class'Hat_Ability_Chemical') 
+			&& (!lo.BackpackHasInventory(class'Archipelago_Weapon_Umbrella', true) || !lo.BackpackHasInventory(class'Hat_Badge_Weapon_Projectile')))
+			{
+				return false;
+			}
+		}
+		else if (id == 2000349912)
+		{
+			// Spider with a rift pon that's too high to hit with umbrella
+			if (m.SlotData.LockHomingAttack)
+			{
+				if (m.GetAPBits("HasHomingAttack") == 0
+					&& !lo.BackpackHasInventory(class'Hat_Ability_Chemical')
+					&& !lo.BackpackHasInventory(class'Hat_Ability_StatueFall'))
+				{
+					return false;
+				}
+			}
+		}
+	}
+	else if (mapName ~= "TimeRift_Cave_MountainRift")
+	{
+		// Mountain Rift
+		if (!lo.BackpackHasInventory(class'Hat_Ability_FoxMask'))
+		{
+			if (id != 2000351701 && id != 2000351703 && id != 2000351709
+			&& id != 2000345895 && id != 2000345894 && id != 2000345943)
+			{
+				return false;
+			}
+		}
+	}
+	
+	// Murder on the Owl Express rec room token
+	if (difficulty == `EASY && id == 2001104768 && !lo.BackpackHasInventory(class'Hat_Ability_StatueFall'))
+	{
+		return false;
 	}
 	
 	if (HookshotRequiredLocs.Find(id) != -1 && !hookshot)
@@ -680,10 +902,13 @@ function bool CanReachLocation(int id, HUD H)
 	if (BrewingHatRequiredLocs.Find(id) != -1 && !lo.BackpackHasInventory(class'Hat_Ability_Chemical'))
 		return false;
 	
+	if (difficulty == `EASY && CourtyardPaintingLocs.Find(id) != -1 && !lo.BackpackHasInventory(class'Hat_Ability_FoxMask'))
+	{
+		return false;
+	}
+	
 	if (m.SlotData.ShuffleSubconPaintings && mapName ~= "subconforest")
 	{
-		paintingUnlock = m.GetPaintingUnlocks();
-		
 		if (VillagePaintingLocs.Find(id) != -1)
 			return paintingUnlock >= 1 || CanSkipPaintings();
 		
@@ -692,6 +917,11 @@ function bool CanReachLocation(int id, HUD H)
 		
 		if (CourtyardPaintingLocs.Find(id) != -1)
 			return paintingUnlock >= 3 || CanSkipPaintings();
+	}
+
+	if (m.SlotData.LockObjectGrab && GrabRequiredLocs.Find(id) != -1 && !CanGrabObjects())
+	{
+		return false;
 	}
 	
 	// Nyakuza Metro
@@ -747,6 +977,23 @@ static function bool CanHitObjects(optional bool MaskBypass, optional bool Umbre
 	|| MaskBypass && class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_FoxMask');
 }
 
+static function bool CanHurtMostEnemies()
+{
+	return !`AP.SlotData.LockHomingAttack || `AP.GetAPBits("HasHomingAttack") > 0
+		|| class'Hat_Loadout'.static.BackpackHasInventory(class'Archipelago_Weapon_Umbrella', true) 
+		|| class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Chemical')
+		|| class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_StatueFall');
+}
+
+static function bool CanKillMafia()
+{
+	// Mafia need something to finish them off besides Umbrella
+	return !`AP.SlotData.LockHomingAttack || `AP.GetAPBits("HasHomingAttack") > 0
+		|| class'Hat_Loadout'.static.BackpackHasInventory(class'Archipelago_Weapon_Umbrella', true) && class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Badge_Weapon_Projectile')
+		|| class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Chemical')
+		|| class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_StatueFall');
+}
+
 static function bool TicketSkipsAllowed()
 {
 	return `AP.SlotData.NoTicketSkips == 0;
@@ -771,30 +1018,50 @@ static function bool CanSkipPaintings()
 	return true;
 }
 
+static function bool CanGrabObjects()
+{
+	if (!`AP.SlotData.LockObjectGrab)
+		return true;
+
+	return bool(`AP.GetAPBits("HasObjectGrab"));
+}
+
 defaultproperties
 {
 	IceHatRequiredLocs[0] = 2000304607;
 	IceHatRequiredLocs[1] = 2000304831;
-	IceHatRequiredLocs[2] = 2000304829;
-	IceHatRequiredLocs[3] = 2000304979;
-	IceHatRequiredLocs[4] = 2000304049;
+	IceHatRequiredLocs[2] = 2000304979;
+	IceHatRequiredLocs[3] = 2000304049;
+	IceHatRequiredLocs[4] = 2000354228;
+	IceHatRequiredLocs[5] = 2000355236;
 	
 	HookshotRequiredLocs[0] = 2000305218;
 	HookshotRequiredLocs[1] = 2000303481;
-	HookshotRequiredLocs[2] = 2000304213;
-	HookshotRequiredLocs[3] = 2000324766;
-	HookshotRequiredLocs[4] = 2000324856;
-	HookshotRequiredLocs[5] = 2000305432;
-	HookshotRequiredLocs[6] = 2000305059;
-	HookshotRequiredLocs[7] = 2000305057;
-	HookshotRequiredLocs[8] = 2000305061;
-	HookshotRequiredLocs[9] = 2000304813;
-	HookshotRequiredLocs[10] = 2000305058;
-	HookshotRequiredLocs[11] = 2000305431;
-	HookshotRequiredLocs[12] = 2000305819;
-	HookshotRequiredLocs[13] = 2000305110;
-	HookshotRequiredLocs[14] = 2000304106;
-	HookshotRequiredLocs[15] = 2000324311;
+	HookshotRequiredLocs[2] = 2000324766;
+	HookshotRequiredLocs[3] = 2000324856;
+	HookshotRequiredLocs[4] = 2000305432;
+	HookshotRequiredLocs[5] = 2000305059;
+	HookshotRequiredLocs[6] = 2000305057;
+	HookshotRequiredLocs[7] = 2000305061;
+	HookshotRequiredLocs[8] = 2000304813;
+	HookshotRequiredLocs[9] = 2000305058;
+	HookshotRequiredLocs[10] = 2000305431;
+	HookshotRequiredLocs[11] = 2000305819;
+	HookshotRequiredLocs[12] = 2000305110;
+	HookshotRequiredLocs[13] = 2000304106;
+	HookshotRequiredLocs[14] = 2000324311;
+	HookshotRequiredLocs[15] = 2000345896;
+	HookshotRequiredLocs[16] = 2000345901;
+	HookshotRequiredLocs[17] = 2000345896;
+	HookshotRequiredLocs[18] = 2000345901;
+	HookshotRequiredLocs[19] = 2000352713;
+	HookshotRequiredLocs[20] = 2000352776;
+	HookshotRequiredLocs[21] = 2000353814;
+	HookshotRequiredLocs[22] = 2000353766;
+	HookshotRequiredLocs[23] = 2000353821;
+	HookshotRequiredLocs[24] = 2000353856;
+	HookshotRequiredLocs[25] = 2000353775;
+	HookshotRequiredLocs[26] = 2000353830;
 	
 	DwellerMaskRequiredLocs[0] = 2000324767;
 	DwellerMaskRequiredLocs[1] = 2000324464;
@@ -809,6 +1076,15 @@ defaultproperties
 	DwellerMaskRequiredLocs[10] = 2000335826;
 	DwellerMaskRequiredLocs[11] = 2000305110;
 	DwellerMaskRequiredLocs[12] = 2000304106;
+	DwellerMaskRequiredLocs[13] = 2000345942;
+	DwellerMaskRequiredLocs[14] = 2000345892;
+	DwellerMaskRequiredLocs[15] = 2000345941;
+	DwellerMaskRequiredLocs[16] = 2000345896;
+	DwellerMaskRequiredLocs[17] = 2000345901;
+	DwellerMaskRequiredLocs[18] = 2000358266;
+	DwellerMaskRequiredLocs[19] = 2000358319;
+	DwellerMaskRequiredLocs[20] = 2000356260;
+	DwellerMaskRequiredLocs[21] = 2000361260;
 	
 	BrewingHatRequiredLocs[0] = 2000305701;
 	BrewingHatRequiredLocs[1] = 2000334758;
@@ -820,6 +1096,8 @@ defaultproperties
 	BrewingHatRequiredLocs[7] = 2000335492;
 	BrewingHatRequiredLocs[8] = 2000325479;
 	BrewingHatRequiredLocs[9] = 2000325478;
+	BrewingHatRequiredLocs[10] = 2000347214;
+	BrewingHatRequiredLocs[11] = 2000357270;
 	
 	BirdhousePathLocs[0] = 2000335911;
 	BirdhousePathLocs[1] = 2000335756;
@@ -882,4 +1160,21 @@ defaultproperties
 	CourtyardPaintingLocs[7] = 2000325082;
 	CourtyardPaintingLocs[8] = 2000324463;
 	CourtyardPaintingLocs[9] = 2000324766;
+
+	GrabRequiredLocs[0] = 2000303483;
+	GrabRequiredLocs[1] = 2000305387;
+	GrabRequiredLocs[2] = 2000303241;
+	GrabRequiredLocs[3] = 2000324761;
+	GrabRequiredLocs[4] = 2000325078;
+	GrabRequiredLocs[5] = 2000325077;
+	GrabRequiredLocs[6] = 2000325469;
+	GrabRequiredLocs[7] = 2000324465;
+	GrabRequiredLocs[8] = 2000323735;
+	GrabRequiredLocs[9] = 2000324114;
+	GrabRequiredLocs[10] = 2000304108;
+	GrabRequiredLocs[11] = 2000304048;
+	GrabRequiredLocs[12] = 2000304046;
+	GrabRequiredLocs[13] = 2000304049;
+	GrabRequiredLocs[14] = 2000325467;
+	GrabRequiredLocs[15] = 2000324766;
 }

@@ -2,7 +2,7 @@ class Archipelago_RandomizedItem_BadgeNoBonk extends Archipelago_RandomizedItem_
 
 defaultproperties
 {
-	InventoryClass = class'Hat_Ability_NoBonk';
+	InvClass = class'Hat_Ability_NoBonk';
   HUDIcon = Texture2D'HatInTime_Hud_Loadout.Item_Icons.itemicon_badge_sprint'
 	
     Begin Object Name=Model2

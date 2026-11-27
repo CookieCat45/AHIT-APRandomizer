@@ -142,3 +142,19 @@ exec function ap_closest_actors(float radius)
 		m.DebugMessage("ACTOR: " $a.Name $ ", DISTANCE: " $distance);
 	}
 }
+
+/*
+exec function ap_convert_rift_pons()
+{
+	local Hat_Collectible_TreasureBit bit;
+	local int oldId, id;
+	local Archipelago_GameMod m;
+	m = `AP;
+	foreach DynamicActors(class'Hat_Collectible_TreasureBit', bit)
+	{
+		oldId = m.ObjectToLocationIdOld(bit);
+		id = m.ObjectToLocationId(bit);
+		m.DebugMessage(bit.Name $" OLD ID = "$oldId $" ||| NEW ID = "$id);
+	}
+}
+*/

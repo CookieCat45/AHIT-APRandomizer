@@ -122,9 +122,9 @@ function ConnectToAP()
 event Tick(float d)
 {
 	local byte byteMessage[255];
-	local int count, i, a, k, bracket, attempts;
-	local string character, pong, msg, nullChar;
-	local bool b, validMsg;
+	local int count, i, bracket, attempts;
+	local string character, msg;
+	local bool validMsg;
 	
 	Super.Tick(d);
 	
@@ -148,121 +148,54 @@ event Tick(float d)
 		else
 		{
 			EmptyCount = 0;
-			
-			// Check for a ping
-			if (!ParsingMessage && count <= 10)
-			{
-				for (i = 0; i < count; i++)
-				{
-					// UnrealScript doesn't allow null characters in strings, so we need to do this crap
-					if (byteMessage[i] == byte(0))
-					{
-						if (nullChar != "")
-						{
-							msg $= nullChar;
-							continue;
-						}
-						
-						for (a = 33; a <= 255; a++)
-						{
-							b = false;
-							
-							for (k = 0; k < count; k++)
-							{
-								if (byteMessage[k] == byte(a))
-								{
-									b = true;
-									break;
-								}
-							}
-							
-							if (!b)
-							{
-								nullChar = Chr(a);
-								msg $= nullChar;
-								break;
-							}
-						}
-						
-						continue;
-					}
-					
-					msg $= Chr(byteMessage[i]);
-				}
-				
-				for (i = 0; i < Len(msg); i++)
-				{
-					if (Asc(Mid("a"$msg, i, 1)) == `CODE_PING)
-					{
-						// Need to send the same data back as a pong
-						// This is a dumb way to do it, but whatever works.
-						pong = Mid(msg, InStr(msg, Chr(`CODE_PING), false, true));
-						pong = Mid(pong, 2);
-						SendBinaryMessage(pong, false, true, nullChar);
-						break;
-					}
-				}
-				
-				if (pong != "")
-					return;
-			}
-			
 			for (i = 0; i < count; i++)
 			{
 				character = Chr(byteMessage[i]);
 				CurrentMessage.AddItem(character);
-				
-				if (character == "[")
+				if (character == "[" && !ParsingMessage)
 				{
-					if (!ParsingMessage)
-					{
-						CurrentMessage.Length = 0;
-						ParsingMessage = true;
-					}
+					CurrentMessage.Length = 0;
+					ParsingMessage = true;
 				}
 			}
 		}
 	}
 	
-	if (ParsingMessage)
+	if (ParsingMessage && EmptyCount > 5)
 	{
-		if (EmptyCount > 5)
+		// We've got a JSON message, parse it
+		msg = "";
+		for (i = 0; i < CurrentMessage.Length; i++)
 		{
-			// We've got a JSON message, parse it
-			msg = "";
-			
-			for (i = 0; i < CurrentMessage.Length; i++)
+			if (CurrentMessage[i] == "{")
 			{
-				if (CurrentMessage[i] == "{")
-				{
-					if (!validMsg && CurrentMessage[i+1] == "\"")
-						validMsg = true;
-					
-					if (validMsg)
-						bracket--;
-				}
-				else if (validMsg && CurrentMessage[i] == "}")
-				{
-					bracket++;
-				}
+				if (!validMsg && CurrentMessage[i+1] == "\"")
+					validMsg = true;
 				
 				if (validMsg)
-				{
-					msg $= CurrentMessage[i];
-					if (bracket >= 0)
-					{
-						ParseJSON(msg);
-						msg = "";
-						validMsg = false;
-						bracket = 0;
-					}
-				}
+					bracket--;
+			}
+			else if (validMsg && CurrentMessage[i] == "}")
+			{
+				bracket++;
 			}
 			
-			CurrentMessage.Length = 0;
-			ParsingMessage = false;
-			EmptyCount = 0;
+			if (validMsg)
+			{
+				msg $= CurrentMessage[i];
+				if (bracket >= 0)
+				{
+					ParseJSON(msg);
+					msg = "";
+					validMsg = false;
+					bracket = 0;
+				}
+			}
 		}
+		
+		CurrentMessage.Length = 0;
+		ParsingMessage = false;
+		EmptyCount = 0;
 	}
 }
 
@@ -292,7 +225,7 @@ function ParseJSON(string json)
 		}
 	}
 	
-	m.DebugMessage("[ParseJSON] Received command: " $json);
+	m.DebugMessage("[ParseJSON] Received command: " $json, , 2);
 	
 	// UnrealScript's JSON parser does not like []
 	json = Repl(json, "[{", "{");
@@ -304,7 +237,7 @@ function ParseJSON(string json)
 		m.ReplOnce(json, "slot", "my_slot", json);
 	}
 	
-	m.DebugMessage("[ParseJSON] Reformatted command: " $json);
+	m.DebugMessage("[ParseJSON] Reformatted command: " $json, , 2);
 	if (InStr(json, "\"RoomInfo\"") == -1 && InStr(json, "\"Connected\"") == -1)
 	{
 		// Security
@@ -342,12 +275,14 @@ function ParseJSON(string json)
 			m.OnPreConnected();
 			
 			if (!ShouldFilterSelfJoins())
+			{
 				m.ScreenMessage("Successfully connected to AP Client (" $m.SlotData.Host $":"$m.SlotData.Port $")");
+			}
 			
 			Reconnecting = false;
-			m.SlotData.PlayerSlot = jsonObj.GetIntValue("my_slot");
 			FullyConnected = true;
 			ConnectingToAP = false;
+			m.SlotData.PlayerSlot = jsonObj.GetIntValue("my_slot"); // should be removed in favor of the player slot number in slot data - this is just legacy support
 			
 			if (!m.SlotData.Initialized)
 			{
@@ -371,6 +306,11 @@ function ParseJSON(string json)
 					if (len(num) > 0 && s == ",")
 					{
 						locId = int(num);
+						if (m.SlotData.ExistingLocations.Find(locId) == -1)
+						{
+							m.SlotData.ExistingLocations.AddItem(locId);
+						}
+						
 						for (a = 0; a < m.SlotData.LocationInfoArray.Length; a++)
 						{
 							if (m.SlotData.LocationInfoArray[a].ID == locId)
@@ -406,6 +346,11 @@ function ParseJSON(string json)
 					if (len(num) > 0 && s == ",")
 					{
 						locId = int(num);
+						if (m.SlotData.ExistingLocations.Find(locId) == -1)
+						{
+							m.SlotData.ExistingLocations.AddItem(locId);
+						}
+						
 						if (!m.IsLocationChecked(locId) && missingLocs.Find(locId) == -1)
 						{
 							m.SlotData.CheckedLocations.AddItem(locId);
@@ -457,6 +402,7 @@ function ParseJSON(string json)
 					if (jsonChild.GetIntValue("slot") == m.SlotData.PlayerSlot)
 					{
 						m.SlotData.SlotName = jsonChild.GetStringValue("name");
+						m.SlotData.Team = jsonChild.GetIntValue("team");
 					}
 				}
 				
@@ -626,17 +572,13 @@ function OnLocationInfoCommand(string json)
 	local array<class< Object > > shopItemClasses;
 	local Actor container;
 	local Archipelago_GameMod m;
-	
-	mapName = class'Hat_SaveBitHelper'.static.GetCorrectedMapFilename();
-	
-	// Fix for Rock the Boat
-	if (`GameManager.GetCurrentMapFilename() ~= "ship_sinking")
-		mapName = "ship_sinking";
+	local class<Hat_SnatcherContract_DeathWish> dw;
+	local DeathWishRewardInfo dwReward;
 	
 	m = `AP;
+	mapName = m.GetMapName();
 	m.ReplOnce(json, "locations", "locations_0", json, true);
 	count = 0;
-	
 	while (m.ReplOnce(json, ",{", ",\"locations_" $count+1 $"\":{", s, false))
 	{
 		json = s;
@@ -669,6 +611,9 @@ function OnLocationInfoCommand(string json)
 		
 		foreach DynamicActors(class'Hat_Collectible_Important', collectible)
 		{
+			if (collectible.IsA('Archipelago_RandomizedItem_Base'))
+				continue;
+			
 			if (collectible.IsA('Hat_Collectible_VaultCode_Base') || collectible.IsA('Hat_Collectible_InstantCamera')
 				|| collectible.IsA('Hat_Collectible_Sticker') || collectible.IsA('Hat_Collectible_MetroTicket_Base'))
 				continue;
@@ -721,6 +666,16 @@ function OnLocationInfoCommand(string json)
 			m.SlotData.LocationInfoArray.AddItem(locInfo);
 			continue;
 		}
+
+		dw = class'Archipelago_ItemInfo'.static.GetDeathWishFromLocationID(locId-class'Archipelago_GameMod'.const.DWRewardIDOffset);
+		if (dw != None)
+		{
+			// Death Wish reward visual
+			class'Archipelago_ItemInfo'.static.GetNativeItemData(m.GetStringValue2(jsonChild, "item"), locInfo.ItemClass);
+			dwReward.DeathWish = dw;
+			dwReward.RewardClass = locInfo.ItemClass;
+			m.SlotData.DeathWishRewardItems.AddItem(dwReward);
+		}
 		
 		if (locId == m.CameraBadgeCheck1 || locId == m.CameraBadgeCheck2)
 		{
@@ -763,6 +718,7 @@ function OnLocationInfoCommand(string json)
 		m.SlotData.ScoutedMaps.AddItem(Locs(mapName));
 	}
 	
+	m.ReplaceDeathWishRewards();
 	m.SaveGame();
 	
 	jsonObj = None;
@@ -802,8 +758,8 @@ function OnReceivedItemsCommand(string json)
 	
 	// This means we are reconnecting to a previous session, and the server is giving us our entire list of items,
 	// so we need to begin from the next new item in our list or don't give anything otherwise
-	m.DebugMessage("serverIndex: "$serverIndex);
-	m.DebugMessage("index: "$index);
+	//m.DebugMessage("serverIndex: "$serverIndex);
+	//m.DebugMessage("index: "$index);
 	if (serverIndex == 0 && index > 0)
 	{
 		if (index > count)
@@ -821,7 +777,7 @@ function OnReceivedItemsCommand(string json)
 		start = 0;
 	}
 	
-	m.DebugMessage("start: "$start);
+	//m.DebugMessage("start: "$start);
 	for (i = start; i <= count; i++)
 	{
 		jsonChild = jsonObj.GetObject("items_"$i);
@@ -861,7 +817,7 @@ function GrantItem(int itemId)
 		if (item != None)
 		{
 			if (invOverride != None) // override? (probably a relic)
-				item.InventoryClass = invOverride;
+				item.InvClass = invOverride;
 		
 			item.PickupActor = player;
 			item.OnCollected(player);
@@ -892,6 +848,25 @@ function GrantItem(int itemId)
 		{
 			// This is a hat, make sure hats are in the correct order for swapping
 			`AP.SortPlayerHats();
+		}
+		else if (itemId == 2000300054)
+		{
+			`AP.SetAPBits("HasHomingAttack", 1);
+		}
+		else if (itemId == 2000300055)
+		{
+			`AP.SetAPBits("HasObjectGrab", 1);
+			`AP.ToggleCarryAbility();
+		}
+		else if (itemId == 2000340000)
+		{
+			// Progressive Death Wish Contract
+			`AP.SetAPBits("ProgressiveDeathWish", `AP.GetAPBits("ProgressiveDeathWish") + 1);
+		}
+		else if (itemId >= 2000350000 && itemId <= 2000350074)
+		{
+			// Death Wish individual contract unlock
+			`AP.SetAPBits("DeathWishUnlocked_"$itemId, 1);
 		}
 		else
 		{
@@ -1120,6 +1095,12 @@ function bool GiveRandomSkin(array<class< Object > > skins)
 		if (class<Hat_Collectible_Skin>(skins[i]).default.RequiredDLC != None &&
 			!class'Hat_GameDLCInfo'.static.IsGameDLCInfoInstalled(class<Hat_Collectible_Skin>(skins[i]).default.RequiredDLC))
 			continue;
+			
+		if (class<Hat_Collectible_Skin>(skins[i]).default.InventoryItemID > 0)
+		{
+			// Skip Steam inventory items
+			continue;
+		}
 		
 		if (!lo.BackpackHasInventory(class<Hat_Collectible_Skin>(skins[i]))
 		&& class<Hat_Collectible_Skin>(skins[i]).default.ItemQuality != None)
@@ -1157,6 +1138,12 @@ function bool GiveRandomFlair(array<class< Object > > flairs)
 		
 		if (class<Hat_CosmeticItemQualityInfo>(flairs[i]).default.SkinWeApplyTo != None)
 			continue;
+			
+		if (class<Hat_CosmeticItemQualityInfo>(flairs[i]).default.OnlineItemID > 0)
+		{
+			// Skip Steam inventory items
+			continue;
+		}
 		
 		if (!lo.BackpackHasInventory(class<Hat_CosmeticItemQualityInfo>(flairs[i]).static.GetBaseCosmeticItemWeApplyTo(), true, class<Hat_CosmeticItemQualityInfo>(flairs[i])) 
 			&& class<Hat_CosmeticItemQualityInfo>(flairs[i]).default.CosmeticItemWeApplyTo != None
@@ -1169,9 +1156,12 @@ function bool GiveRandomFlair(array<class< Object > > flairs)
 	if (candidates.Length > 0)
 	{
 		chosen = candidates[RandRange(0, candidates.Length-1)];
-		`AP.ScreenMessage("Got Flair: "$class<Hat_Ability>(chosen.default.CosmeticItemWeApplyTo).static.GetLocalizedName(chosen));
-		lo.AddBackpack(lo.MakeLoadoutItem(chosen.static.GetBaseCosmeticItemWeApplyTo(), chosen), false);
-		return true;
+		if (lo.AddBackpack(lo.MakeLoadoutItem(chosen.static.GetBaseCosmeticItemWeApplyTo(), chosen), false))
+		{
+			`AP.ScreenMessage("Got Flair: "$class<Hat_Ability>(chosen.default.CosmeticItemWeApplyTo).static.GetLocalizedName(chosen));
+			Hat_SaveGame(`SaveManager.SaveData).MyBackpack2017.Hats[Hat_SaveGame(`SaveManager.SaveData).MyBackpack2017.Hats.Length-1].LastUseTime = 0; // fix auto equip
+			return true;
+		}
 	}
 	
 	return false;

@@ -130,6 +130,13 @@ static function bool GetNativeItemData(string itemId, // Archipelago item ID
 optional out class<Actor> worldClass, // Item in the world
 optional out class<Actor> inventoryOverride) // Item inventory class override. Mainly for relics.
 {
+	if (int(itemId) == 2000340000 || int(itemId) >= 2000350000 && int(itemId) <= 2000350074)
+	{
+		// Death Wish contract unlock
+		worldClass = class'Archipelago_RandomizedItem_Contract';
+		return true;
+	}
+	
 	switch (int(itemId))
 	{
 		case YarnItem:
@@ -406,6 +413,14 @@ optional out class<Actor> inventoryOverride) // Item inventory class override. M
 			worldClass = class'Archipelago_RandomizedItem_MetroTicketPink';
 			return true;
 		
+		case 2000300054: // Homing Attack (TODO add visual)
+			worldClass = class'Archipelago_RandomizedItem_Misc';
+			return true;
+
+		case 2000300055: // Object Grab (TODO add visual)
+			worldClass = class'Archipelago_RandomizedItem_Misc';
+			return true;
+
 		default:
 			worldClass = class'Archipelago_RandomizedItem_Misc';
 			return false;
@@ -576,4 +591,20 @@ static function int GetDeathWishLocationID(class<Hat_SnatcherContract_DeathWish>
 	}
 
 	return -1;
+}
+
+static function class<Hat_SnatcherContract_DeathWish> GetDeathWishFromLocationID(int id)
+{
+	local array<class<Object > > DeathWishes;
+	local int i;
+	DeathWishes = class'Hat_ClassHelper'.static.GetAllScriptClasses("Hat_SnatcherContract_DeathWish");
+	for (i = 0; i < DeathWishes.Length; i++)
+	{
+		if (class'Archipelago_ItemInfo'.static.GetDeathWishLocationID(class<Hat_SnatcherContract_DeathWish>(DeathWishes[i])) == id)
+		{
+			return class<Hat_SnatcherContract_DeathWish>(DeathWishes[i]);
+		}
+	}
+
+	return None;
 }

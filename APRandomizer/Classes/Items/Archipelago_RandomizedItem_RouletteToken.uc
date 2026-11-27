@@ -21,5 +21,6 @@ defaultproperties
 	Mesh=Mesh1;
 	HUDIcon = Texture2D'HatInTime_Hud_ItemIcons.Misc.token_icon'
 	
-	//InventoryClass = class'Hat_Collectible_RouletteToken';
+	//InvClass = class'Hat_Collectible_RouletteToken';
+	DisplayName = "Random Cosmetic"
 }
