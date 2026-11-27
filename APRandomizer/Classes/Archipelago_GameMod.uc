@@ -2094,9 +2094,15 @@ function OnPreOpenHUD(HUD InHUD, out class<Object> InHUDElement)
 	if (!IsArchipelagoEnabled())
 		return;
 	
+	// check for subclasses of these, because there are mods that can replace them
 	if (class<Hat_HUDMenuLoadout>(InHUDElement) != None)
 	{
 		Hat_HUD(InHUD).OpenHUD(class'Archipelago_HUDElementInfoButton', , true);
+		return;
+	}
+	else if (class<Hat_HUDMenuShop>(InHUDElement) != None)
+	{
+		SetTimer(0.0001, false, NameOf(CheckShopOverride), self, Hat_HUD(InHUD));
 		return;
 	}
 
@@ -2136,11 +2142,7 @@ function OnPreOpenHUD(HUD InHUD, out class<Object> InHUDElement)
 		case class'Hat_HUDElementRareStickerAlert':
 			SetTimer(0.0001, false, NameOf(RemoveRareStickerAlert), self, Hat_HUD(InHUD));
 			break;
-		
-		case class'Hat_HUDMenuShop':
-			SetTimer(0.0001, false, NameOf(CheckShopOverride), self, Hat_HUD(InHUD));
-			break;
-		
+
 		case class'Hat_HUDMenuActSelect':
 			if (!SlotData.DeathWishOnly)
 				InHUDElement = class'Archipelago_HUDMenuActSelect';
@@ -2385,7 +2387,7 @@ function CheckShopOverride(Hat_HUD hud)
 		return;
 	
 	shopInvs = class'Hat_ClassHelper'.static.GetAllScriptClasses("Archipelago_ShopInventory_Base");
-	shop = Hat_HUDMenuShop(hud.GetHUD(class'Hat_HUDMenuShop'));
+	shop = Hat_HUDMenuShop(hud.GetHUD(class'Hat_HUDMenuShop', true));
 	merchant = shop.MerchantActor;
 	
 	if (merchant.IsA('Hat_NPC_MetroCreepyCat_FoodShop') || merchant.IsA('Hat_NPC_MetroHelpDesk'))
