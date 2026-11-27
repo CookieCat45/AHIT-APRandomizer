@@ -618,6 +618,13 @@ function bool Tick(HUD H, float d)
 			mod.SendLocationCheck(class'Archipelago_ItemInfo'.static.GetDeathWishLocationID(AwardRewardDeathWish.DeathWish) + class'Archipelago_GameMod'.const.DWRewardIDOffset);
 			AwardRewardDeathWish.RewardObtained = true;
 			AwardRewardDeathWish = None;
+			foreach DeathWishes(icon)
+			{
+				if (!icon.RewardObtained && icon.DeathWish != None && mod.SlotData.ObtainedDeathWishRewards.Find(icon.DeathWish) != -1)
+				{
+					icon.RewardObtained = true;
+				}
+			}
 		}
 
 		CountStamps();

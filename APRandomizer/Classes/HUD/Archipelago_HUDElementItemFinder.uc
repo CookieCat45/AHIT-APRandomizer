@@ -249,23 +249,41 @@ function UpdateClosestMarker(HUD H)
 		{
 			foreach H.PlayerOwner.DynamicActors(class'Hat_Collectible_TreasureBit', bit)
 			{
-				if (!bit.CanBeMagnetized)
+				// attached to an enemy?
+				base = bit.GetBaseMost();
+				if (base != None && base.IsA('Hat_Enemy'))
 				{
-					// attached to an enemy
 					if (!CanHurtMostEnemies())
 						continue;
-						
-					if (!class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_FoxMask', true))
+					
+					if (Hat_Enemy(base).OnlyVulnerableIfFoxMaskEquipped && !class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_FoxMask', true))
 					{
-						base = bit.GetBaseMost();
-						if (base != None && base != bit && base.IsA('Hat_Enemy') && Hat_Enemy(base).OnlyVulnerableIfFoxMaskEquipped)
+						continue;
+					}
+					
+					if (base.IsA('Hat_Enemy_Mobster_Base') && !CanKillMafia())
+					{
+						continue;
+					}
+					
+					if (base.IsA('Hat_Enemy_MadCrow_Red') && m.SlotData.LockHomingAttack)
+					{
+						// Mad Crows can't be hurt by Ice Hat
+						if (`AP.GetAPBits("HasHomingAttack") == 0
+							&& !class'Hat_Loadout'.static.BackpackHasInventory(class'Archipelago_Weapon_Umbrella', true)
+							&& !class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Chemical'))
 						{
 							continue;
 						}
 					}
+					
+					locId = m.ObjectToLocationId(base);
+				}
+				else
+				{
+					locId = m.ObjectToLocationId(bit);
 				}
 				
-				locId = m.ObjectToLocationId(bit);
 				if (!CanReachLocation(locId, H) || m.IsLocationChecked(locId)) continue;
 				
 				locInfo = m.GetLocationInfoFromID(locId);
@@ -537,11 +555,12 @@ function bool CanReachLocation(int id, HUD H)
 	// Old guys in Mafia Town
 	if (id == 2000303832)
 	{
-		return canHurtMostEnemies;
+		return CanKillMafia();
 	}
 	else if (id == 2000303833)
 	{
-		return canHurtMostEnemies || difficulty >= `MODERATE;
+		// You can easily kick a can at the ones near Seaside Spaghetti, but that means knowing of it
+		return CanKillMafia() || difficulty >= `MODERATE;
 	}
 	
 	// Is the cannon to Mafia HQ accessible?
@@ -966,6 +985,15 @@ static function bool CanHurtMostEnemies()
 		|| class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_StatueFall');
 }
 
+static function bool CanKillMafia()
+{
+	// Mafia need something to finish them off besides Umbrella
+	return !`AP.SlotData.LockHomingAttack || `AP.GetAPBits("HasHomingAttack") > 0
+		|| class'Hat_Loadout'.static.BackpackHasInventory(class'Archipelago_Weapon_Umbrella', true) && class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Badge_Weapon_Projectile')
+		|| class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_Chemical')
+		|| class'Hat_Loadout'.static.BackpackHasInventory(class'Hat_Ability_StatueFall');
+}
+
 static function bool TicketSkipsAllowed()
 {
 	return `AP.SlotData.NoTicketSkips == 0;
@@ -1147,4 +1175,6 @@ defaultproperties
 	GrabRequiredLocs[11] = 2000304048;
 	GrabRequiredLocs[12] = 2000304046;
 	GrabRequiredLocs[13] = 2000304049;
+	GrabRequiredLocs[14] = 2000325467;
+	GrabRequiredLocs[15] = 2000324766;
 }

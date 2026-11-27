@@ -14,6 +14,7 @@ var bool PlayerNamesInitialized;
 var bool ConnectedOnce;
 
 var int PlayerSlot;
+var int Team;
 var string SlotName;
 var string Password;
 var string Host;
@@ -27,6 +28,7 @@ var array<int> PageLocationIDs;
 var array<string> PendingCompletedActs;
 var array<class< Hat_SnatcherContract_DeathWish > > PendingCompletedDeathWishes;
 var Vector LastSpaceshipLocation;
+var JsonObject DWCompletedObjectives;
 
 var int Goal;
 var int TotalLocations;

@@ -275,12 +275,14 @@ function ParseJSON(string json)
 			m.OnPreConnected();
 			
 			if (!ShouldFilterSelfJoins())
+			{
 				m.ScreenMessage("Successfully connected to AP Client (" $m.SlotData.Host $":"$m.SlotData.Port $")");
+			}
 			
 			Reconnecting = false;
-			m.SlotData.PlayerSlot = jsonObj.GetIntValue("my_slot");
 			FullyConnected = true;
 			ConnectingToAP = false;
+			m.SlotData.PlayerSlot = jsonObj.GetIntValue("my_slot"); // should be removed in favor of the player slot number in slot data - this is just legacy support
 			
 			if (!m.SlotData.Initialized)
 			{
@@ -400,6 +402,7 @@ function ParseJSON(string json)
 					if (jsonChild.GetIntValue("slot") == m.SlotData.PlayerSlot)
 					{
 						m.SlotData.SlotName = jsonChild.GetStringValue("name");
+						m.SlotData.Team = jsonChild.GetIntValue("team");
 					}
 				}
 				
@@ -1092,6 +1095,12 @@ function bool GiveRandomSkin(array<class< Object > > skins)
 		if (class<Hat_Collectible_Skin>(skins[i]).default.RequiredDLC != None &&
 			!class'Hat_GameDLCInfo'.static.IsGameDLCInfoInstalled(class<Hat_Collectible_Skin>(skins[i]).default.RequiredDLC))
 			continue;
+			
+		if (class<Hat_Collectible_Skin>(skins[i]).default.InventoryItemID > 0)
+		{
+			// Skip Steam inventory items
+			continue;
+		}
 		
 		if (!lo.BackpackHasInventory(class<Hat_Collectible_Skin>(skins[i]))
 		&& class<Hat_Collectible_Skin>(skins[i]).default.ItemQuality != None)
@@ -1129,6 +1138,12 @@ function bool GiveRandomFlair(array<class< Object > > flairs)
 		
 		if (class<Hat_CosmeticItemQualityInfo>(flairs[i]).default.SkinWeApplyTo != None)
 			continue;
+			
+		if (class<Hat_CosmeticItemQualityInfo>(flairs[i]).default.OnlineItemID > 0)
+		{
+			// Skip Steam inventory items
+			continue;
+		}
 		
 		if (!lo.BackpackHasInventory(class<Hat_CosmeticItemQualityInfo>(flairs[i]).static.GetBaseCosmeticItemWeApplyTo(), true, class<Hat_CosmeticItemQualityInfo>(flairs[i])) 
 			&& class<Hat_CosmeticItemQualityInfo>(flairs[i]).default.CosmeticItemWeApplyTo != None
